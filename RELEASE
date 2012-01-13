@@ -1,0 +1,11 @@
+Rlease check-list 
+-----------------
+
+* Change the release version in 
+    ./CHANGELOG,
+    ./pluggdapps/__init__.py
+* Update setup.py and MANIFEST.in for release
+* Create a tag and push the tagged branch to code.google.com & bitbucket.com
+* Upload the source into pypi.
+        make upload
+* After making the release, taging the branch, increment the version number.

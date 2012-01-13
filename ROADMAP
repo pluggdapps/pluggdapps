@@ -1,0 +1,63 @@
+Roadmap for tayra templating language
+
+h4. Language syntax and feature.
+
+* Syntax to break the text. like,
+    hello world <br> how are you
+  where <br> come anywhere in the `content` rule.
+* White space preservation.
+* Whitespace pruning,
+    before and after opening tag and closing tag (for outerprune)
+* @charset directive is pretty much a stale feature. Figure out how to use
+  that, without compromising on ttlconfig['input_encoding']
+* For attributes, the value, along with the "=" character, can be omitted
+  altogether if the value is the empty string, eg,
+    disabled, selected etc ...
+  To be handled as specifier option.
+* Enable wiki text as content selectable using the tag's specifier. like,
+    <div etx> **hello** world
+* Decorator for generating HTML based on client-agent.
+
+h4. Other features and functions.
+
+* Automatically detect the user-agent compatibility level with html and
+  generate elements in confirmance to it. This must play safe with the
+  following knobs,
+    - doctype specification in ttl file
+    - encoding specification in ttl file
+    - language specification in ttl file
+    - config params passed to compile the ttl file
+    - HTTP headers (or any other real-time info available from user agent)
+      denoting the user agent capabilities.
+* somehow find a way to pass the arguments to `body` function.
+* Just saw Adobe Egdge ... Can tayra be the keyboard version for addressing
+  the same market place as Adobe's ?
+* Ruby's code-block style syntax to write event-handlers for tag-elements.
+* Custom tag plugin for form generation.
+
+h4. Internals
+
+* Do not maintain context information with `igen` instead maintain that with
+  parser object.
+* Figure out a way to cache the plugins catogarised by initplugins() function.
+* html-entity-escaping in escape-filters, should text-contents need escape
+  filtering as well ?
+* making `devmod` as False seems to have degrading effect on performance.
+* Micro-templating similar to mako. This will demonstrate the true power of
+  StackMachine based design.
+  This requires a change in the filter-block syntax and symantics. It would be
+  better if it is possible to parse the filter-block as signature + siblings.
+
+h4. Administrative
+
+* Find a way to pass the body arguments programmatically via Renderer()
+* Generate beautiful html, using lxml
+
+-----
+
+{{{ Nested 
+# { 'font-size' : 'small', 'color' : 'gray' }
+Document edited using Vim <br>
+/* vim: set filetype=etx : */
+}}}
+
