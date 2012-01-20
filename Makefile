@@ -1,7 +1,7 @@
 develop :
-	rm -rf pluggdapps-env
-	virtualenv pluggdapps-env --no-site-packages
-	bash -c "source pluggdapps-env/bin/activate ; python ./setup.py develop"
+	rm -rf pa-env
+	virtualenv pa-env --no-site-packages
+	bash -c "source pa-env/bin/activate ; python ./setup.py develop"
 
 bdist_egg : copy
 	python ./setup.py bdist_egg
@@ -19,7 +19,7 @@ copy :
 	cp ROADMAP docs/ROADMAP
 
 cleanall : clean
-	rm -rf pluggdapps-env
+	rm -rf pa-env
 
 clean :
 	rm -rf build;

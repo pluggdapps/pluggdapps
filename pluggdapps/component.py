@@ -5,7 +5,14 @@
 # -*- coding: utf-8 -*-
 
 import sys, types
-from   utils    import getmodule
+from   utils        import getmodule
+
+__all__ = [ 
+    # API functions
+    'queryPlugin', 'queryPlugins', 'implements',
+    # Classes
+    'Interface', 'Plugin', 'Attribute'
+]
 
 def _reflect_interface( cls, name, bases, d ):
     """`cls` is class deriving from Interface baseclass and provides 
