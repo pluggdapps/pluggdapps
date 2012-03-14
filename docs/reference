@@ -1,0 +1,4 @@
+* Study `SocketServer` section under `Internet-Protocol-and-support` chapter.
+* Some notes on `poll` and `epoll` in unix systems.
+    http://linux.die.net/man/2/poll
+    http://linux.die.net/man/4/epoll
