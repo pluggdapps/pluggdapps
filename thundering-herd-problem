@@ -1,0 +1,24 @@
+The thundering herd problem occurs when a large number of processes waiting
+for an event are awoken when that event occurs, but only one process is able
+to proceed at a time. After the processes wake up, they all demand the
+resource and a decision must be made as to which process can continue. After
+the decision is made the remaining processes are put back to sleep, only to
+all wake up again to request access to the resource.
+
+This occurs repeatedly, until there are no more processes to be woken up.
+Because all the processes use system resources upon waking, it is more
+efficient if only one process is woken up at a time.
+
+This may render the computer unusable, but it can also be used as a technique
+if there is no other way to decide which process should continue (for example
+when programming with semaphores).
+
+Though the phrase is mostly used in computer science, it could be an
+abstraction of the observation seen when cattle are released from a shed or
+when wildebeest are crossing the Mara River. In both instances, the movement
+is suboptimal.
+
+Reference,
+    http://en.wikipedia.org/wiki/Thundering_herd_problem
+    http://www.catb.org/jargon/html/T/thundering-herd-problem.html
+    http://lkml.org/lkml/2004/5/2/108
