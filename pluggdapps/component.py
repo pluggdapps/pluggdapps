@@ -5,7 +5,11 @@
 # -*- coding: utf-8 -*-
 
 import sys, types
-from   utils        import getmodule
+from   utils        import whichmodule
+
+# TODO :
+#   1. How to check for multiple plugins by name name defined for same
+#      Interface.
 
 __all__ = [ 
     # API functions
@@ -16,20 +20,18 @@ __all__ = [
 
 def _reflect_interface( cls, name, bases, d ):
     """`cls` is class deriving from Interface baseclass and provides 
-    specification for interface `name`."""
-
-    # Get module specifying interface
-    clsmod = getmodule( cls.__module__ )
+    specification for interface `name`.
+    """
+    clsmod = whichmodule( cls )
     info = {
         'cls'  : cls,
         'file' : clsmod.__file__ if clsmod else '',
         'config' : {},      # Configuration dictionary for interface
         'attributes' : {},  # Map of attribute names and Attribute() object
         'methods' : {},     # Map of method names and method object
-        'plugins' : [],     # Map of plugin name and plugin-class
     }
 
-    # Collect attributes and methods specified by 
+    # Collect attributes and methods specified by `interface` class.
     for k in dir(cls) :
         if k.startswith('__') : continue
         v = getattr(cls, k)
@@ -42,12 +44,14 @@ def _reflect_interface( cls, name, bases, d ):
 
 
 def _reflect_plugin( cls, name, bases, d ):
-
-    # Get module implementing the plugin
-    clsmod = getmodule( cls.__module__ )
+    """`cls` is class deriving from Plugin baseclass and implements
+    interface specifications.
+    """
+    clsmod = whichmodule( cls.__module__ )
     info = {
-        'cls'  : cls,
-        'file' : clsmod.__file__ if clsmod else '',
+        'cls'    : cls,
+        'file'   : clsmod.__file__ if clsmod else '',
+        'config' : {}       # Configuration dictionary for plugin
     }
     return info
 
@@ -55,9 +59,16 @@ def _reflect_plugin( cls, name, bases, d ):
 class CompEnv( type ):
     """Plugin component manager."""
 
-    _interfaces = {}    # Collection of all interfaces
-    _plugins = {}       # Collection of all plugins
-    _implements = {}    # Map of plugins implementing interfaces
+    # Map of interface names (which is name of the class deriving Interface
+    # base class) and class object.
+    _clsInterfaces = {}
+
+    # Map of plugin names (which is name of the class deriving Plugin
+    # base class) and class object.
+    _clsPlugins = {}
+
+    # Map of interface class object and list of plugin-names.
+    _implementers = {}
 
     def __new__( cls, name, bases, d ):
         new_class = type.__new__( cls, name, bases, d )
@@ -66,19 +77,18 @@ class CompEnv( type ):
             return new_class
 
         if (Interface in bases) and (Plugin in bases) :
-            err = 'class cannot derive from both Interface and Plugin'
-            raise Exception( err )
+            raise Exception('Class `%s` derives both Interface and Plugin'%name)
 
         if Interface in bases :
-            if CompEnv._interfaces.has_key( name ) :
+            if CompEnv._clsInterfaces.has_key( name ) :
                 f = CompEnv._interface[name]['file']
-                err = 'Interface %r defined multiple times in %s' % f
-                raise Exception( err )
-            CompEnv._interfaces[name] = _reflect_interface(cls, name, bases, d)
+                raise Exception( 'Interface %r defined multiple times in %s'%f )
+            CompEnv._interface_class[name] = _reflect_interface(cls, name, bases, d)
         elif Plugin in bases :
-            CompEnv._plugins[name] = _reflect_plugin(cls, name, bases, d)
+            CompEnv._clsPlugins[name] = _reflect_plugin(cls, name, bases, d)
 
         return new_class
+
 
 class Interface( object ):
     """Base class for interface specifying classes. All interface-classes are
@@ -102,31 +112,30 @@ def implements( *interfaces ):
     """Declare interfaces implemented by class. This function can be called
     only in the context of a class deriving from Plugin class."""
     frame = sys._getframe(1)
-    CompEnv._implements[ frame.f_code.co_name ] = interfaces
+    pluginname = frame.f_code.co_name
+    for i in interfaces :
+        if pluginname in CompEnv._implementers[i] :
+            raise Exception( 'Plugin %s is defined twice.' % pluginname )
+        CompEnv._implementers.setdefault(i, []).append( pluginname )
 
 
 def queryPlugins( interface, *args, **kwargs ):
     """Use this API to query for plugins using the `interface` class it
     implements. Positional and keyword arguments will be used to instantiate
-    the plugin object, provided plugin definition has a `__call__` method .
+    the plugin object.
 
-    A note on plugin instantiation. If the plugin provide a callable interface
-    (i.e) there is a __call__ method available, then the plugin will be called
-    with *args and **kwargs arguments and expects a new instance of the
-    plugin.
-
-    Returns a list of plugin instance.
+    Returns a list of plugin instance implementing `interface`
     """
-    cs = CompEnv._interfaces.get(interface, {}).get('plugins', {}).values()
-    return [ c( *args, **kwargs ) for c in cs ]
+    return map( lambda nm : CompEnv._clsPlugins[nm]( *args, **kwargs )
+                CompEnv._implementers.get(interface, []) )
 
 
 def queryPlugin( interface, name, *args, **kwargs ):
     """Same as queryPlugins, but returns a single plugin instance as opposed
-    an entire list.
-    
-    If optional key-word argument ``_cls`` is passed, first matching plugin
-    class will be returned else, the first plugin instance, will be returned.
+    an entire list. Positional and keyword arguments will be used to 
+    instantiate the plugin object.
     """
-    p = CompEnv._interfaces.get(interface, {}).get('plugins', {}).get(name, None)
-    return p( *args, **kwargs )
+    if name in CompEnv._implementers.get( interface, [] ) :
+        return CompEnv._clsPlugins[name]( *args, **kwargs )
+    else :
+        return None

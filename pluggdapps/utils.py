@@ -6,8 +6,11 @@
 
 import sys
 
-def getmodule( name ):
-    return sys.modules.get( name, None )
+def whichmodule( attr ):
+    """If `attr` contains __module__ attribute use the attribute to fetch the
+    module object in which `attr` is defined"""
+    modname = getattr( attr, '__module__' )
+    return sys.modules.get( modname, None ) if modname else None
 
 def parsecsv( line ) :
     """Parse a single line of comma separated values, into a list of strings"""
