@@ -1,0 +1,34 @@
+# This file is subject to the terms and conditions defined in
+# file 'LICENSE', which is part of this source code package.
+#       Copyright (c) 2011 SKR Farms (P) LTD.
+
+# -*- coding: utf-8 -*-
+
+from   optparse      import OptionParser
+
+from   plugincore    import Plugin, implements
+from   interfaces    import ICommand
+
+
+class UnitTest( Plugin ):
+    implements( ICommand )
+
+    usage = "usage: pa unittest [options] <module>"
+
+    def __init__( self, argv=[] ):
+        parser = self._parse( UnitTest.usage )
+        self.options, self.args = parser.parse_args( argv )
+
+    def _parse( self, usage ):
+        return self._options( OptionParser( usage=usage ))
+
+    def _options( self, parser ):
+        return parser
+
+    def argparse( self, argv ):
+        parser = self._parse( UnitTest.usage )
+        self.options, self.args = parser.parse_args( argv )
+        return self.options, self.args
+
+    def run( self, options=None, args=[] ):
+        pass
