@@ -176,8 +176,9 @@ class Plugin( PluginBase ):
 
     # Plugin constructor and instantiater methods.
     def __init__( self, **kwargs ):
-        self._settngx = self.default_settings()
-        self._settngx = self._settngx.update( kwargs.get( 'settings', {} ))
+        self._settngx = {}
+        self._settngs.update( self.default_settings() )
+        self._settngx.update( kwargs.get( 'settings', {} ))
 
     # :class:`ISettings` interface methods
     def normalize_settings( self, settings ):

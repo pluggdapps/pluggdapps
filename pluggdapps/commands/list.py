@@ -4,11 +4,11 @@
 
 # -*- coding: utf-8 -*-
 
-from   pprint        import pprint
-from   optparse      import OptionParser
+from   pprint                   import pprint
+from   optparse                 import OptionParser
 
-from   plugincore    import Plugin, implements, PluginMeta
-from   interfaces    import ICommand
+from   pluggdapps.plugincore    import Plugin, implements, PluginMeta
+from   pluggdapps.interfaces    import ICommand
 
 
 class List( Plugin ):

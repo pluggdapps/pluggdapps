@@ -50,14 +50,12 @@ class ConfigDict( dict ):
         dict.__init__( self, *args, **kwargs )
 
     def __setitem__( self, name, value ):
-        if name not in self and isinstance(value, ConfigItem) :
-            self._spec[name] = value
-            val = value['default']
-        elif name not in self and isinstance(value, dict) :
-            self._spec[name] = ConfigItem( value )
-            val = value['default']
-        else :
-            val = value
+        if not isinstance( value, (ConfigItem, dict) ) :
+            raise Exception( "Type recieved %r not `ConfigItem` or `dict`'" )
+
+        value = value if isinstance(value, ConfigItem) else ConfigItem(value)
+        self._spec[name] = value
+        val = value['default']
         return dict.__setitem__( self, name, val )
 
     def specifications( self ):
@@ -94,9 +92,6 @@ class ConfigItem( dict ):
     def _options( self ):
         opts = self.get( 'options', '' )
         return opts() if callable(opts) else opts
-
-    def html( self ):
-        return '<p> %s </p>' % self.help
 
     # Compulsory fields
     default = property( lambda s : s['default'] )
