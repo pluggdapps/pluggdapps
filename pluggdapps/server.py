@@ -4,7 +4,7 @@
 
 # -*- coding: utf-8 -*-
 
-import time, socket
+import time, socket, fcntl
 
 from   pluggdapps   import __version__
 from   plugincore   import Plugin, implements
@@ -94,6 +94,7 @@ _default_settings['nodelay']                    = {
                 "socket option."
 }
 
+
 class HTTPServer( Plugin ):
 
     implements( IHTTPServer )
@@ -128,45 +129,11 @@ class HTTPServer( Plugin ):
         Plugin.__init__( self )
 
         self.bind_addr = (self['host'], self['port'])
-        self.gateway = gateway
-        self.pool = multiprocessing.Pool( 
+        self.procpool = multiprocessing.Pool( 
             self['minprocess'], None, [], self['maxtaskperchild'] )
-        self._clear_stats()
+        self.sockthread = threading.Thread()
 
-    def _clear_stats( self ):
-        self._start_time = None
-        self._run_time = 0
-        self.stats = {
-            'Enabled'     : False,
-            'Bind Address': lambda s: repr( self.bind_addr ),
-            'Run time'    : lambda s: (not s['Enabled']) and -1 or self.runtime(),
-            'Accepts': 0,
-            'Accepts/sec': lambda s: s['Accepts'] / self.runtime(),
-            'Queue': lambda s: getattr(self.requests, "qsize", None),
-            'Threads': lambda s: len(getattr(self.requests, "_threads", [])),
-            'Threads Idle': lambda s: getattr(self.requests, "idle", None),
-            'Socket Errors': 0,
-            'Requests': lambda s: (not s['Enabled']) and -1 or sum([w['Requests'](w) for w
-                                       in s['Worker Threads'].values()], 0),
-            'Bytes Read': lambda s: (not s['Enabled']) and -1 or sum([w['Bytes Read'](w) for w
-                                         in s['Worker Threads'].values()], 0),
-            'Bytes Written': lambda s: (not s['Enabled']) and -1 or sum([w['Bytes Written'](w) for w
-                                            in s['Worker Threads'].values()], 0),
-            'Work Time': lambda s: (not s['Enabled']) and -1 or sum([w['Work Time'](w) for w
-                                         in s['Worker Threads'].values()], 0),
-            'Read Throughput': lambda s: (not s['Enabled']) and -1 or sum(
-                [w['Bytes Read'](w) / (w['Work Time'](w) or 1e-6)
-                 for w in s['Worker Threads'].values()], 0),
-            'Write Throughput': lambda s: (not s['Enabled']) and -1 or sum(
-                [w['Bytes Written'](w) / (w['Work Time'](w) or 1e-6)
-                 for w in s['Worker Threads'].values()], 0),
-            'Worker Threads': {},
-            }
-        logging.statistics["CherryPy HTTPServer %d" % id(self)] = self.stats
-
-    def start( self ):
-        self._interrupt = None
-
+    def _addrinfo( self, bind_addr ):
         # Support both AF_INET and AF_INET6 family of address
         host, port = self.bind_addr
         try:
@@ -175,29 +142,40 @@ class HTTPServer( Plugin ):
                         socket.SOCK_STREAM, 0, socket.AI_PASSIVE 
                    )
         except socket.gaierror:
-            if ':' in self.bind_addr[0]:
-                info = [( socket.AF_INET6, socket.SOCK_STREAM,
-                           0, "", self.bind_addr + (0, 0) )]
+            if ':' in self.host :
+                af, sa = socket.AF_INET6, (host, port, 0, 0)
             else:
-                info = [( socket.AF_INET, socket.SOCK_STREAM,
-                          0, "", self.bind_addr )]
+                af, sa = socket.AF_INET,  (host, port, 0, 0)
+            info = [( af, socket.SOCK_STREAM, 0, "", sa )]
+        return info
 
+    def _bind( self, family, socktype, proto=0 ):
+        sock = socket.socket( family, socktype, proto )
+        # Mark the given socket fd as non-inheritable (POSIX).
+        fd = sock.fileno()
+        old_flags = fcntl.fcntl( fd, fcntl.F_GETFD )
+        fcntl.fcntl( fd, fcntl.F_SETFD, old_flags | fcntl.FD_CLOEXEC )
+
+        sock.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
+        if self['nodelay'] and not isinstance( self.bind_addr, str ) :
+            sock.setsockopt( socket.IPPROTO_TCP, socket.TCP_NODELAY, 1 )
+
+        sock.bind( self.bind_addr )
+        return sock
+
+    def start( self ):
+        info = self._addrinfo( self.bind_addr )
         msg = "No socket could be created"
         self.socket = None
         for af, socktype, proto, caname, sa in info:
             try:
-                self.bind( af, socktype, proto )
+                self.socket = self._bind( af, socktype, proto )
                 break
             except socket.error:
                 self.socket.close() if self.socket else None
                 self.socket = None
+                raise socket.error( msg ).
 
-        if not self.socket:
-            raise socket.error( msg ).
-
-        # Timeout so KeyboardInterrupt can be caught on Win32
-        self.socket.settimeout(1)
-        # Listen
         self.socket.listen( self['request_queue_size'] )
 
         self._tickloop = True
@@ -209,11 +187,6 @@ class HTTPServer( Plugin ):
                 raise
             except :
                 # TODO : Log error message
-
-            if self.interrupt:
-                # Wait for self.stop() to complete. See _set_interrupt.
-                while self.interrupt is True : time.sleep(0.1)
-                if self.interrupt : raise self.interrupt
 
     # ISettings interface methods.
     def normalize_settings( self, settings ):
