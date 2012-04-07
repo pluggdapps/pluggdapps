@@ -65,7 +65,7 @@ class ConfigDict( dict ):
 
 
 class ConfigItem( dict ):
-    """Convenience class to encapsulate configuration value description, which
+    """Convenience class to encapsulate config parameter description, which
     is a dictionary of following keys,
 
     ``default``,
@@ -104,5 +104,3 @@ class ConfigItem( dict ):
     help = property( lambda s : s.get('help', '') )
     webconfig = property( lambda s : s.get('webconfig', True) )
     options = property( _options )
-
-

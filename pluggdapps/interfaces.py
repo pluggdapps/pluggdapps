@@ -48,7 +48,7 @@ class ISettings( Interface ):
         Use this method to do any post processing on plugin's configuration
         parameter and return the final form of configuration parameters."""
 
-    def default_settings( settings ):
+    def default_settings():
         """Return instance of :class:`ConfigDict` providing meta data
         associated with each configuration parameters supported by the plugin.
         Like - default value, value type, help text, wether web configuration
@@ -64,19 +64,6 @@ class ISettings( Interface ):
         
         * To update the in-memory configuration settings with new `settings`
         * To persist new `settings` in a backend data-store."""
-
-
-class IConfig( Interface ):
-    """Convert configuration parameters from source format, like ini, json,
-    database, to dictionary of plugin settings."""
-
-    def settings( spec ):
-        """`spec` is a dictionary of information to parse configuration
-        parameter into settings map.
-
-        Return a map from plugin names to plugin settings. A special
-        plugin-name `DEFAULT` is interpreted as global settings applicable to
-        all plugins."""
 
 
 class IApplication( Interface ):
@@ -103,3 +90,9 @@ class IRouter( Interface ):
     def route( request ):
 
     def match( request ):
+
+
+class IHTTPServer( Interface ):
+
+    def serve( appsettings ):
+        """Use appsettings to start serving http request."""

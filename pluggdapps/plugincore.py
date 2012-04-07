@@ -176,15 +176,18 @@ class Plugin( PluginBase ):
 
     # Plugin constructor and instantiater methods.
     def __init__( self, **kwargs ):
-        self._settngx = kwargs.get( 'settings', {} )
+        self._settngx = self.default_settings()
+        self._settngx = self._settngx.update( kwargs.get( 'settings', {} ))
 
     # :class:`ISettings` interface methods
     def normalize_settings( self, settings ):
         pass
 
+    def default_settings( self ):
+        return {}
+
     def web_admin( self, settings ):
         pass
-
 
 
 class Attribute( object ):
@@ -229,8 +232,10 @@ def query_plugins( interface, *args, **kwargs ):
 
     Returns a list of plugin instance implementing `interface`
     """
-    return [ cls( *args, **kwargs )
-             for cls in PluginMeta._implementers.get(interface, {}).values() ]
+    plugins = []
+    for pcls in PluginMeta._implementers.get(interface, {}).values() : 
+        plugin.append( cls( *args, **kwargs ))
+    return plugins
 
 
 def query_plugin( interface, name, *args, **kwargs ):

@@ -4,22 +4,19 @@
 
 # -*- coding: utf-8 -*-
 
-from   ConfigParser     import SafeConfigParser
-from   plugincore       import plugin_init
 import pkg_resources    as pkg
 
+from   ConfigParser     import SafeConfigParser
+from   plugincore       import plugin_init
+import config
 # Load all interface specifications defined by this package.
 import plugincore
 import interfaces
 import commands
 
-# TODO : 
-#   1. Right now all packages in the environment are loaded. Instead filter
-#      for pluggdapps packages and load them.
-
 __version__ = '0.1dev'
 
-appsettings = {}
+appsettings = { 'root' : {} }
 """Dictionary of plugin configurations. Note that,
 
   * Every mountable application is a plugin object implementing
@@ -27,8 +24,8 @@ appsettings = {}
 
   * Platform configuration file (master ini file) can specify separate 
     configuration files for each loaded application like,
-     [app:*]
-        use = <configuration-file>
+     [app:<appname>]
+        use = config:<ini-file>
 
   * `appsettings` dictionary will have the following structure,
       { <appname> : { 'DEFAULT'    : { <option> : <value>, ... },
@@ -54,60 +51,20 @@ appsettings = {}
 
 
 def boot( inifile=None ):
-    """Boot platform using an optional master configuration file `inifile`."""
-    _appsettings = loadsettings( inifile ) if inifile else {}
-    rootsett = _appsettings.get( 'root', {} )
-    loadpackages( rootsett )
-    plugin_init()
-
-
-def loadsettings( inifile ):
-    """Load root settings, application settings, and section-wise settings for
-    each application."""
+    """Do the following,
+    * Boot platform using an optional master configuration file `inifile`.
+    * Load pluggdapps packages.
+    * Init plugins
+    """
     global appsettings
-    cp = SafeConfigParser()
-    cp.read( inifile )
-    rootsett = { 'DEFAULT' : cp.defaults() }
-    for secname in cp.sections() :
-        secname = secname.strip()
-        if secname.startswith( 'app:' ) :
-            appname = secname[4:].lower() 
-            appsettings[appname] = loadapp( dict(cp.options( secname )))
-        else :
-            rootsett[secname] = deepload( dict( cp.options( secname )))
-    appsettings['root'] = rootsett
+    appsett = config.loadsettings( inifile ) if inifile else {}
+    appsettings['root'].update( appsett.pop('root', {}) )
+    appsettings.update( appsett )
+    loadpackages()
+    plugin_init()
     return appsettings
-         
-
-def loadapp( options ):
-    """Load application settings and section-wise settings for application
-    `options` from master configuration file."""
-    appsett = { 'DEFAULT' : options }
-    cp.SafeConfigParser()
-    useoption = options.get( 'use', '' )
-    if useoption.startswith( 'config', '' ) :
-        cp.read( useoption.split(':')[1].strip() )
-        appsett['DEFAULT'].update( cp.defaults() )
-        appsett.update( dict([ 
-            ( sec, deepload( dict( cp.options( sec ))) )
-            for sec in cp.sections() ])
-        )
-    return appsett
 
 
-def deepload( options ) :
-    """Check for nested configuration file under `use` option in `options`,
-    if present parse their default section update this `options`."""
-    cp = SafeConfigParser()
-    useoption = options.get( 'use', '' )
-    if useoption.startswith( 'config:' ) :
-        cp.read( useoption.split(':')[1].strip() )
-        options.update( cp.defaults() )
-    return options
-
-
-def loadpackages( rootsett ) :
-    """Import all packages from this python environment."""
-    pkgnames = pkg.WorkingSet().by_key.keys()
-    [ __import__(pkgname) for pkgname in sorted( pkgnames ) ]
-    log.info( "%s pluggdapps packages loaded" % len( _package.keys() ))
+def start():
+    """Start platform and return a http request handler.
+    """
