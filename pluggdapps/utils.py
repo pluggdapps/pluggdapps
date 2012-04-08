@@ -99,3 +99,16 @@ class ConfigItem( dict ):
     help = property( lambda s : s.get('help', '') )
     webconfig = property( lambda s : s.get('webconfig', True) )
     options = property( _options )
+
+
+def set_close_exec( self, *fds ):
+    for fd in fds :
+        flags = fcntl.fcntl( fd, fcntl.F_GETFD )
+        fcntl.fcntl( fd, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC )
+
+
+def set_nonblocking( self, *fds ):
+    for fd in fds :
+        flags = fcntl.fcntl( fd, fcntl.F_GETFL )
+        fcntl.fcntl( fd, fcntl.F_SETFL, flags | os.O_NONBLOCK )
+
