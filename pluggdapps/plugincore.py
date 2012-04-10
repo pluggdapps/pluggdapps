@@ -5,7 +5,7 @@
 # -*- coding: utf-8 -*-
 
 import sys, types
-from   utils            import whichmodule, subclassof, pluginName
+from   pluggdapps.util import whichmodule, subclassof, pluginName
 
 # TODO :
 #   1. How to check for multiple plugins by name defined for same Interface.

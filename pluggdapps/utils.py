@@ -105,14 +105,25 @@ def timedelta_to_seconds( td ) :
     """Equivalent to td.total_seconds() (introduced in python 2.7)."""
     return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
 
-def set_close_exec( self, *fds ):
+def set_close_exec( *fds ):
     for fd in fds :
-        flags = fcntl.fcntl( fd, fcntl.F_GETFD )
-        fcntl.fcntl( fd, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC )
+        flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+        fcntl.fcntl(fd, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
 
-
-def set_nonblocking( self, *fds ):
+def set_nonblocking( *fds ):
     for fd in fds :
-        flags = fcntl.fcntl( fd, fcntl.F_GETFL )
-        fcntl.fcntl( fd, fcntl.F_SETFL, flags | os.O_NONBLOCK )
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+class ObjectDict(dict):
+    """Makes a dictionary behave like an object."""
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
 

@@ -1,417 +1,17 @@
-"""An I/O event loop for non-blocking sockets.
+# Derived work from Facebook's tornado server.
 
-In addition to I/O events, the `IOLoop` can also schedule time-based events.
-`IOLoop.add_timeout` is a non-blocking alternative to `time.sleep`.
-"""
+"""A utility class to write to and read from a non-blocking socket."""
 
 from __future__ import absolute_import, division, with_statement
 
-import datetime, errno, heapq, time, collections
-import os, sys, re, fcntl, logging, traceback, ssl
-import select, signal, thread, threading, socket
+import sys, re, collections, errno, logging, socket
+import ssl  # Python 2.6+
 
-from   utils    import timedelta_to_seconds
+import pluggdapps.evserver import ioloop
+import pluggdapps.evserver import stack_context
 
-def set_close_exec( *fds ):
-    for fd in fds :
-        flags = fcntl.fcntl( fd, fcntl.F_GETFD )
-        fcntl.fcntl( fd, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC )
 
-def set_nonblocking( *fds ):
-    for fd in fds :
-        flags = fcntl.fcntl( fd, fcntl.F_GETFL )
-        fcntl.fcntl( fd, fcntl.F_SETFL, flags | os.O_NONBLOCK )
-
-class Waker( object ):
-    def __init__(self):
-        r, w = os.pipe()
-        set_nonblocking(r, w)
-        set_close_exec(r, w)
-        self.reader = os.fdopen(r, "rb", 0)
-        self.writer = os.fdopen(w, "wb", 0)
-
-    def fileno(self):
-        return self.reader.fileno()
-
-    def wake(self):
-        try           : self.writer.write(b"x"))
-        except IOError: pass
-
-    def consume(self):
-        try           : while self.reader.read() : pass
-        except IOError: pass
-
-    def close(self):
-        self.reader.close()
-        self.writer.close()
-
-# Constants from the epoll module
-_EPOLLIN = 0x001
-_EPOLLPRI = 0x002
-_EPOLLOUT = 0x004
-_EPOLLERR = 0x008
-_EPOLLHUP = 0x010
-_EPOLLRDHUP = 0x2000
-_EPOLLONESHOT = (1 << 30)
-_EPOLLET = (1 << 31)
-
-class IOLoop(object):
-    """A level-triggered I/O loop. A faster version of poll(2)."""
-
-    # IOLoop events mapped to epoll events
-    NONE = 0
-    READ = _EPOLLIN
-    WRITE = _EPOLLOUT
-    ERROR = _EPOLLERR | _EPOLLHUP
-
-    default_settings = {}
-
-    def __init__( self, poll, settings={} ):
-        # I/O Even poller
-        self._poll = poll = poll or select.poll
-        set_close_exec( poll.fileno() ) if hasattr( poll, 'fileno') else None
-        self.settings = {}
-        self.settings.update( self.default_settings )
-        self.settings.update( settings )
-        # Book-keeping
-        self._handlers = {}   # map of descriptors and callback handlers
-        self._events = {}     # map of descriptors and events unblocking them
-        self._callbacks = []  # list of callbacks to call for each iteration
-        self._callback_lock = threading.Lock() # synchronize _callback_lock
-        self._timeouts = []   # list of _Timeout objects
-        self._running = False # boolean whether ioloop is running
-        self._stopped = False # stop() was called, and start() must exit
-        self._thread_ident = None
-        self._blocking_signal_threshold = None
-        # Create a pipe that we send bogus data to when we want to wake
-        # the I/O loop when it is idle
-        self._waker = Waker()
-        self.add_handler(
-                self._waker.fileno(), 
-                lambda fd, events: self._waker.consume(),
-                self.READ )
-
-    def close( self ):
-        """Closes the IOLoop, freeing any resources used.
-
-        An IOLoop must be completely stopped before it can be closed.  This
-        means that `IOLoop.stop()` must be called *and* `IOLoop.start()` must
-        be allowed to return before attempting to call `IOLoop.close()`.
-        Therefore the call to `close` will usually appear just after
-        the call to `start` rather than near the call to `stop`.
-        """
-        self.remove_handler( self._waker.fileno() )
-        self.close_handlers()
-        self._waker.close()
-        self._poll.close()
-
-    def close_handlers( self ):
-        [ os.close(fd) for fd in self._handlers.keys()[:] ]
-
-    def add_handler(self, fd, handler, events):
-        """Registers the given handler to receive the given events for fd."""
-        self._handlers[fd] = handler
-        self._poll.register( fd, events | self.ERROR )
-
-    def update_handler( self, fd, events ):
-        """Changes the events we listen for fd."""
-        self._poll.modify( fd, events | self.ERROR )
-
-    def remove_handler( self, fd ):
-        """Stop listening for events on fd."""
-        self._handlers.pop( fd, None )
-        self._events.pop( fd, None )
-        self._poll.unregister( fd )
-
-    def set_blocking_signal_threshold( self, seconds, action ):
-        """Sends a signal if the ioloop is blocked for more than s seconds.
-
-        Pass seconds=None to disable.  Requires python 2.6 on a unixy
-        platform.
-
-        The action parameter is a python signal handler.  Read the
-        documentation for the python 'signal' module for more information.
-        If action is None, the process will be killed if it is blocked for
-        too long.
-        """
-        self._blocking_signal_threshold = seconds
-        action = action if action is not None else signal.SIG_DFL
-        signal.signal(signal.SIGALRM, action) if seconds is not None else None
-
-    def set_blocking_log_threshold( self, seconds ):
-        """Logs a stack trace if the ioloop is blocked for more than s seconds.
-        Equivalent to set_blocking_signal_threshold(seconds, self.log_stack)
-        """
-        self.set_blocking_signal_threshold( seconds, self.log_stack )
-
-    def log_stack( self, signal, frame ):
-        """Signal handler to log the stack trace of the current thread.
-
-        For use with set_blocking_signal_threshold.
-        """
-        fframe = ''.join(traceback.format_stack(frame))
-        logging.warning( "IOLoop blocked for %f seconds in\n%s",
-                         self._blocking_signal_threshold, fframe )
-
-    def start( self ):
-        """Starts the I/O loop.
-
-        The loop will run until one of the I/O handlers calls stop(), which
-        will make the loop stop after the current event iteration completes.
-        """
-        if self._stopped:
-            self._stopped = False
-            return
-
-        self._thread_ident = thread.get_ident()
-        self._running = True
-        while True:
-            poll_timeout = 3600.0
-
-            # Prevent IO event starvation by delaying new callbacks
-            # to the next iteration of the event loop.
-            with self._callback_lock:
-                callbacks = self._callbacks
-                self._callbacks = []
-            map( self._run_callback, callbacks )
-
-            if self._timeouts :
-                now = time.time()
-                while self._timeouts :
-                    if self._timeouts[0].callback is None : # timeout cancelled
-                        heapq.heappop( self._timeouts )
-                    elif self._timeouts[0].deadline <= now :
-                        timeout = heapq.heappop( self._timeouts )
-                        self._run_callback( timeout.callback )
-                    else :
-                        seconds = self._timeouts[0].deadline - now
-                        poll_timeout = min( seconds, poll_timeout )
-                        break
-
-            if self._callbacks:
-                # If any callbacks or timeouts called add_callback,
-                # we don't want to wait in poll() before we run them.
-                poll_timeout = 0.0
-
-            
-            if self._running == False : break   # <--- Exit IOLoop
-
-            if self._blocking_signal_threshold is not None :
-                # clear alarm so it doesn't fire while poll is waiting for
-                # events.
-                signal.setitimer( signal.ITIMER_REAL, 0, 0 )
-
-            try:
-                event_pairs = self._poll.poll( poll_timeout )
-            except Exception, e:
-                # Depending on python version and IOLoop implementation,
-                # different exception types may be thrown and there are
-                # two ways EINTR might be signaled:
-                # * e.errno == errno.EINTR
-                # * e.args is like (errno.EINTR, 'Interrupted system call')
-                if (getattr(e, 'errno', None) == errno.EINTR or
-                    (isinstance(getattr(e, 'args', None), tuple) and
-                     len(e.args) == 2 and e.args[0] == errno.EINTR)):
-                    continue
-                else:
-                    raise
-
-            if self._blocking_signal_threshold is not None :
-                signal.setitimer(
-                    signal.ITIMER_REAL, self._blocking_signal_threshold, 0 )
-
-            # Pop one fd at a time from the set of pending fds and run
-            # its handler. Since that handler may perform actions on
-            # other file descriptors, there may be reentrant calls to
-            # this IOLoop that update self._events
-            self._events.update( event_pairs )
-            while self._events:
-                fd, events = self._events.popitem()
-                try:
-                    self._handlers[fd]( fd, events )
-                except (OSError, IOError), e :
-                    if e.args[0] == errno.EPIPE:
-                        # Happens when the client closes the connection
-                        pass
-                    else:
-                        logging.error( "Exception in I/O handler for fd %s",
-                                       fd, exc_info=True )
-                except Exception:
-                    logging.error( "Exception in I/O handler for fd %s",
-                                   fd, exc_info=True )
-
-        # Exit this IOLoop and reset the stopped flag so another start/stop 
-        # pair can be issued
-        self._stopped = False
-        if self._blocking_signal_threshold is not None :
-            signal.setitimer( signal.ITIMER_REAL, 0, 0 )
-
-    def stop( self ):
-        """Stop the loop after the current event loop iteration is complete.
-        If the event loop is not currently running, the next call to start()
-        will return immediately.
-
-        To use asynchronous methods from otherwise-synchronous code (such as
-        unit tests), you can start and stop the event loop like this::
-
-          ioloop = IOLoop()
-          async_method(ioloop=ioloop, callback=ioloop.stop)
-          ioloop.start()
-
-        ioloop.start() will return after async_method has run its callback,
-        whether that callback was invoked before or after ioloop.start.
-
-        Note that even after `stop` has been called, the IOLoop is not
-        completely stopped until `IOLoop.start` has also returned.
-        """
-        self._running = False
-        self._stopped = True
-        self._waker.wake()
-
-    def running( self ):
-        """Returns true if this IOLoop is currently running."""
-        return self._running
-
-    def add_timeout( self, deadline, callback ):
-        """Calls the given callback at the time deadline from the I/O loop.
-
-        Returns a handle that may be passed to remove_timeout to cancel.
-
-        ``deadline`` may be a number denoting a unix timestamp (as returned
-        by ``time.time()`` or a ``datetime.timedelta`` object for a deadline
-        relative to the current time.
-
-        Note that it is not safe to call `add_timeout` from other threads.
-        Instead, you must use `add_callback` to transfer control to the
-        IOLoop's thread, and then call `add_timeout` from there.
-        """
-        timeout = _Timeout( deadline, callback )
-        heapq.heappush( self._timeouts, timeout )
-        return timeout
-
-    def remove_timeout( self, timeout ):
-        """Cancels a pending timeout.
-
-        The argument is a handle as returned by add_timeout.
-        """
-        # Removing from a heap is complicated, so just leave the defunct
-        # timeout object in the queue (see discussion in
-        # http://docs.python.org/library/heapq.html).
-        # If this turns out to be a problem, we could add a garbage
-        # collection pass whenever there are too many dead timeouts.
-        timeout.callback = None
-        return None
-
-    def add_callback( self, callback ):
-        """Calls the given callback on the next I/O loop iteration.
-
-        It is safe to call this method from any thread at any time.
-        Note that this is the *only* method in IOLoop that makes this
-        guarantee; all other interaction with the IOLoop must be done
-        from that IOLoop's thread.  add_callback() may be used to transfer
-        control from other threads to the IOLoop's thread.
-        """
-        with self._callback_lock:
-            list_empty = not self._callbacks
-            self._callbacks.append( callback )
-        if list_empty and thread.get_ident() != self._thread_ident:
-            # If we're in the IOLoop's thread, we know it's not currently
-            # polling.  If we're not, and we added the first callback to an
-            # empty list, we may need to wake it up (it may wake up on its
-            # own, but an occasional extra wake is harmless).  Waking
-            # up a polling IOLoop is relatively expensive, so we try to
-            # avoid it when we can.
-            self._waker.wake()
-
-    def _run_callback(self, callback):
-        try:
-            callback()
-        except Exception:
-            self.handle_callback_exception(callback)
-
-    def handle_callback_exception(self, callback):
-        """This method is called whenever a callback run by the IOLoop
-        throws an exception.
-
-        By default simply logs the exception as an error.  Subclasses
-        may override this method to customize reporting of exceptions.
-
-        The exception itself is not passed explicitly, but is available
-        in sys.exc_info.
-        """
-        logging.error("Exception in callback %r", callback, exc_info=True)
-
-
-class _Timeout( object ):
-    """An IOLoop timeout, a UNIX timestamp and a callback"""
-
-    # Reduce memory overhead when there are lots of pending callbacks
-    __slots__ = ['deadline', 'callback']
-
-    def __init__( self, deadline, callback ):
-        if isinstance(deadline, (int, long, float)):
-            self.deadline = deadline
-        elif isinstance( deadline, datetime.timedelta ):
-            self.deadline = time.time() + _Timeout.timedelta_to_seconds(deadline)
-        else:
-            raise TypeError("Unsupported deadline %r" % deadline)
-        self.callback = callback
-
-    # Comparison methods to sort by deadline, with object id as a tiebreaker
-    # to guarantee a consistent ordering.  The heapq module uses __le__
-    # in python2.5, and __lt__ in 2.6+ (sort() and most other comparisons
-    # use __lt__).
-    def __lt__(self, other):
-        return ((self.deadline, id(self)) < (other.deadline, id(other)))
-
-    def __le__(self, other):
-        return ((self.deadline, id(self)) <= (other.deadline, id(other)))
-
-
-class PeriodicCallback(object):
-    """Schedules the given callback to be called periodically.
-
-    The callback is called every callback_time milliseconds.
-
-    `start` must be called after the PeriodicCallback is created.
-    """
-    def __init__( self, callback, callback_time, io_loop ):
-        self.callback = callback
-        self.callback_time = callback_time
-        self.io_loop = io_loop
-        self._running = False   # Whether periodic timeout is active or not
-        self._timeout = None    # _Timeout instance subscribed to ioloop
-
-    def start(self):
-        """Starts the timer."""
-        self._running = True
-        self._next_timeout = time.time()
-        self._schedule_next()
-
-    def stop(self):
-        """Stops the timer."""
-        self._running = False
-        if self._timeout != None :
-            self._timeout = self.io_loop.remove_timeout(self._timeout)
-
-    def _run(self):
-        if not self._running: return
-
-        try:
-            self.callback()
-        except Exception:
-            logging.error("Error in periodic callback", exc_info=True)
-        self._schedule_next()
-
-    def _schedule_next(self):
-        if not self._running: return
-
-        while self._next_timeout <= time.time() :
-            self._next_timeout += self.callback_time / 1000.0
-        self._timeout = self.io_loop.add_timeout(self._next_timeout, self._run)
-
-
-class IOStream( object ):
+class IOStream(object):
     r"""A utility class to write to and read from a non-blocking socket.
 
     We support a non-blocking ``write()`` and a family of ``read_*()`` methods.
@@ -423,40 +23,64 @@ class IOStream( object ):
     For client operations the socket is created with socket.socket(),
     and may either be connected before passing it to the IOStream or
     connected with IOStream.connect.
+
+    A very simple (and broken) HTTP client using this class::
+
+        from tornado import ioloop
+        from tornado import iostream
+        import socket
+
+        def send_request():
+            stream.write("GET / HTTP/1.0\r\nHost: friendfeed.com\r\n\r\n")
+            stream.read_until("\r\n\r\n", on_headers)
+
+        def on_headers(data):
+            headers = {}
+            for line in data.split("\r\n"):
+               parts = line.split(":")
+               if len(parts) == 2:
+                   headers[parts[0].strip()] = parts[1].strip()
+            stream.read_bytes(int(headers["Content-Length"]), on_body)
+
+        def on_body(data):
+            print data
+            stream.close()
+            ioloop.IOLoop.instance().stop()
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+        stream = iostream.IOStream(s)
+        stream.connect(("friendfeed.com", 80), send_request)
+        ioloop.IOLoop.instance().start()
+
     """
     default_settings = {
         'max_buffer_size' : 104857600,
         'read_chunk_size' : 4096,
     }
 
-    def __init__( self, socket, io_loop, settings={} ):
+    def __init__(self, socket, io_loop=None, settings={} ):
         self.socket = socket
         self.socket.setblocking(False)
-        self.io_loop = io_loop
-        self.settings = {}
-        self.settings.update( self.default_settings )
-        self.settings.update( settings )
-        self._state = None
-        self._pending_callbacks = 0
-        # Connection state-vars
-        self._connect_callback = None
-        self._connecting = False
-        self._close_callback = None
-        # Read state-vars
-        self._read_callback = None
-        self._streaming_callback = None
+        self.io_loop = io_loop or ioloop.IOLoop.instance()
+
         self._read_buffer = collections.deque()
+        self._write_buffer = collections.deque()
         self._read_buffer_size = 0
+        self._write_buffer_frozen = False
         self._read_delimiter = None
         self._read_regex = None
         self._read_bytes = None
         self._read_until_close = False
-        # Write state-vars
-        self._write_buffer = collections.deque()
-        self._write_buffer_frozen = False
+        self._read_callback = None
+        self._streaming_callback = None
         self._write_callback = None
+        self._close_callback = None
+        self._connect_callback = None
+        self._connecting = False
+        self._state = None
+        self._pending_callbacks = 0
 
-    def connect( self, address, callback=None ):
+    def connect(self, address, callback=None):
         """Connects the socket to a remote address without blocking.
 
         May only be called if the socket passed to the constructor was
@@ -483,11 +107,11 @@ class IOStream( object ):
             # localhost, so handle them the same way as an error
             # reported later in _handle_connect.
             if e.args[0] not in (errno.EINPROGRESS, errno.EWOULDBLOCK):
-                logging.warning( "Connect error on fd %d: %s",
-                                 self.socket.fileno(), e )
+                logging.warning("Connect error on fd %d: %s",
+                                self.socket.fileno(), e)
                 self.close()
                 return
-        self._connect_callback = callback
+        self._connect_callback = stack_context.wrap(callback)
         self._add_io_state(self.io_loop.WRITE)
 
     def read_until_regex(self, regex, callback):
@@ -512,7 +136,7 @@ class IOStream( object ):
         self._set_read_callback(callback)
         assert isinstance(num_bytes, (int, long))
         self._read_bytes = num_bytes
-        self._streaming_callback = streaming_callback
+        self._streaming_callback = stack_context.wrap(streaming_callback)
         self._try_inline_read()
 
     def read_until_close(self, callback, streaming_callback=None):
@@ -522,8 +146,8 @@ class IOStream( object ):
         of data as they become available, and the argument to the final
         ``callback`` will be empty.
 
-        Subject to ``max_buffer_size`` limit from `IOStream` constructor if
-        a ``streaming_callback`` is not used.
+        Subject to ``max_buffer_size`` limit if a ``streaming_callback`` is 
+        not used.
         """
         self._set_read_callback(callback)
         if self.closed():
@@ -531,7 +155,7 @@ class IOStream( object ):
             self._read_callback = None
             return
         self._read_until_close = True
-        self._streaming_callback = streaming_callback
+        self._streaming_callback = stack_context.wrap(streaming_callback)
         self._add_io_state(self.io_loop.READ)
 
     def write(self, data, callback=None):
@@ -548,7 +172,7 @@ class IOStream( object ):
             # We use bool(_write_buffer) as a proxy for write_buffer_size>0,
             # so never put empty strings in the buffer.
             self._write_buffer.append(data)
-        self._write_callback = callback
+        self._write_callback = stack_context.wrap(callback)
         self._handle_write()
         if self._write_buffer:
             self._add_io_state(self.io_loop.WRITE)
@@ -556,7 +180,7 @@ class IOStream( object ):
 
     def set_close_callback(self, callback):
         """Call the given callback when the stream is closed."""
-        self._close_callback = callback
+        self._close_callback = stack_context.wrap(callback)
 
     def close(self):
         """Close this stream."""
@@ -659,8 +283,14 @@ class IOStream( object ):
         #   non-reentrant mutexes
         # * Ensures that the try/except in wrapper() is run outside
         #   of the application's StackContexts
-        self._pending_callbacks += 1
-        self.io_loop.add_callback( wrapper )
+        with stack_context.NullContext():
+            # stack_context was already captured in callback, we don't need to
+            # capture it again for IOStream's wrapper.  This is especially
+            # important if the callback was pre-wrapped before entry to
+            # IOStream (as in HTTPConnection._header_callback), as we could
+            # capture and leak the wrong context here.
+            self._pending_callbacks += 1
+            self.io_loop.add_callback(wrapper)
 
     def _handle_read(self):
         try:
@@ -726,7 +356,7 @@ class IOStream( object ):
         May be overridden in subclasses.
         """
         try:
-            chunk = self.socket.recv(self.read_chunk_size)
+            chunk = self.socket.recv(self.settings['read_chunk_size'])
         except socket.error, e:
             if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                 return None
@@ -756,7 +386,7 @@ class IOStream( object ):
             return 0
         self._read_buffer.append(chunk)
         self._read_buffer_size += len(chunk)
-        if self._read_buffer_size >= self.max_buffer_size:
+        if self._read_buffer_size >= self.settings['max_buffer_size'] :
             logging.error("Reached maximum read buffer size")
             self.close()
             raise IOError("Reached maximum read buffer size")
@@ -922,11 +552,12 @@ class IOStream( object ):
             return
         if self._state is None:
             self._state = ioloop.IOLoop.ERROR | state
-            self.io_loop.add_handler( 
-                self.socket.fileno(), self._handle_events, self._state )
+            with stack_context.NullContext():
+                self.io_loop.add_handler(
+                    self.socket.fileno(), self._handle_events, self._state)
         elif not self._state & state:
             self._state = self._state | state
-            self.io_loop.update_handler( self.socket.fileno(), self._state )
+            self.io_loop.update_handler(self.socket.fileno(), self._state)
 
 
 class SSLIOStream(IOStream):
@@ -1018,7 +649,7 @@ class SSLIOStream(IOStream):
             # The recv() method blocks (at least in python 2.6) if it is
             # called when there is nothing to read, so we have to use
             # read() instead.
-            chunk = self.socket.read(self.read_chunk_size)
+            chunk = self.socket.read(self.settings['read_chunk_size'])
         except ssl.SSLError, e:
             # SSLError is a subclass of socket.error, so this except
             # block must come first.
@@ -1081,8 +712,3 @@ def _merge_prefix(deque, size):
         deque.appendleft(type(prefix[0])().join(prefix))
     if not deque:
         deque.appendleft(b"")
-
-
-def doctests():
-    import doctest
-    return doctest.DocTestSuite()
