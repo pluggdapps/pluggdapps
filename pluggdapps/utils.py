@@ -99,3 +99,9 @@ class ConfigItem( dict ):
     help = property( lambda s : s.get('help', '') )
     webconfig = property( lambda s : s.get('webconfig', True) )
     options = property( _options )
+
+
+def timedelta_to_seconds( td ) :
+    """Equivalent to td.total_seconds() (introduced in python 2.7)."""
+    return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
+
