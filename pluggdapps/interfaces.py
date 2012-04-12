@@ -46,7 +46,8 @@ class ISettings( Interface ):
         parameters.
 
         Use this method to do any post processing on plugin's configuration
-        parameter and return the final form of configuration parameters."""
+        parameter and return the final form of configuration parameters.
+        Processed parameters are updated in-pace"""
 
     def default_settings():
         """Return instance of :class:`ConfigDict` providing meta data
@@ -83,6 +84,19 @@ class IApplication( Interface ):
     def finish( request ):
 
     def router( request ):
+
+
+class IRequest( Interface ):
+    """Entry point for every request into the application code. Typically
+    pluggdapps platform will provide a collection of request handler plugins
+    implementing this interface. While the applications can simply derive
+    their handler class from the base class and override necessary methods."""
+
+    methods = Attribute(
+        "Request handler can override this attribute to provide a sequence of "
+        "HTTP Methods supported by the class. "
+        "Default : ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS') "
+    )
 
 
 class IRouter( Interface ):

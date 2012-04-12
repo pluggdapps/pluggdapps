@@ -53,10 +53,3 @@ def deepload( options ) :
         cp.read( useoption.split(':')[1].strip() )
         options.update( cp.defaults() )
     return options
-
-
-def loadpackages() :
-    """Import all packages from this python environment."""
-    pkgnames = pkg.WorkingSet().by_key.keys()
-    [ __import__(pkgname) for pkgname in sorted( pkgnames ) ]
-    log.info( "%s pluggdapps packages loaded" % len( _package.keys() ))

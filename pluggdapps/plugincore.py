@@ -176,9 +176,10 @@ class Plugin( PluginBase ):
 
     # Plugin constructor and instantiater methods.
     def __init__( self, **kwargs ):
-        self._settngx = {}
-        self._settngs.update( self.default_settings() )
-        self._settngx.update( kwargs.get( 'settings', {} ))
+        sett = {}
+        sett.update( self.default_settings() )
+        sett.update( kwargs.get( 'settings', {} ))
+        self._settngx = self.normalize_settings( sett )
 
     # :class:`ISettings` interface methods
     def normalize_settings( self, settings ):
@@ -210,6 +211,13 @@ def implements( *interfaces ):
 
 
 def plugin_init():
+    """It is a chicken egg situation here.
+    * The plugin class objects are not availabe until the class is fully
+      parsed and loaded.
+    * PluginMeta._implementers need to save plugin class object based on
+      the plugin class's implements() calls which happens during class
+      loading.
+    """
     PluginMeta._implementers = dict([ 
         ( i, dict([ (nm, PluginMeta._pluginmap[nm]['cls']) for nm in pmap ])
         ) for i, pmap in PluginMeta._implementers.items()
@@ -231,6 +239,9 @@ def query_plugins( interface, *args, **kwargs ):
     implements. Positional and keyword arguments will be used to instantiate
     the plugin object.
 
+    If ``settings`` key-word argument is present, it will be used to override
+    default plugin settings.
+
     Returns a list of plugin instance implementing `interface`
     """
     plugins = []
@@ -243,6 +254,11 @@ def query_plugin( interface, name, *args, **kwargs ):
     """Same as queryPlugins, but returns a single plugin instance as opposed
     an entire list. Positional and keyword arguments will be used to 
     instantiate the plugin object.
+
+    If ``settings`` key-word argument is present, it will be used to override
+    default plugin settings.
+
+    Return a single Plugin instance.
     """
     nm = pluginname( name )
     cls = PluginMeta._implementers.get( interface, {} ).get( nm, None )

@@ -4,10 +4,10 @@
 
 Typical applications have little direct interaction with the `HTTPServer`
 class except to start a server at the beginning of the process
-(and even that is often done indirectly via `tornado.web.Application.listen`).
+(and even that is often done indirectly via `Platform.listen`).
 
 This module also defines the `HTTPRequest` class which is exposed via
-`tornado.web.RequestHandler.request`.
+`RequestHandler.request`.
 """
 
 from __future__ import absolute_import, division, with_statement
@@ -62,7 +62,7 @@ class HTTPServer(TCPServer):
 
     If ``xheaders`` is ``True``, we support the ``X-Real-Ip`` and ``X-Scheme``
     headers, which override the remote IP and HTTP scheme for all requests.
-    These headers are useful when running Tornado behind a reverse proxy or
+    These headers are useful when running pluggdapps behind a reverse proxy or
     load balancer.
 
     `HTTPServer` can serve SSL traffic with Python 2.6+ and OpenSSL.
@@ -76,18 +76,18 @@ class HTTPServer(TCPServer):
        })
 
     `HTTPServer` initialization follows one of three patterns (the
-    initialization methods are defined on `tornado.netutil.TCPServer`):
+    initialization methods are defined on `tcpserver.TCPServer`):
 
-    1. `~tornado.netutil.TCPServer.listen`: simple single-process::
+    1. `~tcpserver.TCPServer.listen`: simple single-process::
 
             server = HTTPServer(app)
             server.listen(8888)
             IOLoop.instance().start()
 
-       In many cases, `tornado.web.Application.listen` can be used to avoid
+       In many cases, `Platform.listen` can be used to avoid
        the need to explicitly create the `HTTPServer`.
 
-    2. `~tornado.netutil.TCPServer.bind`/`~tornado.netutil.TCPServer.start`:
+    2. `~tcpserver.TCPServer.bind`/`~tcpserver.TCPServer.start`:
        simple multi-process::
 
             server = HTTPServer(app)
@@ -99,20 +99,20 @@ class HTTPServer(TCPServer):
        to the `HTTPServer` constructor.  `start` will always start
        the server on the default singleton `IOLoop`.
 
-    3. `~tornado.netutil.TCPServer.add_sockets`: advanced multi-process::
+    3. `~tcpserver.TCPServer.add_sockets`: advanced multi-process::
 
-            sockets = tornado.netutil.bind_sockets(8888)
-            tornado.process.fork_processes(0)
+            sockets = tcpserver.netutil.bind_sockets(8888)
+            process.fork_processes(0)
             server = HTTPServer(app)
             server.add_sockets(sockets)
             IOLoop.instance().start()
 
        The `add_sockets` interface is more complicated, but it can be
-       used with `tornado.process.fork_processes` to give you more
+       used with `process.fork_processes` to give you more
        flexibility in when the fork happens.  `add_sockets` can
        also be used in single-process servers if you want to create
        your listening sockets in some way other than
-       `tornado.netutil.bind_sockets`.
+       `tcpserver.bind_sockets`.
 
     """
     default_settings = {

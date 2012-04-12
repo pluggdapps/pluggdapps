@@ -8,6 +8,7 @@ import pkg_resources    as pkg
 
 from   ConfigParser     import SafeConfigParser
 from   plugincore       import plugin_init
+from   plugincore       import Plugin, Attribute, Interface, implements
 import config
 # Load all interface specifications defined by this package.
 import plugincore
@@ -49,22 +50,31 @@ appsettings = { 'root' : {} }
   * `appsettings` will be populated during platform boot-up time.
 """
 
+class Platform( object ):
 
-def boot( inifile=None ):
-    """Do the following,
-    * Boot platform using an optional master configuration file `inifile`.
-    * Load pluggdapps packages.
-    * Init plugins
-    """
-    global appsettings
-    appsett = config.loadsettings( inifile ) if inifile else {}
-    appsettings['root'].update( appsett.pop('root', {}) )
-    appsettings.update( appsett )
-    loadpackages()
-    plugin_init()
-    return appsettings
+    def boot( inifile=None ):
+        """Do the following,
+        * Boot platform using an optional master configuration file `inifile`.
+        * Load pluggdapps packages.
+        * Init plugins
+        """
+        global appsettings
+        appsett = config.loadsettings( inifile ) if inifile else {}
+        appsettings['root'].update( appsett.pop('root', {}) )
+        appsettings.update( appsett )
+        self._loadpackages()
+        plugin_init()
+        return appsettings
 
+    def serve( self ):
+        rootsett = appsettings['root']
+        servtype = rootsett['servertype']
+        host = rootsett['host']
+        port = rootsett['port']
 
-def start():
-    """Start platform and return a http request handler.
-    """
+    def _loadpackages( self ):
+        """Import all packages from this python environment."""
+        pkgnames = pkg.WorkingSet().by_key.keys()
+        [ __import__(pkgname) for pkgname in sorted( pkgnames ) ]
+        logging.info( "%s pluggdapps packages loaded" % len( _package.keys() ))
+

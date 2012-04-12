@@ -17,9 +17,27 @@ from __future__ import absolute_import, division, with_statement
 import datetime, errno, heapq, logging, time
 import os, select, thread, threading, traceback, signal
 
-from   pluggdapps.util import set_close_exec, set_nonblocking, \
-                              timedelta_to_seconds
-import pluggdapps.evserver import stack_context
+from   pluggdapps.util      import set_close_exec, set_nonblocking, \
+                                   timedelta_to_seconds
+import pluggdapps.evserver  import stack_context
+from   pluggdapps           import Plugin
+
+_default_settings = ConfigDict()
+_default_settings.__doc__ = \
+    "Configuration settings for poll based even handling IOLoop"
+
+_default_settings['poll_threshold']     = {
+    'default' : 1000,
+    'types'   : (int,)
+    'help'    : "A warning limit for number of descriptors being polled by a "
+                "single poll instance."
+}
+_default_settings['poll_timeout']       = {
+    'default' : 3600.0,
+    'types'   : (float,),
+    'help'    : "in seconds. Poll instance will timeout after so many seconds "
+                "and perform callbacks (if any) and start a fresh poll."
+}
 
 class Waker(interface.Waker):
     def __init__(self):
@@ -45,7 +63,7 @@ class Waker(interface.Waker):
         self.writer.close()
 
 
-class IOLoop(object):
+class IOLoop( Plugin ):
     """A level-triggered I/O loop using Linux epoll and requires python 2.6+.
 
     Example usage for a simple TCP server::
@@ -93,10 +111,6 @@ class IOLoop(object):
     READ = _EPOLLIN
     WRITE = _EPOLLOUT
     ERROR = _EPOLLERR | _EPOLLHUP
-
-    default_settings = {
-        'poll_threshold' : 1000,
-    }
 
     def __init__( self, impl=None, settings={} ):
         self._impl = impl or _poll()
@@ -257,7 +271,7 @@ class IOLoop(object):
         self._thread_ident = thread.get_ident()
         self._running = True
         while True:
-            poll_timeout = 3600.0
+            poll_timeout = self.settings['poll_timeout']
 
             # Prevent IO event starvation by delaying new callbacks
             # to the next iteration of the event loop.
@@ -432,13 +446,13 @@ class IOLoop(object):
         logging.error("Exception in callback %r", callback, exc_info=True)
 
 
-class _Timeout(object):
+class _Timeout( object ):
     """An IOLoop timeout, a UNIX timestamp and a callback"""
 
     # Reduce memory overhead when there are lots of pending callbacks
     __slots__ = ['deadline', 'callback']
 
-    def __init__(self, deadline, callback):
+    def __init__( self, deadline, callback ):
         if isinstance(deadline, (int, long, float)):
             self.deadline = deadline
         elif isinstance(deadline, datetime.timedelta):
@@ -451,43 +465,43 @@ class _Timeout(object):
     # to guarantee a consistent ordering.  The heapq module uses __le__
     # in python2.5, and __lt__ in 2.6+ (sort() and most other comparisons
     # use __lt__).
-    def __lt__(self, other):
+    def __lt__( self, other ):
         return ((self.deadline, id(self)) <
                 (other.deadline, id(other)))
 
-    def __le__(self, other):
+    def __le__( self, other ):
         return ((self.deadline, id(self)) <=
                 (other.deadline, id(other)))
 
 
-class PeriodicCallback(object):
+class PeriodicCallback( object ):
     """Schedules the given callback to be called periodically.
 
     The callback is called every callback_time milliseconds.
 
     `start` must be called after the PeriodicCallback is created.
     """
-    def __init__(self, callback, callback_time, io_loop=None):
+    def __init__( self, callback, callback_time, io_loop=None ):
         self.callback = callback
         self.callback_time = callback_time
         self.io_loop = io_loop or IOLoop.instance()
         self._running = False
         self._timeout = None
 
-    def start(self):
+    def start( self ):
         """Starts the timer."""
         self._running = True
         self._next_timeout = time.time()
         self._schedule_next()
 
-    def stop(self):
+    def stop( self ):
         """Stops the timer."""
         self._running = False
         if self._timeout is not None:
             self.io_loop.remove_timeout(self._timeout)
             self._timeout = None
 
-    def _run(self):
+    def _run( self ):
         if not self._running:
             return
         try:
@@ -496,13 +510,20 @@ class PeriodicCallback(object):
             logging.error("Error in periodic callback", exc_info=True)
         self._schedule_next()
 
-    def _schedule_next(self):
+    def _schedule_next( self ):
         if self._running:
             current_time = time.time()
             while self._next_timeout <= current_time:
                 self._next_timeout += self.callback_time / 1000.0
             self._timeout = self.io_loop.add_timeout(self._next_timeout, self._run)
 
+    # ISettings
+    def default_settings( self ):
+        return default_settings
+
+    def normalize_settings( self, settings ):
+        settings['poll_threshold'] = int( settings['poll_threshold'] )
+        settings['poll_timeout'] = float( settings['poll_threshold'] )
 
 # Python 2.6+ on Linux
 _poll = select.epoll

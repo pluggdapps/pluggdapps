@@ -50,13 +50,13 @@ class TCPServer(object):
     3. `add_sockets`: advanced multi-process::
 
             sockets = bind_sockets(8888)
-            tornado.process.fork_processes(0)
+            process.fork_processes(0)
             server = TCPServer()
             server.add_sockets(sockets)
             IOLoop.instance().start()
 
        The `add_sockets` interface is more complicated, but it can be
-       used with `tornado.process.fork_processes` to give you more
+       used with `process.fork_processes` to give you more
        flexibility in when the fork happens.  `add_sockets` can
        also be used in single-process servers if you want to create
        your listening sockets in some way other than
@@ -76,7 +76,7 @@ class TCPServer(object):
         self._pending_sockets = []
         self._started = False
 
-    def listen(self, port, address=""):
+    def listen( self, port, address="" ):
         """Starts accepting connections on the given port.
 
         This method may be called more than once to listen on multiple ports.
@@ -87,13 +87,13 @@ class TCPServer(object):
         sockets = bind_sockets(port, address=address)
         self.add_sockets(sockets)
 
-    def add_sockets(self, sockets):
+    def add_sockets( self, sockets ):
         """Makes this server start accepting connections on the given sockets.
 
         The ``sockets`` parameter is a list of socket objects such as
         those returned by `bind_sockets`.
         `add_sockets` is typically used in combination with that
-        method and `tornado.process.fork_processes` to provide greater
+        method and `process.fork_processes` to provide greater
         control over the initialization of a multi-process server.
         """
         if self.io_loop is None:
@@ -103,11 +103,11 @@ class TCPServer(object):
             self._sockets[sock.fileno()] = sock
             add_accept_handler( sock, self._handle_connection, self.io_loop )
 
-    def add_socket(self, socket):
+    def add_socket( self, socket ):
         """Singular version of `add_sockets`.  Takes a single socket object."""
         self.add_sockets([socket])
 
-    def bind(self, port, address=None, family=socket.AF_UNSPEC, backlog=128):
+    def bind( self, port, address=None, family=socket.AF_UNSPEC, backlog=128 ):
         """Binds this server to the given port on the given address.
 
         To start the server, call `start`. If you want to run this server
@@ -134,7 +134,7 @@ class TCPServer(object):
         else:
             self._pending_sockets.extend(sockets)
 
-    def start(self, num_processes=1):
+    def start( self, num_processes=1 ):
         """Starts this server in the IOLoop.
 
         By default, we run the server in this process and do not fork any
@@ -149,9 +149,9 @@ class TCPServer(object):
         between any server code.
 
         Note that multiple processes are not compatible with the autoreload
-        module (or the ``debug=True`` option to `tornado.web.Application`).
-        When using multiple processes, no IOLoops can be created or
-        referenced until after the call to ``TCPServer.start(n)``.
+        module (or the ``debug=True`` option to `Platform`). When using 
+        multiple processes, no IOLoops can be created or referenced until 
+        after the call to ``TCPServer.start(n)``.
         """
         assert not self._started
         self._started = True
