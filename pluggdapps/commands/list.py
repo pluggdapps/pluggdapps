@@ -16,7 +16,8 @@ class List( Plugin ):
 
     usage = "usage: pa list [options] <module>"
 
-    def __init__( self, argv=[] ):
+    def __init__( self, appname, argv=[] ):
+        super(Plugin, self).__init__( appname, argv=argv )
         parser = self._parse( List.usage )
         self.options, self.args = parser.parse_args( argv )
 

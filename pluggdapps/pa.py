@@ -43,7 +43,7 @@ def options( parser ):
 
 def docommand( command, argv ):
     """Handle sub-commands."""
-    comm = query_plugin( ICommand, command, argv=argv )
+    comm = query_plugin( pluggdapps.ROOTAPP, ICommand, command, argv=argv )
     comm.run()
 
 

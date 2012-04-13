@@ -7,7 +7,7 @@
 import pkg_resources    as pkg
 
 from   ConfigParser     import SafeConfigParser
-from   plugincore       import plugin_init
+from   plugincore       import plugin_init, query_plugin, query_plugins
 from   plugincore       import Plugin, Attribute, Interface, implements
 import config
 # Load all interface specifications defined by this package.
@@ -16,6 +16,7 @@ import interfaces
 import commands
 
 __version__ = '0.1dev'
+ROOTAPP = 'root'
 
 appsettings = { 'root' : {} }
 """Dictionary of plugin configurations. Note that,

@@ -4,6 +4,9 @@
 
 # -*- coding: utf-8 -*-
 
+# TODO :
+#   * Improve function asbool() implementation.
+
 import sys
 
 def whichmodule( attr ):
@@ -27,7 +30,7 @@ def parsecsvlines( lines ):
 
 def subclassof( cls, supers ):
     """Check whether cls is a subclass of one of the super-classes passed in
-    `super`."""
+    `supers`."""
     for sup in supers :
         if issubclass( cls, sup ) : return sup
     return None
@@ -36,7 +39,13 @@ def subclassof( cls, supers ):
 def pluginname( o ):
     """Plugin names are nothing but normalized form of plugin's class name,
     where normalization is done by lower casing plugin's class name."""
-    return (o if isinstance( clsname, basestring ) else o.__name__).lower()
+    from pluggdapps import Plugin
+    if isinstance(o, basestring) :
+        return o
+    elif issubclass(o, Plugin) :
+        return o.__name__.lower()
+    else :
+        return o.__class__.__name__.lower()
 
 
 class ConfigDict( dict ):
@@ -100,6 +109,30 @@ class ConfigItem( dict ):
     webconfig = property( lambda s : s.get('webconfig', True) )
     options = property( _options )
 
+def asbool( val, default=None ):
+    try :
+        if isinstance(val, basestring) :
+            v = True if val.lower() == 'true' else False
+        else :
+            v = bool(val)
+    except :
+        v = default
+    return v
+
+def asint( val, default=None ):
+    try    : v = int( val )
+    except : v = default
+    return v
+
+def asfloat( val, default=None ):
+    try    : v = float( val )
+    except : v = default
+    return v
+
+def settingsfor( prefix, settings ):
+    """Parse `settings` keys starting with `prefix` and return a dictionary of
+    corresponding options."""
+    return dict([ (k, v) for k, v in settings.items() if k.startswith(prefix) ])
 
 def timedelta_to_seconds( td ) :
     """Equivalent to td.total_seconds() (introduced in python 2.7)."""

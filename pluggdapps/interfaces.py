@@ -40,7 +40,8 @@ class ISettings( Interface ):
     """
 
     def normalize_settings( settings ):
-        """`settings` is a dictionary of configuration parameters. This method 
+        """Static interface method.
+        `settings` is a dictionary of configuration parameters. This method 
         will be called after aggregating all configuration parameters for a
         plugin and before updating the plugin instance with its configuration
         parameters.
@@ -50,7 +51,8 @@ class ISettings( Interface ):
         Processed parameters are updated in-pace"""
 
     def default_settings():
-        """Return instance of :class:`ConfigDict` providing meta data
+        """Static interface method.
+        Return instance of :class:`ConfigDict` providing meta data
         associated with each configuration parameters supported by the plugin.
         Like - default value, value type, help text, wether web configuration
         is allowed, optional values, etc ...
@@ -67,10 +69,56 @@ class ISettings( Interface ):
         * To persist new `settings` in a backend data-store."""
 
 
+class IHTTPServer( Interface ):
+    """Interface to bind, listen, accept HTTP server."""
+
+    def listen( port, address="" ):
+        """Starts accepting connections on the given port and address.
+        This method may be called more than once to listen on multiple ports.
+        `listen` takes effect immediately;
+        """
+
+    def bind( port, address=None, family=socket.AF_UNSPEC, backlog=128 ):
+        """Binds this server to the given port on the given address.
+
+        To start the server, call `start`. If you want to run this server
+        in a single process, you can call `listen` as a shortcut to the
+        sequence of `bind` and `start` calls.
+
+        Address may be either an IP address or hostname.  If it's a hostname,
+        the server will listen on all IP addresses associated with the
+        name.  Address may be an empty string or None to listen on all
+        available interfaces.  Family may be set to either ``socket.AF_INET``
+        or ``socket.AF_INET6`` to restrict to ipv4 or ipv6 addresses, otherwise
+        both will be used if available.
+
+        The ``backlog`` argument has the same meaning as for
+        `socket.listen`.
+
+        This method may be called multiple times prior to `start` to listen
+        on multiple ports or interfaces.
+        """
+
+    def start( *args, **kwargs ):
+        """Starts this server."""
+
+    def stop():
+        """Stops listening for new connections.
+
+        Requests currently in progress may still continue after the
+        server is stopped.
+        """
+
+    def handle_stream( stream, address ):
+        """To handle a new connection stream."""
+
+
 class IApplication( Interface ):
     """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
     of configuration parameters implementing one or more interface
     specification."""
+
+    appname = Attribute( "Application name" )
 
     def boot( inifile ):
         """Every application boots from an inifile which is a one time
@@ -85,6 +133,10 @@ class IApplication( Interface ):
 
     def router( request ):
 
+    def query_plugins( interface, name, *args, **kwargs ):
+
+    def query_plugin( interface, name, *args, **kwargs ):
+
 
 class IRequest( Interface ):
     """Entry point for every request into the application code. Typically
@@ -97,6 +149,12 @@ class IRequest( Interface ):
         "HTTP Methods supported by the class. "
         "Default : ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS') "
     )
+    app = Attribute(
+        "Application instance deriving from :class:`Plugin` implementing "
+        ":class:`IApplication` interface."
+    )
+
+    def __init__( app ):
 
 
 class IRouter( Interface ):
@@ -105,8 +163,3 @@ class IRouter( Interface ):
 
     def match( request ):
 
-
-class IHTTPServer( Interface ):
-
-    def serve( appsettings ):
-        """Use appsettings to start serving http request."""

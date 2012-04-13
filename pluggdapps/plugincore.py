@@ -5,7 +5,8 @@
 # -*- coding: utf-8 -*-
 
 import sys, types
-from   pluggdapps.util import whichmodule, subclassof, pluginName
+from   pluggdapps      import ROOTAPP
+from   pluggdapps.util import whichmodule, subclassof, pluginname
 
 # TODO :
 #   1. How to check for multiple plugins by name defined for same Interface.
@@ -175,15 +176,16 @@ class Plugin( PluginBase ):
         return self._settngx.__contains__( item )
 
     # Plugin constructor and instantiater methods.
-    def __init__( self, **kwargs ):
+    def __init__( self, appname, *args, **kwargs ):
+        from  pluggdapps import appsettings
         sett = {}
-        sett.update( self.default_settings() )
-        sett.update( kwargs.get( 'settings', {} ))
-        self._settngx = self.normalize_settings( sett )
+        sett.update( appsettings[appname][pluginname(self)] )
+        sett.update( kwargs.pop( 'settings', {} ))
+        self._settngx = sett
 
     # :class:`ISettings` interface methods
     def normalize_settings( self, settings ):
-        pass
+        return settings
 
     def default_settings( self ):
         return {}
@@ -195,7 +197,7 @@ class Plugin( PluginBase ):
 class Attribute( object ):
     """Doc specifier for interface attributes."""
     def __init__( self, docstring ):
-        self.docstring
+        self.docstring = docstring
 
 
 def implements( *interfaces ):
@@ -217,7 +219,23 @@ def plugin_init():
     * PluginMeta._implementers need to save plugin class object based on
       the plugin class's implements() calls which happens during class
       loading.
+    Additionally,
+    * It is expected to be called after process global `appsettings`
+      dictionary is populated so that configuration values gathered from
+      different sources are normalized to python data types.
     """
+    from pluggdapps import appsettings
+    # Normalize plugin settings
+    for appname, setts in appsettings.items()[:] :
+        for p, sett in setts :
+            info = PluginMeta._pluginmap.get( p, {} )
+            cls = info.get('cls', None)
+            s = {}
+            s.update( cls.default_settings() ) if cls else None
+            s.update( sett )
+            cls.normalize_settings( s ) if cls else None
+            appsettings[appname][p] = s
+    # Optimize _implementers for query_*
     PluginMeta._implementers = dict([ 
         ( i, dict([ (nm, PluginMeta._pluginmap[nm]['cls']) for nm in pmap ])
         ) for i, pmap in PluginMeta._implementers.items()
@@ -234,7 +252,7 @@ def plugin_info( nm ):
         raise Exception( "Could not get plugin information for %r " % nm )
 
 
-def query_plugins( interface, *args, **kwargs ):
+def query_plugins( appname, interface, *args, **kwargs ):
     """Use this API to query for plugins using the `interface` class it
     implements. Positional and keyword arguments will be used to instantiate
     the plugin object.
@@ -244,13 +262,14 @@ def query_plugins( interface, *args, **kwargs ):
 
     Returns a list of plugin instance implementing `interface`
     """
+    appname = appname or ROOTAPP
     plugins = []
     for pcls in PluginMeta._implementers.get(interface, {}).values() : 
-        plugin.append( cls( *args, **kwargs ))
+        plugin.append( cls( appname, *args, **kwargs ))
     return plugins
 
 
-def query_plugin( interface, name, *args, **kwargs ):
+def query_plugin( appname, interface, name, *args, **kwargs ):
     """Same as queryPlugins, but returns a single plugin instance as opposed
     an entire list. Positional and keyword arguments will be used to 
     instantiate the plugin object.
@@ -260,9 +279,10 @@ def query_plugin( interface, name, *args, **kwargs ):
 
     Return a single Plugin instance.
     """
+    appname = appname or ROOTAPP
     nm = pluginname( name )
     cls = PluginMeta._implementers.get( interface, {} ).get( nm, None )
-    return cls( *args, **kwargs ) if cls else None
+    return cls( appname, *args, **kwargs ) if cls else None
 
 
 def plugin_names( interface ):

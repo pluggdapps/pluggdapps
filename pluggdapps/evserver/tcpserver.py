@@ -7,71 +7,26 @@ from __future__ import absolute_import, division, with_statement
 import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
-from pluggdapps.evserver import process
-from pluggdapps.evserver.ioloop import IOLoop
-from pluggdapps.evserver.iostream import IOStream, SSLIOStream
-from pluggdapps.util import set_close_exec
+from pluggdapps.evserver            import process
+from pluggdapps.evserver.httpioloop import HTTPIOLoop
+from pluggdapps.evserver.iostream   import HTTPIOStream, HTTPSSLIOStream
+from pluggdapps.util                import set_close_exec, settingsfor
 
-class TCPServer(object):
-    r"""A non-blocking, single-threaded TCP server.
 
-    To use `TCPServer`, define a subclass which overrides the `handle_stream`
-    method.
+class TCPServer( object ):
+    """A non-blocking, single-threaded "Mixin class" implementing TCP server.
+
+    To use `TCPServer`, define a `Plugin` subclass which overrides the 
+    `handle_stream` method.
 
     `TCPServer` can serve SSL traffic with Python 2.6+ and OpenSSL.
-    To make this server serve SSL traffic, send the ssl_options dictionary
-    argument with the arguments required for the `ssl.wrap_socket` method,
-    including "certfile" and "keyfile"::
-
-       TCPServer(ssl_options={
-           "certfile": os.path.join(data_dir, "mydomain.crt"),
-           "keyfile": os.path.join(data_dir, "mydomain.key"),
-       })
-
-    `TCPServer` initialization follows one of three patterns:
-
-    1. `listen`: simple single-process::
-
-            server = TCPServer()
-            server.listen(8888)
-            IOLoop.instance().start()
-
-    2. `bind`/`start`: simple multi-process::
-
-            server = TCPServer()
-            server.bind(8888)
-            server.start(0)  # Forks multiple sub-processes
-            IOLoop.instance().start()
-
-       When using this interface, an `IOLoop` must *not* be passed
-       to the `TCPServer` constructor.  `start` will always start
-       the server on the default singleton `IOLoop`.
-
-    3. `add_sockets`: advanced multi-process::
-
-            sockets = bind_sockets(8888)
-            process.fork_processes(0)
-            server = TCPServer()
-            server.add_sockets(sockets)
-            IOLoop.instance().start()
-
-       The `add_sockets` interface is more complicated, but it can be
-       used with `process.fork_processes` to give you more
-       flexibility in when the fork happens.  `add_sockets` can
-       also be used in single-process servers if you want to create
-       your listening sockets in some way other than
-       `bind_sockets`.
+    To make this server serve SSL traffic, configure the sub-class plugin with
+    `ssloptions.*` settings. which is required for the `ssl.wrap_socket` method,
+    including "certfile" and "keyfile" 
     """
-    default_settings = {
-        'ssl_options' : None,
-    }
 
-    def __init__( self, io_loop=None, settings={} ):
-        self.io_loop = io_loop
-        self.settings = {}
-        self.settings.update( default_settings )
-        self.settings.update( settings )
-        self.ssl_options = self.settings['ssl_options']
+    def __init__( self, ioloop ):
+        self.ioloop = ioloop
         self._sockets = {}  # fd -> socket object
         self._pending_sockets = []
         self._started = False
@@ -82,7 +37,7 @@ class TCPServer(object):
         This method may be called more than once to listen on multiple ports.
         `listen` takes effect immediately; it is not necessary to call
         `TCPServer.start` afterwards.  It is, however, necessary to start
-        the `IOLoop`.
+        the `HTTPIOLoop`.
         """
         sockets = bind_sockets(port, address=address)
         self.add_sockets(sockets)
@@ -96,12 +51,9 @@ class TCPServer(object):
         method and `process.fork_processes` to provide greater
         control over the initialization of a multi-process server.
         """
-        if self.io_loop is None:
-            self.io_loop = IOLoop.instance()
-
         for sock in sockets:
             self._sockets[sock.fileno()] = sock
-            add_accept_handler( sock, self._handle_connection, self.io_loop )
+            add_accept_handler( sock, self._handle_connection, self.ioloop )
 
     def add_socket( self, socket ):
         """Singular version of `add_sockets`.  Takes a single socket object."""
@@ -134,28 +86,28 @@ class TCPServer(object):
         else:
             self._pending_sockets.extend(sockets)
 
-    def start( self, num_processes=1 ):
-        """Starts this server in the IOLoop.
+    def start( self ):
+        """Starts this server in the HTTPIOLoop.
 
         By default, we run the server in this process and do not fork any
         additional child process.
 
-        If num_processes is ``None`` or <= 0, we detect the number of cores
-        available on this machine and fork that number of child
-        processes. If num_processes is given and > 1, we fork that
-        specific number of sub-processes.
+        If `multiprocess` settings not configured or configured as <= 0, we 
+        detect the number of cores available on this machine and fork that 
+        number of child processes. If `multiprocess` settings configured as
+        > 0, we fork that specific number of sub-processes.
 
         Since we use processes and not threads, there is no shared memory
         between any server code.
 
         Note that multiple processes are not compatible with the autoreload
         module (or the ``debug=True`` option to `Platform`). When using 
-        multiple processes, no IOLoops can be created or referenced until 
+        multiple processes, no HTTPIOLoop can be created or referenced until
         after the call to ``TCPServer.start(n)``.
         """
         assert not self._started
         self._started = True
-        if num_processes != 1:
+        if self['num_processes'] != 1:
             process.fork_processes(num_processes)
         sockets = self._pending_sockets
         self._pending_sockets = []
@@ -168,37 +120,43 @@ class TCPServer(object):
         server is stopped.
         """
         for fd, sock in self._sockets.iteritems():
-            self.io_loop.remove_handler(fd)
+            self.ioloop.remove_handler(fd)
             sock.close()
 
     def handle_stream(self, stream, address):
         """Override to handle a new `IOStream` from an incoming connection."""
         raise NotImplementedError()
 
-    def _handle_connection(self, connection, address):
-        if self.ssl_options is not None:
+    def _handle_connection( self, conn, address ):
+        from pluggdapps import query_plugin, ROOTAPP
+
+        ssloptions = settingsfor( 'ssloptions.', self )
+        if ssloptions :
             assert ssl, "Python 2.6+ and OpenSSL required for SSL"
             try:
-                connection = ssl.wrap_socket(connection,
-                                             server_side=True,
-                                             do_handshake_on_connect=False,
-                                             **self.ssl_options)
+                conn = ssl.wrap_socket( conn,
+                                        server_side=True,
+                                        do_handshake_on_connect=False,
+                                        **ssloptions )
             except ssl.SSLError, err:
                 if err.args[0] == ssl.SSL_ERROR_EOF:
-                    return connection.close()
+                    return conn.close()
                 else:
                     raise
             except socket.error, err:
                 if err.args[0] == errno.ECONNABORTED:
-                    return connection.close()
+                    return conn.close()
                 else:
                     raise
         try:
-            if self.ssl_options is not None:
-                stream = SSLIOStream(connection, io_loop=self.io_loop)
+            if ssloptions is not None:
+                stream = query_plugin( ROOTAPP,
+                            ISettings, 'httpssliostream', conn, self.ioloop,
+                            ssloptions=ssloptions )
             else:
-                stream = IOStream(connection, io_loop=self.io_loop)
-            self.handle_stream(stream, address)
+                stream = query_plugin( ROOTAPP,
+                            ISettings, 'httpiostream', conn, self.ioloop )
+            self.handle_stream( stream, address )
         except Exception:
             logging.error("Error in connection callback", exc_info=True)
 
@@ -253,14 +211,15 @@ def bind_sockets(port, address=None, family=socket.AF_UNSPEC, backlog=128):
         sockets.append(sock)
     return sockets
 
-def add_accept_handler(sock, callback, io_loop):
-    """Adds an ``IOLoop`` event handler to accept new connections on ``sock``.
+def add_accept_handler(sock, callback, ioloop):
+    """Adds an ``HTTPIOLoop`` event handler to accept new connections on 
+    ``sock``.
 
     When a connection is accepted, ``callback(connection, address)`` will
     be run (``connection`` is a socket object, and ``address`` is the
     address of the other end of the connection).  Note that this signature
     is different from the ``callback(fd, events)`` signature used for
-    ``IOLoop`` handlers.
+    ``HTTPIOLoop`` handlers.
     """
     def accept_handler(fd, events):
         while True:
@@ -271,4 +230,4 @@ def add_accept_handler(sock, callback, io_loop):
                     return
                 raise
             callback(connection, address)
-    io_loop.add_handler(sock.fileno(), accept_handler, IOLoop.READ)
+    ioloop.add_handler( sock.fileno(), accept_handler, HTTPIOLoop.READ )

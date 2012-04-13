@@ -2,7 +2,7 @@
 
 """A non-blocking, single-threaded HTTP server.
 
-Typical applications have little direct interaction with the `HTTPServer`
+Typical applications have little direct interaction with the `HTTPIOServer`
 class except to start a server at the beginning of the process
 (and even that is often done indirectly via `Platform.listen`).
 
@@ -15,19 +15,56 @@ from __future__ import absolute_import, division, with_statement
 import Cookie, logging, socket, time, urlparse
 import ssl  # Python 2.6+
 
-from pluggdapps.evserver import iostream
-from pluggdapps.evserver.tcpserver import TCPServer
-from pluggdapps.evserver import stack_context
-from pluggdapps.evserver.httputil import utf8, native_str, parse_qs_bytes, \
-                                    HTTPHeaders, parse_multipart_form_data
+from pluggdapps.util                import ConfigDict, asbool
+from pluggdapps.evserver            import iostream
+from pluggdapps.evserver.tcpserver  import TCPServer
+from pluggdapps.evserver            import stack_context
+from pluggdapps.evserver.httputil   import utf8, native_str, parse_qs_bytes, \
+                                           HTTPHeaders, parse_multipart_form_data
+
+_default_settings = ConfigDict()
+_default_settings.__doc__ = \
+    "Configuration settings for event poll based HTTP server."""
+
+_default_settings['multiprocess']  = {
+    'default' : 1,
+    'types'   : (int,),
+    'help'    : "Number process to fork and listen for HTTP connections."
+}
+_default_settings['no_keep_alive']  = {
+    'default' : False,
+    'types'   : (bool,),
+    'help'    : "HTTP /1.1, whether to close the connection after every "
+                "request.",
+}
+_default_settings['xheaders']  = {
+    'default' : False,
+    'types'   : (bool,),
+    'help'    : "If `True`, `X-Real-Ip`` and `X-Scheme` headers are supperted, "
+                "which override the remote IP and HTTP scheme for all "
+                "requests. These headers are useful when running pluggdapps "
+                "behind a reverse proxy or load balancer."
+}
+_default_settings['ssloptions.certfile']  = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "SSL Certificate file location."
+
+}
+_default_settings['ssloptions.keyfile']   = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "SSL Key file location."
+
+}
 
 class _BadRequestException(Exception):
     """Exception class for malformed HTTP requests."""
     pass
 
 
-class HTTPServer(TCPServer):
-    r"""A non-blocking, single-threaded HTTP server.
+class HTTPIOServer( TCPServer, Plugin ):
+    """Plugin deriving TCPServer, a non-blocking, single-threaded HTTP server.
 
     A server is defined by a request callback that takes an HTTPRequest
     instance as an argument and writes a valid HTTP response with
@@ -37,7 +74,7 @@ class HTTPServer(TCPServer):
     requested::
 
         import httpserver
-        import ioloop
+        import httpioloop
 
         def handle_request(request):
            message = "You requested %s\n" % request.uri
@@ -45,18 +82,19 @@ class HTTPServer(TCPServer):
                          len(message), message))
            request.finish()
 
-        http_server = httpserver.HTTPServer(handle_request)
+        http_server = httpserver.HTTPIOServer(handle_request)
         http_server.listen(8888)
-        ioloop.IOLoop.instance().start()
+        ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
+        ioloop.start()
 
-    `HTTPServer` is a very basic connection handler. Beyond parsing the
+    `HTTPIOServer` is a very basic connection handler. Beyond parsing the
     HTTP request body and headers, the only HTTP semantics implemented
-    in `HTTPServer` is HTTP/1.1 keep-alive connections. We do not, however,
+    in `HTTPIOServer` is HTTP/1.1 keep-alive connections. We do not, however,
     implement chunked encoding, so the request callback must provide a
     ``Content-Length`` header or implement chunked encoding for HTTP/1.1
     requests for the server to run correctly for HTTP/1.1 clients. If
     the request handler is unable to do this, you can provide the
-    ``no_keep_alive`` argument to the `HTTPServer` constructor, which will
+    ``no_keep_alive`` argument to the `HTTPIOServer` constructor, which will
     ensure the connection is closed on every request no matter what HTTP
     version the client is using.
 
@@ -65,47 +103,30 @@ class HTTPServer(TCPServer):
     These headers are useful when running pluggdapps behind a reverse proxy or
     load balancer.
 
-    `HTTPServer` can serve SSL traffic with Python 2.6+ and OpenSSL.
-    To make this server serve SSL traffic, send the ssl_options dictionary
-    argument with the arguments required for the `ssl.wrap_socket` method,
-    including "certfile" and "keyfile"::
+    `HTTPIOServer` can serve SSL traffic with Python 2.6+ and OpenSSL. The
+    implementation is available via base class TCPServer.
 
-       HTTPServer(applicaton, ssl_options={
-           "certfile": os.path.join(data_dir, "mydomain.crt"),
-           "keyfile": os.path.join(data_dir, "mydomain.key"),
-       })
-
-    `HTTPServer` initialization follows one of three patterns (the
+    `HTTPIOServer` initialization follows one of two patterns (the
     initialization methods are defined on `tcpserver.TCPServer`):
 
     1. `~tcpserver.TCPServer.listen`: simple single-process::
 
-            server = HTTPServer(app)
+            ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
+            server = HTTPIOServer(app, ioloop)
             server.listen(8888)
-            IOLoop.instance().start()
+            ioloop.start()
 
        In many cases, `Platform.listen` can be used to avoid
-       the need to explicitly create the `HTTPServer`.
+       the need to explicitly create the `HTTPIOServer`.
 
-    2. `~tcpserver.TCPServer.bind`/`~tcpserver.TCPServer.start`:
-       simple multi-process::
+    2. `~tcpserver.TCPServer.add_sockets`: advanced multi-process::
 
-            server = HTTPServer(app)
-            server.bind(8888)
-            server.start(0)  # Forks multiple sub-processes
-            IOLoop.instance().start()
-
-       When using this interface, an `IOLoop` must *not* be passed
-       to the `HTTPServer` constructor.  `start` will always start
-       the server on the default singleton `IOLoop`.
-
-    3. `~tcpserver.TCPServer.add_sockets`: advanced multi-process::
-
+            ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
             sockets = tcpserver.netutil.bind_sockets(8888)
             process.fork_processes(0)
-            server = HTTPServer(app)
+            server = HTTPIOServer(app, ioloop)
             server.add_sockets(sockets)
-            IOLoop.instance().start()
+            ioloop.start()
 
        The `add_sockets` interface is more complicated, but it can be
        used with `process.fork_processes` to give you more
@@ -115,26 +136,31 @@ class HTTPServer(TCPServer):
        `tcpserver.bind_sockets`.
 
     """
-    default_settings = {
-        'no_keep_alive' : False,
-        'xheaders' : False,
-        'ssl_options' : None,
-    }
-    def __init__( self, request_callback, io_loop=None, settings={}, **kwargs ):
-        self.settings = {}
-        self.settings.update( self.default_settings )
-        self.settings.update( settings )
-        self.settings.update( kwargs )
+    implements( IHTTPServer )
+
+    def __init__( self, appname, request_callback, ioloop, **kwargs ):
+        Plugin.__init__( self, appname, request_callback, ioloop, **kwargs )
         self.request_callback = request_callback
-        TCPServer.__init__( self, io_loop=io_loop, self.settings )
+        TCPServer.__init__( self, ioloop )
 
     def handle_stream( self, stream, address ):
-        settings = {
-            'no_keep_alive' : self.settings['no_keep_alive'],
-            'xheaders' : self.settings['xheaders'],
-        }
-        HTTPConnection( 
-            stream, address, self.request_callback, settings=settings )
+        HTTPConnection( stream, address, self.request_callback,
+                        no_keep_alive=self['no_keep_alive'],
+                        xheaders=self['xheaders'] )
+
+    # ISettings interface methods
+    def default_settings( self ):
+        return _default_settings
+
+    def normalize_settings( self, settings ):
+        settings['multiprocess']  = asint( 
+            settings['multiprocess'], _default_settings['multiprocess'] )
+        settings['no_keep_alive'] = asbool(
+            settings['no_keep_alive'], _default_settings['no_keep_alive'] )
+        settings['xheaders']      = asbool(
+            settings['xheaders'], _default_settings['xheaders'] )
+        return settings
+
 
 
 class HTTPConnection(object):
@@ -307,13 +333,13 @@ class HTTPRequest(object):
 
     .. attribute:: remote_ip
 
-       Client's IP address as a string.  If `HTTPServer.xheaders` is set,
+       Client's IP address as a string.  If `HTTPIOServer.xheaders` is set,
        will pass along the real IP address provided by a load balancer
        in the ``X-Real-Ip`` header
 
     .. attribute:: protocol
 
-       The protocol used, either "http" or "https".  If `HTTPServer.xheaders`
+       The protocol used, either "http" or "https".  If `HTTPIOServer.xheaders`
        is set, will pass along the protocol used by a load balancer if
        reported via an ``X-Scheme`` header.
 
@@ -427,10 +453,10 @@ class HTTPRequest(object):
     def get_ssl_certificate(self):
         """Returns the client's SSL certificate, if any.
 
-        To use client certificates, the HTTPServer must have been constructed
+        To use client certificates, the HTTPIOServer must have been constructed
         with cert_reqs set in ssl_options, e.g.::
 
-            server = HTTPServer(app,
+            server = HTTPIOServer(app,
                 ssl_options=dict(
                     certfile="foo.crt",
                     keyfile="foo.key",

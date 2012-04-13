@@ -7,11 +7,29 @@ from __future__ import absolute_import, division, with_statement
 import sys, re, collections, errno, logging, socket
 import ssl  # Python 2.6+
 
-import pluggdapps.evserver import ioloop
-import pluggdapps.evserver import stack_context
+from   pluggdapps           import Plugin
+from   pluggdapps.util      import ConfigDict
+import pluggdapps.evserver  import httpioloop
+import pluggdapps.evserver  import stack_context
 
 
-class IOStream(object):
+_default_settings = ConfigDict()
+_default_settings.__doc__ = \
+    "Configuration settings for event poll based HTTP connection stream HTTPIOStream"
+
+_default_settings['max_buffer_size'] = {
+    'default' : 104857600,
+    'types'   : (int,),
+    'help'    : "Maximum size of read buffer.",
+}
+_default_settings['read_chunk_size'] = {
+    'default' : 4096,
+    'types'   : (int,),
+    'help'    : "Reach chunk size",
+}
+
+
+class HTTPIOStream( Plugin ):
     r"""A utility class to write to and read from a non-blocking socket.
 
     We support a non-blocking ``write()`` and a family of ``read_*()`` methods.
@@ -21,13 +39,13 @@ class IOStream(object):
     The socket parameter may either be connected or unconnected.  For
     server operations the socket is the result of calling socket.accept().
     For client operations the socket is created with socket.socket(),
-    and may either be connected before passing it to the IOStream or
-    connected with IOStream.connect.
+    and may either be connected before passing it to the HTTPIOStream or
+    connected with HTTPIOStream.connect.
 
     A very simple (and broken) HTTP client using this class::
 
-        from pluggdapps.evserver import ioloop
-        from pluggdapps.evserver import iostream
+        from pluggdapps.evserver import httpioloop
+        from pluggdapps.evserver import httpiostream
         import socket
 
         def send_request():
@@ -45,23 +63,20 @@ class IOStream(object):
         def on_body(data):
             print data
             stream.close()
-            ioloop.IOLoop.instance().stop()
+            self.ioloop.stop()
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-        stream = iostream.IOStream(s)
-        stream.connect(("friendfeed.com", 80), send_request)
-        ioloop.IOLoop.instance().start()
+        ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
+        s = socket.socket( socket.AF_INET, socket.SOCK_STREAM, 0 )
+        stream = query_plugin( ROOTAPP, ISettings, 'httpiostream', s, ioloop )
+        stream.connect( ("friendfeed.com", 80), send_request )
+        ioloop.start()
 
     """
-    default_settings = {
-        'max_buffer_size' : 104857600,
-        'read_chunk_size' : 4096,
-    }
-
-    def __init__(self, socket, io_loop=None, settings={} ):
+    def __init__( self, appname, socket, ioloop ):
+        super(Plugin, self).__init__( appname, socket, ioloop )
         self.socket = socket
         self.socket.setblocking(False)
-        self.io_loop = io_loop or ioloop.IOLoop.instance()
+        self.ioloop = ioloop
 
         self._read_buffer = collections.deque()
         self._write_buffer = collections.deque()
@@ -89,9 +104,9 @@ class IOStream(object):
         If callback is specified, it will be called when the
         connection is completed.
 
-        Note that it is safe to call IOStream.write while the
+        Note that it is safe to call HTTPIOStream.write while the
         connection is pending, in which case the data will be written
-        as soon as the connection is ready.  Calling IOStream read
+        as soon as the connection is ready.  Calling HTTPIOStream read
         methods before the socket is connected works on some platforms
         but is non-portable.
         """
@@ -112,7 +127,7 @@ class IOStream(object):
                 self.close()
                 return
         self._connect_callback = stack_context.wrap(callback)
-        self._add_io_state(self.io_loop.WRITE)
+        self._add_io_state(self.ioloop.WRITE)
 
     def read_until_regex(self, regex, callback):
         """Call callback when we read the given regex pattern."""
@@ -156,7 +171,7 @@ class IOStream(object):
             return
         self._read_until_close = True
         self._streaming_callback = stack_context.wrap(streaming_callback)
-        self._add_io_state(self.io_loop.READ)
+        self._add_io_state(self.ioloop.READ)
 
     def write(self, data, callback=None):
         """Write the given data to this stream.
@@ -175,7 +190,7 @@ class IOStream(object):
         self._write_callback = stack_context.wrap(callback)
         self._handle_write()
         if self._write_buffer:
-            self._add_io_state(self.io_loop.WRITE)
+            self._add_io_state(self.ioloop.WRITE)
         self._maybe_add_error_listener()
 
     def set_close_callback(self, callback):
@@ -192,7 +207,7 @@ class IOStream(object):
                 self._run_callback(callback,
                                    self._consume(self._read_buffer_size))
             if self._state is not None:
-                self.io_loop.remove_handler(self.socket.fileno())
+                self.ioloop.remove_handler(self.socket.fileno())
                 self._state = None
             self.socket.close()
             self.socket = None
@@ -224,34 +239,34 @@ class IOStream(object):
             logging.warning("Got events for closed stream %d", fd)
             return
         try:
-            if events & self.io_loop.READ:
+            if events & self.ioloop.READ:
                 self._handle_read()
             if not self.socket:
                 return
-            if events & self.io_loop.WRITE:
+            if events & self.ioloop.WRITE:
                 if self._connecting:
                     self._handle_connect()
                 self._handle_write()
             if not self.socket:
                 return
-            if events & self.io_loop.ERROR:
+            if events & self.ioloop.ERROR:
                 # We may have queued up a user callback in _handle_read or
-                # _handle_write, so don't close the IOStream until those
+                # _handle_write, so don't close the HTTPIOStream until those
                 # callbacks have had a chance to run.
-                self.io_loop.add_callback(self.close)
+                self.ioloop.add_callback(self.close)
                 return
-            state = self.io_loop.ERROR
+            state = self.ioloop.ERROR
             if self.reading():
-                state |= self.io_loop.READ
+                state |= self.ioloop.READ
             if self.writing():
-                state |= self.io_loop.WRITE
-            if state == self.io_loop.ERROR:
-                state |= self.io_loop.READ
+                state |= self.ioloop.WRITE
+            if state == self.ioloop.ERROR:
+                state |= self.ioloop.READ
             if state != self._state:
                 assert self._state is not None, \
                     "shouldn't happen: _handle_events without self._state"
                 self._state = state
-                self.io_loop.update_handler(self.socket.fileno(), self._state)
+                self.ioloop.update_handler(self.socket.fileno(), self._state)
         except Exception:
             logging.error("Uncaught exception, closing connection.",
                           exc_info=True)
@@ -271,26 +286,27 @@ class IOStream(object):
                 # gc'd, but we don't want to rely on gc happening before we
                 # run out of file descriptors)
                 self.close()
-                # Re-raise the exception so that IOLoop.handle_callback_exception
-                # can see it and log the error
+                # Re-raise the exception so that 
+                # HTTPIOLoop.handle_callback_exception can see it and log the 
+                # error
                 raise
             self._maybe_add_error_listener()
-        # We schedule callbacks to be run on the next IOLoop iteration
+        # We schedule callbacks to be run on the next HTTPIOLoop iteration
         # rather than running them directly for several reasons:
         # * Prevents unbounded stack growth when a callback calls an
-        #   IOLoop operation that immediately runs another callback
+        #   HTTPIOLoop operation that immediately runs another callback
         # * Provides a predictable execution context for e.g.
         #   non-reentrant mutexes
         # * Ensures that the try/except in wrapper() is run outside
         #   of the application's StackContexts
         with stack_context.NullContext():
             # stack_context was already captured in callback, we don't need to
-            # capture it again for IOStream's wrapper.  This is especially
+            # capture it again for HTTPIOStream's wrapper.  This is especially
             # important if the callback was pre-wrapped before entry to
-            # IOStream (as in HTTPConnection._header_callback), as we could
+            # HTTPIOStream (as in HTTPConnection._header_callback), as we could
             # capture and leak the wrong context here.
             self._pending_callbacks += 1
-            self.io_loop.add_callback(wrapper)
+            self.ioloop.add_callback(wrapper)
 
     def _handle_read(self):
         try:
@@ -334,7 +350,7 @@ class IOStream(object):
         """Attempt to complete the current read operation from buffered data.
 
         If the read can be completed without blocking, schedules the
-        read callback on the next IOLoop iteration; otherwise starts
+        read callback on the next HTTPIOLoop iteration; otherwise starts
         listening for reads on the socket.
         """
         # See if we've already got the data from a previous read
@@ -347,7 +363,7 @@ class IOStream(object):
             self._check_closed()
         if self._read_from_buffer():
             return
-        self._add_io_state(self.io_loop.READ)
+        self._add_io_state(self.ioloop.READ)
 
     def _read_from_socket(self):
         """Attempts to read from the socket.
@@ -356,7 +372,7 @@ class IOStream(object):
         May be overridden in subclasses.
         """
         try:
-            chunk = self.socket.recv(self.settings['read_chunk_size'])
+            chunk = self.socket.recv( self['read_chunk_size'] )
         except socket.error, e:
             if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                 return None
@@ -386,7 +402,7 @@ class IOStream(object):
             return 0
         self._read_buffer.append(chunk)
         self._read_buffer_size += len(chunk)
-        if self._read_buffer_size >= self.settings['max_buffer_size'] :
+        if self._read_buffer_size >= self['max_buffer_size'] :
             logging.error("Reached maximum read buffer size")
             self.close()
             raise IOError("Reached maximum read buffer size")
@@ -455,12 +471,12 @@ class IOStream(object):
     def _handle_connect(self):
         err = self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
         if err != 0:
-            # IOLoop implementations may vary: some of them return
+            # HTTPIOLoop implementations may vary: some of them return
             # an error state before the socket becomes writable, so
             # in that case a connection failure would be handled by the
             # error path in _handle_events instead of here.
-            logging.warning("Connect error on fd %d: %s",
-                            self.socket.fileno(), errno.errorcode[err])
+            logging.warning( "Connect error on fd %d: %s",
+                             self.socket.fileno(), errno.errorcode[err] )
             self.close()
             return
         if self._connect_callback is not None:
@@ -524,20 +540,20 @@ class IOStream(object):
             if self.socket is None:
                 self._maybe_run_close_callback()
             else:
-                self._add_io_state(ioloop.IOLoop.READ)
+                self._add_io_state(self.ioloop.READ)
 
     def _add_io_state(self, state):
-        """Adds `state` (IOLoop.{READ,WRITE} flags) to our event handler.
+        """Adds `state` (HTTPIOLoop.{READ,WRITE} flags) to our event handler.
 
         Implementation notes: Reads and writes have a fast path and a
         slow path.  The fast path reads synchronously from socket
         buffers, while the slow path uses `_add_io_state` to schedule
-        an IOLoop callback.  Note that in both cases, the callback is
+        an HTTPIOLoop callback.  Note that in both cases, the callback is
         run asynchronously with `_run_callback`.
 
         To detect closed connections, we must have called
         `_add_io_state` at some point, but we want to delay this as
-        much as possible so we don't have to set an `IOLoop.ERROR`
+        much as possible so we don't have to set an `HTTPIOLoop.ERROR`
         listener that will be overwritten by the next slow-path
         operation.  As long as there are callbacks scheduled for
         fast-path ops, those callbacks may do more reads.
@@ -551,16 +567,28 @@ class IOStream(object):
             # connection has been closed, so there can be no future events
             return
         if self._state is None:
-            self._state = ioloop.IOLoop.ERROR | state
+            self._state = self.ioloop.ERROR | state
             with stack_context.NullContext():
-                self.io_loop.add_handler(
+                self.ioloop.add_handler(
                     self.socket.fileno(), self._handle_events, self._state)
         elif not self._state & state:
             self._state = self._state | state
-            self.io_loop.update_handler(self.socket.fileno(), self._state)
+            self.ioloop.update_handler(self.socket.fileno(), self._state)
+
+    # ISettings interface methods
+    def default_settings( self ):
+        return _default_settings
+
+    def normalize_settings( self, settings ):
+        settings['max_buffer_size'] = asint(
+            settings['max_buffer_size'], _default_settings['max_buffer_size'] )
+        settings['read_chunk_size'] = asint(
+            settings['read_chunk_size'], _default_settings['read_chunk_size'] )
+        return settings
 
 
-class SSLIOStream(IOStream):
+
+class HTTPSSLIOStream( HTTPIOStream ):
     """A utility class to write to and read from a non-blocking SSL socket.
 
     If the socket passed to the constructor is already connected,
@@ -568,26 +596,26 @@ class SSLIOStream(IOStream):
 
         ssl.wrap_socket(sock, do_handshake_on_connect=False, **kwargs)
 
-    before constructing the SSLIOStream.  Unconnected sockets will be
-    wrapped when IOStream.connect is finished.
+    before constructing the HTTPSSLIOStream.  Unconnected sockets will be
+    wrapped when HTTPIOStream.connect is finished.
     """
-    def __init__(self, *args, **kwargs):
-        """Creates an SSLIOStream.
+    def __init__( self, appname, *args, **kwargs ):
+        """Creates an HTTPSSLIOStream.
 
-        If a dictionary is provided as keyword argument ssl_options,
+        If a dictionary is provided as keyword argument ssloptions,
         it will be used as additional keyword arguments to ssl.wrap_socket.
         """
-        self._ssl_options = kwargs.pop('ssl_options', {})
-        super(SSLIOStream, self).__init__(*args, **kwargs)
+        self.ssloptions = kwargs.pop('ssloptions', {})
+        super(HTTPSSLIOStream, self).__init__( appname, *args, **kwargs )
         self._ssl_accepting = True
         self._handshake_reading = False
         self._handshake_writing = False
 
     def reading(self):
-        return self._handshake_reading or super(SSLIOStream, self).reading()
+        return self._handshake_reading or super(HTTPSSLIOStream, self).reading()
 
     def writing(self):
-        return self._handshake_writing or super(SSLIOStream, self).writing()
+        return self._handshake_writing or super(HTTPSSLIOStream, self).writing()
 
     def _do_ssl_handshake(self):
         # Based on code from test_ssl.py in the python stdlib
@@ -614,24 +642,24 @@ class SSLIOStream(IOStream):
                 return self.close()
         else:
             self._ssl_accepting = False
-            super(SSLIOStream, self)._handle_connect()
+            super(HTTPSSLIOStream, self)._handle_connect()
 
     def _handle_read(self):
         if self._ssl_accepting:
             self._do_ssl_handshake()
             return
-        super(SSLIOStream, self)._handle_read()
+        super(HTTPSSLIOStream, self)._handle_read()
 
     def _handle_write(self):
         if self._ssl_accepting:
             self._do_ssl_handshake()
             return
-        super(SSLIOStream, self)._handle_write()
+        super(HTTPSSLIOStream, self)._handle_write()
 
     def _handle_connect(self):
         self.socket = ssl.wrap_socket(self.socket,
                                       do_handshake_on_connect=False,
-                                      **self._ssl_options)
+                                      **self.ssloptions)
         # Don't call the superclass's _handle_connect (which is responsible
         # for telling the application that the connection is complete)
         # until we've completed the SSL handshake (so certificates are
@@ -649,7 +677,7 @@ class SSLIOStream(IOStream):
             # The recv() method blocks (at least in python 2.6) if it is
             # called when there is nothing to read, so we have to use
             # read() instead.
-            chunk = self.socket.read(self.settings['read_chunk_size'])
+            chunk = self.socket.read( self['read_chunk_size'] )
         except ssl.SSLError, e:
             # SSLError is a subclass of socket.error, so this except
             # block must come first.

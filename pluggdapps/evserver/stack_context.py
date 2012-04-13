@@ -1,6 +1,6 @@
 # Derived work from Facebook's tornado server.
 
-'''StackContext allows applications to maintain threadlocal-like state
+"""StackContext allows applications to maintain threadlocal-like state
 that follows execution as it moves to other execution contexts.
 
 The motivating examples are to eliminate the need for explicit
@@ -13,7 +13,7 @@ and resumed in a new context that state needs to be preserved.  StackContext
 shifts the burden of restoring that state from each call site (e.g.
 wrapping each AsyncHTTPClient callback in async_callback) to the mechanisms
 that transfer control from one context to another (e.g. AsyncHTTPClient
-itself, IOLoop, thread pools, etc).
+itself, HTTPIOLoop, thread pools, etc).
 
 Example usage::
 
@@ -30,7 +30,8 @@ Example usage::
         # will cause the process to exit instead of spinning endlessly
         # in the ioloop.
         http_client.fetch(url, callback)
-    ioloop.start()
+
+    query_plugin( ROOTAPP, ISettings, 'httpioloop' ).start()
 
 Most applications shouln't have to work with `StackContext` directly.
 Here are a few rules of thumb for when it's necessary:
@@ -50,7 +51,7 @@ Here are a few rules of thumb for when it's necessary:
   persist across asynchronous calls, create a new `StackContext` (or
   `ExceptionStackContext`), and make your asynchronous calls in a ``with``
   block that references your `StackContext`.
-'''
+"""
 
 from __future__ import absolute_import, division, with_statement
 

@@ -4,31 +4,27 @@
 
 from __future__ import absolute_import, division, with_statement
 
-import os, sys, time, logging, errno
+import os, sys, time, logging, errno, random
 from   binascii import hexlify
 
-from   pluggdapps.evserver import ioloop
 import multiprocessing  # Python 2.6+
+
 
 def cpu_count():
     """Returns the number of processors on this machine."""
-    if multiprocessing is not None:
-        try:
-            return multiprocessing.cpu_count()
-        except NotImplementedError:
-            pass
     try:
-        return os.sysconf("SC_NPROCESSORS_CONF")
-    except ValueError:
-        pass
-    logging.error("Could not detect number of processors; assuming 1")
+        return multiprocessing.cpu_count()
+    except :
+        try:
+            return os.sysconf("SC_NPROCESSORS_CONF")
+        except ValueError:
+            logging.error("Could not detect number of processors; assuming 1")
     return 1
 
 
 def _reseed_random():
     if 'random' not in sys.modules:
         return
-    import random
     # If os.urandom is available, this method does the same thing as
     # random.seed (at least as of python 2.6).  If os.urandom is not
     # available, we mix in the pid in addition to a timestamp.
@@ -42,7 +38,7 @@ def _reseed_random():
 _task_id = None
 
 
-def fork_processes(num_processes, max_restarts=100):
+def fork_processes( num_processes, max_restarts ):
     """Starts multiple worker processes.
 
     If ``num_processes`` is None or <= 0, we detect the number of cores
@@ -55,7 +51,7 @@ def fork_processes(num_processes, max_restarts=100):
 
     Note that multiple processes are not compatible with the autoreload
     module (or the debug=True option to `Platform`).
-    When using multiple processes, no IOLoops can be created or
+    When using multiple processes, no HTTPIOLoops can be created or
     referenced until after the call to ``fork_processes``.
 
     In each child process, ``fork_processes`` returns its *task id*, a
@@ -70,10 +66,6 @@ def fork_processes(num_processes, max_restarts=100):
     assert _task_id is None
     if num_processes is None or num_processes <= 0:
         num_processes = cpu_count()
-    if ioloop.IOLoop.initialized():
-        raise RuntimeError("Cannot run in multiple processes: IOLoop instance "
-                           "has already been initialized. You cannot call "
-                           "IOLoop.instance() before calling start_processes()")
     logging.info("Starting %d processes", num_processes)
     children = {}
 
@@ -120,7 +112,7 @@ def fork_processes(num_processes, max_restarts=100):
             return new_id
     # All child processes exited cleanly, so exit the master process
     # instead of just returning to right after the call to
-    # fork_processes (which will probably just start up another IOLoop
+    # fork_processes (which will probably just start up another HTTPIOLoop
     # unless the caller checks the return value).
     sys.exit(0)
 

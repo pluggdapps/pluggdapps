@@ -7,7 +7,7 @@ Thread-safety notes
 In general, methods on RequestHandler and elsewhere in pluggapps evserver
 (event server)  are not thread-safe.  In particular, methods such as write(),
 finish(), and flush() must only be called from the main thread.  If you use
-multiple threads it is important to use IOLoop.add_callback to transfer
+multiple threads it is important to use HTTPIOLoop.add_callback to transfer
 control back to the main thread before finishing the request.
 """
 
@@ -1095,14 +1095,15 @@ class Application(object):
     """A collection of request handlers that make up a web application.
 
     Instances of this class are callable and can be passed directly to
-    HTTPServer to serve the application::
+    HTTPIOServer to serve the application::
 
         application = web.Application([
             (r"/", MainPageHandler),
         ])
-        http_server = httpserver.HTTPServer(application)
+        http_server = httpserver.HTTPIOServer(application)
         http_server.listen(8080)
-        ioloop.IOLoop.instance().start()
+        ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
+        ioloop.start()
 
     The constructor for this class takes in a list of URLSpec objects
     or (regexp, request_class) tuples. When we receive requests, we
@@ -1185,20 +1186,20 @@ class Application(object):
     def listen(self, port, address="", **kwargs):
         """Starts an HTTP server for this application on the given port.
 
-        This is a convenience alias for creating an HTTPServer object
+        This is a convenience alias for creating an HTTPIOServer object
         and calling its listen method.  Keyword arguments not
-        supported by HTTPServer.listen are passed to the HTTPServer
+        supported by HTTPIOServer.listen are passed to the HTTPIOServer
         constructor.  For advanced uses (e.g. preforking), do not use
-        this method; create an HTTPServer and call its bind/start
+        this method; create an HTTPIOServer and call its bind/start
         methods directly.
 
         Note that after calling this method you still need to call
-        IOLoop.instance().start() to start the server.
+        HTTPIOLoop.start() to start the server.
         """
-        # import is here rather than top level because HTTPServer
+        # import is here rather than top level because HTTPIOServer
         # is not importable on appengine
-        from tornado.httpserver import HTTPServer
-        server = HTTPServer(self, **kwargs)
+        from tornado.httpserver import HTTPIOServer
+        server = HTTPIOServer(self, **kwargs)
         server.listen(port, address)
 
     def add_handlers(self, host_pattern, host_handlers):
@@ -1292,7 +1293,7 @@ class Application(object):
                     pass
 
     def __call__(self, request):
-        """Called by HTTPServer to execute the request."""
+        """Called by HTTPIOServer to execute the request."""
         transforms = [t(request) for t in self.transforms]
         handler = None
         args = []

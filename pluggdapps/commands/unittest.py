@@ -15,7 +15,8 @@ class UnitTest( Plugin ):
 
     usage = "usage: pa unittest [options] <module>"
 
-    def __init__( self, argv=[] ):
+    def __init__( self, appname, argv=[] ):
+        super(Plugin, self).__init__( appname, argv=argv )
         parser = self._parse( UnitTest.usage )
         self.options, self.args = parser.parse_args( argv )
 

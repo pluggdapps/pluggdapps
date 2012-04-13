@@ -2,14 +2,12 @@
 
 """An I/O event loop for non-blocking sockets.
 
-Typical applications will use a single `IOLoop` object, in the
-`IOLoop.instance` singleton.  The `IOLoop.start` method should usually
-be called at the end of the ``main()`` function.  Atypical applications may
-use more than one `IOLoop`, such as one `IOLoop` per thread, or per `unittest`
-case.
+The server command is typically responsible for starting `HTTPIOLoop`,
+    query_plugin( ROOTAPP, ISettings, 'httpioloop' ).start()
 
-In addition to I/O events, the `IOLoop` can also schedule time-based events.
-`IOLoop.add_timeout` is a non-blocking alternative to `time.sleep`.
+In addition to I/O events, the `HTTPIOLoop` can also schedule time-based 
+events.  `HTTPIOLoop.add_timeout` is a non-blocking alternative to 
+`time.sleep`.
 """
 
 from __future__ import absolute_import, division, with_statement
@@ -18,25 +16,26 @@ import datetime, errno, heapq, logging, time
 import os, select, thread, threading, traceback, signal
 
 from   pluggdapps.util      import set_close_exec, set_nonblocking, \
-                                   timedelta_to_seconds
+                                   timedelta_to_seconds, ConfigDict, \
+                                   asint, asfloat
 import pluggdapps.evserver  import stack_context
 from   pluggdapps           import Plugin
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for poll based even handling IOLoop"
+    "Configuration settings for poll based event handling for HTTP sockets"
 
 _default_settings['poll_threshold']     = {
     'default' : 1000,
-    'types'   : (int,)
+    'types'   : (int,),
     'help'    : "A warning limit for number of descriptors being polled by a "
-                "single poll instance."
+                "single poll instance.",
 }
 _default_settings['poll_timeout']       = {
     'default' : 3600.0,
     'types'   : (float,),
     'help'    : "in seconds. Poll instance will timeout after so many seconds "
-                "and perform callbacks (if any) and start a fresh poll."
+                "and perform callbacks (if any) and start a fresh poll.",
 }
 
 class Waker(interface.Waker):
@@ -63,15 +62,10 @@ class Waker(interface.Waker):
         self.writer.close()
 
 
-class IOLoop( Plugin ):
+class HTTPIOLoop( Plugin ):
     """A level-triggered I/O loop using Linux epoll and requires python 2.6+.
 
     Example usage for a simple TCP server::
-
-        import errno
-        import functools
-        import ioloop
-        import socket
 
         def connection_ready(sock, fd, events):
             while True:
@@ -90,36 +84,34 @@ class IOLoop( Plugin ):
         sock.bind(("", port))
         sock.listen(128)
 
-        io_loop = ioloop.IOLoop.instance()
+        ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
         callback = functools.partial(connection_ready, sock)
-        io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
-        io_loop.start()
+        ioloop.add_handler(sock.fileno(), callback, ioloop.READ)
+        ioloop.start()
 
     """
     # Constants from the epoll module
-    _EPOLLIN = 0x001
-    _EPOLLPRI = 0x002
-    _EPOLLOUT = 0x004
-    _EPOLLERR = 0x008
-    _EPOLLHUP = 0x010
+    _EPOLLIN    = 0x001
+    _EPOLLPRI   = 0x002
+    _EPOLLOUT   = 0x004
+    _EPOLLERR   = 0x008
+    _EPOLLHUP   = 0x010
     _EPOLLRDHUP = 0x2000
     _EPOLLONESHOT = (1 << 30)
-    _EPOLLET = (1 << 31)
+    _EPOLLET    = (1 << 31)
 
     # Our events map exactly to the epoll events
-    NONE = 0
-    READ = _EPOLLIN
+    NONE  = 0
+    READ  = _EPOLLIN
     WRITE = _EPOLLOUT
     ERROR = _EPOLLERR | _EPOLLHUP
 
-    def __init__( self, impl=None, settings={} ):
+    def __init__( self, appname, impl=None ):
+        super(Plugin, self).__init__( appname, impl=impl )
         self._impl = impl or _poll()
         if hasattr(self._impl, 'fileno'):
-            set_close_exec(self._impl.fileno())
+            set_close_exec( self._impl.fileno() )
 
-        self.settings = {}
-        self.settings.update( self.default_settings )
-        self.settings.update( settings )
         # Book keeping
         self._handlers = {}
         self._events = {}
@@ -138,60 +130,26 @@ class IOLoop( Plugin ):
                          lambda fd, events: self._waker.consume(),
                          self.READ)
 
-    @staticmethod
-    def instance():
-        """Returns a global IOLoop instance.
-
-        Most single-threaded applications have a single, global IOLoop.
-        Use this method instead of passing around IOLoop instances
-        throughout your code.
-
-        A common pattern for classes that depend on IOLoops is to use
-        a default argument to enable programs with multiple IOLoops
-        but not require the argument for simpler applications::
-
-            class MyClass(object):
-                def __init__(self, io_loop=None):
-                    self.io_loop = io_loop or IOLoop.instance()
-        """
-        if not hasattr(IOLoop, "_instance"):
-            IOLoop._instance = IOLoop()
-        return IOLoop._instance
-
-    @staticmethod
-    def initialized():
-        """Returns true if the singleton instance has been created."""
-        return hasattr(IOLoop, "_instance")
-
-    def install(self):
-        """Installs this IOloop object as the singleton instance.
-
-        This is normally not necessary as `instance()` will create
-        an IOLoop on demand, but you may want to call `install` to use
-        a custom subclass of IOLoop.
-        """
-        assert not IOLoop.initialized()
-        IOLoop._instance = self
-
     def close(self, all_fds=False):
-        """Closes the IOLoop, freeing any resources used.
+        """Closes the HTTPIOLoop, freeing any resources used.
 
         If ``all_fds`` is true, all file descriptors registered on the
-        IOLoop will be closed (not just the ones created by the IOLoop itself).
+        HTTPIOLoop will be closed (not just the ones created by the HTTPIOLoop
+        itself).
 
-        Many applications will only use a single IOLoop that runs for the
-        entire lifetime of the process.  In that case closing the IOLoop
+        Many applications will only use a single HTTPIOLoop that runs for the
+        entire lifetime of the process. In that case closing the HTTPIOLoop
         is not necessary since everything will be cleaned up when the
-        process exits.  `IOLoop.close` is provided mainly for scenarios
+        process exits. `HTTPIOLoop.close` is provided mainly for scenarios
         such as unit tests, which create and destroy a large number of
         IOLoops.
 
-        An IOLoop must be completely stopped before it can be closed.  This
-        means that `IOLoop.stop()` must be called *and* `IOLoop.start()` must
-        be allowed to return before attempting to call `IOLoop.close()`.
-        Therefore the call to `close` will usually appear just after
-        the call to `start` rather than near the call to `stop`.
-        """
+        An HTTPIOLoop must be completely stopped before it can be closed.  This
+        means that `HTTPIOLoop.stop()` must be called *and* 
+        `HTTPIOLoop.start()` must be allowed to return before attempting to 
+        call `HTTPIOLoop.close()`. Therefore the call to `close` will usually 
+        appear just after the call to `start` rather than near the call to 
+        `stop`. """
         self.remove_handler(self._waker.fileno())
         if all_fds:
             for fd in self._handlers.keys()[:]:
@@ -206,7 +164,7 @@ class IOLoop( Plugin ):
         """Registers the given handler to receive the given events for fd."""
         self._handlers[fd] = stack_context.wrap(handler)
         self._impl.register(fd, events | self.ERROR)
-        poll_threshold = self.settings['poll_threshold']
+        poll_threshold = self['poll_threshold']
         if len(self._handlers) > poll_threshold :
             logging.warning( "Polled descriptors exceeded threshold %r",
                              poll_threshold )
@@ -222,7 +180,7 @@ class IOLoop( Plugin ):
         try:
             self._impl.unregister(fd)
         except (OSError, IOError):
-            logging.debug("Error deleting fd from IOLoop", exc_info=True)
+            logging.debug("Error deleting fd from HTTPIOLoop", exc_info=True)
 
     def set_blocking_signal_threshold(self, seconds, action):
         """Sends a signal if the ioloop is blocked for more than s seconds.
@@ -255,7 +213,7 @@ class IOLoop( Plugin ):
 
         For use with set_blocking_signal_threshold.
         """
-        logging.warning('IOLoop blocked for %f seconds in\n%s',
+        logging.warning('HTTPIOLoop blocked for %f seconds in\n%s',
                         self._blocking_signal_threshold,
                         ''.join(traceback.format_stack(frame)))
 
@@ -271,7 +229,7 @@ class IOLoop( Plugin ):
         self._thread_ident = thread.get_ident()
         self._running = True
         while True:
-            poll_timeout = self.settings['poll_timeout']
+            poll_timeout = self['poll_timeout']
 
             # Prevent IO event starvation by delaying new callbacks
             # to the next iteration of the event loop.
@@ -311,7 +269,7 @@ class IOLoop( Plugin ):
             try:
                 event_pairs = self._impl.poll(poll_timeout)
             except Exception, e:
-                # Depending on python version and IOLoop implementation,
+                # Depending on python version and HTTPIOLoop implementation,
                 # different exception types may be thrown and there are
                 # two ways EINTR might be signaled:
                 # * e.errno == errno.EINTR
@@ -330,7 +288,7 @@ class IOLoop( Plugin ):
             # Pop one fd at a time from the set of pending fds and run
             # its handler. Since that handler may perform actions on
             # other file descriptors, there may be reentrant calls to
-            # this IOLoop that update self._events
+            # this HTTPIOLoop that update self._events
             self._events.update(event_pairs)
             while self._events:
                 fd, events = self._events.popitem()
@@ -359,22 +317,22 @@ class IOLoop( Plugin ):
         To use asynchronous methods from otherwise-synchronous code (such as
         unit tests), you can start and stop the event loop like this::
 
-          ioloop = IOLoop()
+          ioloop = HTTPIOLoop()
           async_method(ioloop=ioloop, callback=ioloop.stop)
           ioloop.start()
 
         ioloop.start() will return after async_method has run its callback,
         whether that callback was invoked before or after ioloop.start.
 
-        Note that even after `stop` has been called, the IOLoop is not
-        completely stopped until `IOLoop.start` has also returned.
+        Note that even after `stop` has been called, the HTTPIOLoop is not
+        completely stopped until `HTTPIOLoop.start` has also returned.
         """
         self._running = False
         self._stopped = True
         self._waker.wake()
 
     def running(self):
-        """Returns true if this IOLoop is currently running."""
+        """Returns true if this HTTPIOLoop is currently running."""
         return self._running
 
     def add_timeout(self, deadline, callback):
@@ -388,7 +346,7 @@ class IOLoop( Plugin ):
 
         Note that it is not safe to call `add_timeout` from other threads.
         Instead, you must use `add_callback` to transfer control to the
-        IOLoop's thread, and then call `add_timeout` from there.
+        HTTPIOLoop's thread, and then call `add_timeout` from there.
         """
         timeout = _Timeout(deadline, stack_context.wrap(callback))
         heapq.heappush(self._timeouts, timeout)
@@ -410,20 +368,20 @@ class IOLoop( Plugin ):
         """Calls the given callback on the next I/O loop iteration.
 
         It is safe to call this method from any thread at any time.
-        Note that this is the *only* method in IOLoop that makes this
-        guarantee; all other interaction with the IOLoop must be done
-        from that IOLoop's thread.  add_callback() may be used to transfer
-        control from other threads to the IOLoop's thread.
+        Note that this is the *only* method in HTTPIOLoop that makes this
+        guarantee; all other interaction with the HTTPIOLoop must be done
+        from that HTTPIOLoop's thread.  add_callback() may be used to transfer
+        control from other threads to the HTTPIOLoop's thread.
         """
         with self._callback_lock:
             list_empty = not self._callbacks
             self._callbacks.append(stack_context.wrap(callback))
         if list_empty and thread.get_ident() != self._thread_ident:
-            # If we're in the IOLoop's thread, we know it's not currently
+            # If we're in the HTTPIOLoop's thread, we know it's not currently
             # polling.  If we're not, and we added the first callback to an
             # empty list, we may need to wake it up (it may wake up on its
             # own, but an occasional extra wake is harmless).  Waking
-            # up a polling IOLoop is relatively expensive, so we try to
+            # up a polling HTTPIOLoop is relatively expensive, so we try to
             # avoid it when we can.
             self._waker.wake()
 
@@ -434,7 +392,7 @@ class IOLoop( Plugin ):
             self.handle_callback_exception(callback)
 
     def handle_callback_exception(self, callback):
-        """This method is called whenever a callback run by the IOLoop
+        """This method is called whenever a callback run by the HTTPIOLoop
         throws an exception.
 
         By default simply logs the exception as an error.  Subclasses
@@ -445,9 +403,21 @@ class IOLoop( Plugin ):
         """
         logging.error("Exception in callback %r", callback, exc_info=True)
 
+    # `ISettings` interface methods
+    def default_settings( self ):
+        return _default_settings
+
+    @classmethod
+    def normalize_settings( cls, settings ):
+        settings['poll_threshold'] = asint(
+            settings['poll_threshold'], _default_settings['poll_threshold'] )
+        settings['poll_timeout']   = asfloat( 
+            settings['poll_timeout'], _default_settings['poll_timeout'] )
+        return settings
+
 
 class _Timeout( object ):
-    """An IOLoop timeout, a UNIX timestamp and a callback"""
+    """An HTTPIOLoop timeout, a UNIX timestamp and a callback"""
 
     # Reduce memory overhead when there are lots of pending callbacks
     __slots__ = ['deadline', 'callback']
@@ -481,10 +451,10 @@ class PeriodicCallback( object ):
 
     `start` must be called after the PeriodicCallback is created.
     """
-    def __init__( self, callback, callback_time, io_loop=None ):
+    def __init__( self, callback, callback_time, ioloop ):
         self.callback = callback
         self.callback_time = callback_time
-        self.io_loop = io_loop or IOLoop.instance()
+        self.ioloop = ioloop
         self._running = False
         self._timeout = None
 
@@ -498,7 +468,7 @@ class PeriodicCallback( object ):
         """Stops the timer."""
         self._running = False
         if self._timeout is not None:
-            self.io_loop.remove_timeout(self._timeout)
+            self.ioloop.remove_timeout(self._timeout)
             self._timeout = None
 
     def _run( self ):
@@ -515,15 +485,7 @@ class PeriodicCallback( object ):
             current_time = time.time()
             while self._next_timeout <= current_time:
                 self._next_timeout += self.callback_time / 1000.0
-            self._timeout = self.io_loop.add_timeout(self._next_timeout, self._run)
-
-    # ISettings
-    def default_settings( self ):
-        return default_settings
-
-    def normalize_settings( self, settings ):
-        settings['poll_threshold'] = int( settings['poll_threshold'] )
-        settings['poll_timeout'] = float( settings['poll_threshold'] )
+            self._timeout = self.ioloop.add_timeout(self._next_timeout, self._run)
 
 # Python 2.6+ on Linux
 _poll = select.epoll
