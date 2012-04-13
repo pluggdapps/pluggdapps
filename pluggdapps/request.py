@@ -5,42 +5,41 @@
 # -*- coding: utf-8 -*-
 
 import Cookie, socket, time, urlparse
+from   copy import deepcopy
 
 from   pluggdapps               import Plugin, implements
 from   pluggdapps.interfaces    import IHTTPRequest
 from   pluggdapps.evserver      import httpiostream
-from   pluggdapps.util          import ConfigDict, asbool
+from   pluggdapps.util          import ConfigDict, asbool, pluginname
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for HTTPRequest implementing IRequest interface."
-
-_default_settings['protocol_version']  = {
-    'default' : "HTTP/1.0",
-    'types'   : (str,),
-    'help'    : "Default HTTP protocol version.",
-}
-
+    "Configuration settings for HTTPRequest implementing IHTTPRequest interface."
 
 class HTTPRequest( Plugin ):
     implements( IHTTPRequest )
 
-    def __init__( self, appname, connection, method, uri, version, headers,
+    do_methods = ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS')
+
+    # IHTTPRequest interface methods and attributes
+    def __init__( self, application, connection, method, uri, version, headers,
                   remote_ip, host, protocol, files ):
 
-        super(Plugin, self).__init__( appname )
+        super(Plugin, self).__init__( pluginname(application) )
         if connection :
             stream, xheaders = connection.stream, connection.xheaders
         else :
             stream, xheaders = None, None
+        self.application = application
         self.connection = connection
+        self.platform = connection.platform
         
         # Startline
         self.method, self.uri, self.version = method, uri, version
         # Header
         self.headers = headers or httputil.HTTPHeaders()
         # Body
-        self.body = body or ""
+        self.body = ""
 
         if xheaders :
             # Squid uses X-Forwarded-For, others use X-Real-Ip
@@ -63,8 +62,8 @@ class HTTPRequest( Plugin ):
                 self.protocol = "http"
         self.host = host or self.headers.get("Host") or "127.0.0.1"
         self.files = files or {}
-        self._start_time = time.time()
-        self._finish_time = None
+        self.received = time.time()
+        self.full_url = self.protocol + "://" + self.host + self.uri
 
         scheme, netloc, path, query, fragment = urlparse.urlsplit(native_str(uri))
         self.path = path
@@ -76,61 +75,39 @@ class HTTPRequest( Plugin ):
             if values:
                 self.arguments[name] = values
 
-    def supports_http_1_1(self):
-        """Returns True if this request supports HTTP/1.1 semantics"""
+        # Root settings
+        self.rootsettings = deepcopy( self.platform.appsettings.get('root', {}) )
+
+    def handle( self ):
+        sett = self.rootsettings
+        for key, sett in sett.items() :
+            if key.startswith('app:') :
+                subdomain = sett.get('mount_subdomain', None)
+                script = sett.get('mount_script', None)
+
+    def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
 
     @property
-    def cookies(self):
-        """A dictionary of Cookie.Morsel objects."""
-        if not hasattr(self, "_cookies"):
+    def cookies( self ):
+        if not hasattr( self, "_cookies" ):
             self._cookies = Cookie.SimpleCookie()
             if "Cookie" in self.headers:
                 try:
-                    self._cookies.load(
-                        native_str(self.headers["Cookie"]))
+                    self._cookies.load( native_str( self.headers["Cookie"]  )
                 except Exception:
                     self._cookies = {}
         return self._cookies
 
-    def write(self, chunk, callback=None):
-        """Writes the given chunk to the response stream."""
-        assert isinstance(chunk, bytes)
-        self.connection.write(chunk, callback=callback)
+    @property
+    def elapsedtime( self ):
+        return time.time() - self.receivedat
 
-    def finish(self):
-        """Finishes this HTTP request on the open connection."""
-        self.connection.finish()
-        self._finish_time = time.time()
-
-    def full_url(self):
-        """Reconstructs the full URL for this request."""
-        return self.protocol + "://" + self.host + self.uri
-
-    def request_time(self):
-        """Returns the amount of time it took for this request to execute."""
-        if self._finish_time is None:
-            return time.time() - self._start_time
-        else:
-            return self._finish_time - self._start_time
+    @property
+    def servicetime( self ):
+        return time.time() - self.receivedat
 
     def get_ssl_certificate(self):
-        """Returns the client's SSL certificate, if any.
-
-        To use client certificates, the HTTPIOServer must have been constructed
-        with cert_reqs set in ssl_options, e.g.::
-
-            server = HTTPIOServer(app,
-                ssl_options=dict(
-                    certfile="foo.crt",
-                    keyfile="foo.key",
-                    cert_reqs=ssl.CERT_REQUIRED,
-                    ca_certs="cacert.crt"))
-
-        The return value is a dictionary, see SSLSocket.getpeercert() in
-        the standard library for more details.
-        http://docs.python.org/library/ssl.html#sslsocket-objects
-        """
         try:
             return self.connection.stream.socket.getpeercert()
         except ssl.SSLError:

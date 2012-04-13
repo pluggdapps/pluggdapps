@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, with_statement
 import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
+from pluggdapps.interfaces          import ISettings
 from pluggdapps.evserver            import process
 from pluggdapps.evserver.httpioloop import HTTPIOLoop
 from pluggdapps.evserver.iostream   import HTTPIOStream, HTTPSSLIOStream
@@ -25,11 +26,11 @@ class TCPServer( object ):
     including "certfile" and "keyfile" 
     """
 
-    def __init__( self, ioloop ):
-        self.ioloop = ioloop
+    def __init__( self ):
         self._sockets = {}  # fd -> socket object
         self._pending_sockets = []
         self._started = False
+        self.ioloop = None
 
     def listen( self, port, address="" ):
         """Starts accepting connections on the given port.
@@ -51,6 +52,9 @@ class TCPServer( object ):
         method and `process.fork_processes` to provide greater
         control over the initialization of a multi-process server.
         """
+        from pluggdapps import query_plugin, ROOTAPP
+        if self.ioloop == None :
+            self.ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
         for sock in sockets:
             self._sockets[sock.fileno()] = sock
             add_accept_handler( sock, self._handle_connection, self.ioloop )
@@ -107,11 +111,15 @@ class TCPServer( object ):
         """
         assert not self._started
         self._started = True
-        if self['num_processes'] != 1:
-            process.fork_processes(num_processes)
-        sockets = self._pending_sockets
-        self._pending_sockets = []
-        self.add_sockets(sockets)
+        multiprocess = self['multiprocess']
+        port, host = self['port'], self['host']
+        if multiprocess <= 0:  # Single process
+            self.listen( port, address )
+        else :  # multi-process
+            sockets = bind_sockets( port, address )
+            process.fork_processes( multiprocess )
+            self.add_sockets( sockets )
+        self.ioloop.start()
 
     def stop(self):
         """Stops listening for new connections.

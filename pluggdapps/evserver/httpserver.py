@@ -26,9 +26,9 @@ _default_settings.__doc__ = \
     "Configuration settings for event poll based HTTP server."
 
 _default_settings['multiprocess']  = {
-    'default' : 1,
+    'default' : 0,
     'types'   : (int,),
-    'help'    : "Number process to fork and listen for HTTP connections."
+    'help'    : "Number process to fork and listen for HTTP connections.",
 }
 _default_settings['no_keep_alive']  = {
     'default' : False,
@@ -42,24 +42,44 @@ _default_settings['xheaders']  = {
     'help'    : "If `True`, `X-Real-Ip`` and `X-Scheme` headers are supported, "
                 "will override the remote IP and HTTP scheme for all "
                 "requests. These headers are useful when running pluggdapps "
-                "behind a reverse proxy or load balancer."
+                "behind a reverse proxy or load balancer.",
 }
-_default_settings['request_handler']  = {
+_default_settings['request_factory']  = {
     'default' : 'httprequest',
     'types'   : (str,),
-    'help'    : "Handler class (callable) to process completely read request."
+    'help'    : "Handler class (callable) to process fully read request.",
 }
 _default_settings['ssloptions.certfile']  = {
     'default' : '',
     'types'   : (str,),
-    'help'    : "SSL Certificate file location."
+    'help'    : "SSL Certificate file location.",
 
 }
 _default_settings['ssloptions.keyfile']   = {
     'default' : '',
     'types'   : (str,),
-    'help'    : "SSL Key file location."
+    'help'    : "SSL Key file location.",
 
+}
+_default_settings['ssloptions.cert_reqs']  = {
+    'default' : ssl.CERT_REQUIRED,
+    'types'   : (int,),
+    'options' : [ ssl.CERT_NONE, ssl.CERT_OPTIONAL, ssl.CERT_REQUIRED ],
+    'help'    : "Whether a certificate is required from the other side of the "
+                "connection, and whether it will be validated if provided. "
+                "It must be one of the three values CERT_NONE (certificates "
+                "ignored), CERT_OPTIONAL (not required, but validated if "
+                "provided), or CERT_REQUIRED (required and validated). If the "
+                "value of this value is not CERT_NONE, then the `ca_certs` "
+                "parameter must point to a file of CA certificates."
+}
+_default_settings['ssloptions.ca_certs']   = {
+    'default' : None,
+    'types'   : (int,),
+    'help'    : "The ca_certs file contains a set of concatenated "
+                "certification authority. certificates, which are used to "
+                "validate certificates passed from the other end of the "
+                "connection."
 }
 
 class _BadRequestException(Exception):
@@ -110,45 +130,17 @@ class HTTPIOServer( TCPServer, Plugin ):
     `HTTPIOServer` can serve SSL traffic with Python 2.6+ and OpenSSL. The
     implementation is available via base class TCPServer.
 
-    `HTTPIOServer` initialization follows one of two patterns (the
-    initialization methods are defined on `tcpserver.TCPServer`):
-
-    1. `~tcpserver.TCPServer.listen`: simple single-process::
-
-            ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
-            server = HTTPIOServer(app, ioloop)
-            server.listen(8888)
-            ioloop.start()
-
-       In many cases, `Platform.listen` can be used to avoid
-       the need to explicitly create the `HTTPIOServer`.
-
-    2. `~tcpserver.TCPServer.add_sockets`: advanced multi-process::
-
-            ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
-            sockets = tcpserver.netutil.bind_sockets(8888)
-            process.fork_processes(0)
-            server = HTTPIOServer(app, ioloop)
-            server.add_sockets(sockets)
-            ioloop.start()
-
-       The `add_sockets` interface is more complicated, but it can be
-       used with `process.fork_processes` to give you more
-       flexibility in when the fork happens.  `add_sockets` can
-       also be used in single-process servers if you want to create
-       your listening sockets in some way other than
-       `tcpserver.bind_sockets`.
-
     """
     implements( IHTTPServer )
 
-    def __init__( self, appname, request_callback, ioloop, **kwargs ):
-        Plugin.__init__( self, appname, request_callback, ioloop, **kwargs )
-        self.request_callback = request_callback
-        TCPServer.__init__( self, ioloop )
+    def __init__( self, appname, platform, **kwargs ):
+        super( Plugin, self ).__init__( appname, platform, **kwargs )
+        super( TCPServer, self ).__init__()
+        self.platform = platform
 
     def handle_stream( self, stream, address ):
-        HTTPConnection( stream, address, self.request_callback,
+        HTTPConnection( stream, address, self.platform,
+                        request_factory=self['request_factory'],
                         no_keep_alive=self['no_keep_alive'],
                         xheaders=self['xheaders'] )
 
@@ -173,14 +165,15 @@ class HTTPConnection(object):
     We parse HTTP headers and bodies, and execute the request callback
     until the HTTP conection is closed.
     """
-    def __init__( self, stream, address, request_callback, no_keep_alive=False,
-                  xheaders=False ):
+    def __init__( self, stream, address, platform, request_factory, 
+                  no_keep_alive=False, xheaders=False ):
         self.stream = stream
         if self.stream.socket.family not in (socket.AF_INET, socket.AF_INET6):
             # Unix (or other) socket; fake the remote address
             address = ('0.0.0.0', 0)
         self.address = address
-        self.request_callback = request_callback
+        self.platform = platform
+        self.request_factory = request_factory
         self.no_keep_alive = no_keep_alive
         self.xheaders = xheaders
         self._request = None
@@ -255,7 +248,7 @@ class HTTPConnection(object):
 
             headers = HTTPHeaders.parse( data[eol:] )
             self._request = query_plugin( 
-                "root", IHTTPRequest, 'httprequest'
+                "root", IHTTPRequest, self.request_factory,
                 self, method, uri, version, headers, self.address[0],
                 None, None, None )
 
@@ -269,7 +262,7 @@ class HTTPConnection(object):
                 self.stream.read_bytes(content_length, self._on_request_body)
                 return
 
-            self.request_callback(self._request)
+            self._request.handle()
 
         except _BadRequestException, e:
             logging.info( "Malformed HTTP request from %s: %s",
@@ -301,4 +294,4 @@ class HTTPConnection(object):
                 else:
                     logging.warning("Invalid multipart/form-data")
 
-        self.request_callback( self._request )
+        self._request.handle()

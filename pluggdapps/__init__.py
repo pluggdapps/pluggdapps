@@ -7,7 +7,8 @@
 import pkg_resources    as pkg
 
 from   ConfigParser     import SafeConfigParser
-from   plugincore       import plugin_init, query_plugin, query_plugins
+from   plugincore       import plugin_init, query_plugin, query_plugins, \
+                               pluginclass
 from   plugincore       import Plugin, Attribute, Interface, implements
 import config
 # Load all interface specifications defined by this package.
@@ -17,6 +18,9 @@ import commands
 
 __version__ = '0.1dev'
 ROOTAPP = 'root'
+DEFAULT_SERVER = 'httpioserver'
+DEFAULT_HOST = '127.0.0.1'
+DEFAULT_PORT = 5000
 
 appsettings = { 'root' : {} }
 """Dictionary of plugin configurations. Note that,
@@ -63,19 +67,40 @@ class Platform( object ):
         appsett = config.loadsettings( inifile ) if inifile else {}
         appsettings['root'].update( appsett.pop('root', {}) )
         appsettings.update( appsett )
+
+        # Parse master ini file for application mount rules and generate a map
+        self.map_subdomains, self.map_scripts = self._mountmap()
+        # Load packages specific to pluggdapps
         self._loadpackages()
+        # Initialize plugin data structures
         plugin_init()
+
+        self.appsettings = appsettings
         return appsettings
 
     def serve( self ):
-        rootsett = appsettings['root']
-        servtype = rootsett['servertype']
-        host = rootsett['host']
-        port = rootsett['port']
+        rootsett = self.appsettings['root']
+        servername = rootsett.get('servername', DEFAULT_SERVER)
+        self.server = query_plugin( ROOTAPP, IHTTPServer, servername, self )
+        server.start()  # Blocks !
 
     def _loadpackages( self ):
-        """Import all packages from this python environment."""
+        """Import all packages from this python environment.
+
+        TODO : Only import packages specific to pluggdapps"""
         pkgnames = pkg.WorkingSet().by_key.keys()
         [ __import__(pkgname) for pkgname in sorted( pkgnames ) ]
         logging.info( "%s pluggdapps packages loaded" % len( _package.keys() ))
 
+    def _mountmap( self ):
+        subdomains, scripts = {}, {}
+        for key, sett in self.appsettings.items() :
+            if key.startswith('app:') :
+                appname = key.split(':')[1].strip()
+                subdomain = sett.get('mount_subdomain', None)
+                if subdomain :
+                    subdomain.setdefault( subdomain, [] ).append( appname )
+                script = sett.get('mount_script', None)
+                if script :
+                    script.setdefault( script, [] ).append( appname )
+        return subdomains, scripts

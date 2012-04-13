@@ -72,6 +72,12 @@ class ISettings( Interface ):
 class IHTTPServer( Interface ):
     """Interface to bind, listen, accept HTTP server."""
 
+    def __init__( platform, *args, **kwargs ):
+        """
+        ``platform``
+            instance of :class:`Platform`
+        """
+
     def listen( port, address="" ):
         """Starts accepting connections on the given port and address.
         This method may be called more than once to listen on multiple ports.
@@ -100,7 +106,7 @@ class IHTTPServer( Interface ):
         """
 
     def start( *args, **kwargs ):
-        """Starts this server."""
+        """Starts this server and returns a server object."""
 
     def stop():
         """Stops listening for new connections.
@@ -148,22 +154,36 @@ class IHTTPRequest( Interface ):
         "Application instance deriving from :class:`Plugin` implementing "
         ":class:`IApplication` interface."
     )
-    domethods = Attribute(
+    do_methods = Attribute(
         "Request handler can override this attribute to provide a sequence of "
         "HTTP Methods supported by the class. "
-        "Default : ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS') "
     )
     method = Attribute(
         "HTTP request method, e.g. 'GET' or 'POST'"
     )
+    host = Attribute(
+        "The requested hostname, usually taken from the ``Host`` header."
+    )
     uri = Attribute(
         "HTTP Request URI"
+    )
+    full_url = Attribute(
+        "Reconstructs the full URL for this request, which is, "
+        "protocol + host + uri"
     )
     path = Attribute(
         "Path portion of HTTP request URI"
     )
     query = Attribute(
         "Query portion of HTTP request URI"
+    )
+    arguments = Attribute(
+        "GET/POST arguments are available in the arguments property, which "
+        "maps arguments names to lists of values (to support multiple values "
+        "for individual names). Names are of type `str`, while arguments "
+        "are byte strings. Note that this is different from "
+        ":method:`IHTTPRequest.get_argument`, which returns argument values as "
+        "unicode strings."
     )
     version = Attribute(
         "HTTP protocol version specified in request, e.g. 'HTTP/1.1'"
@@ -185,17 +205,6 @@ class IHTTPRequest( Interface ):
         "load-balancer or a proxy, the real scheme will be passed along via "
         "via an `X-Scheme` header."
     )
-    host = Attribute(
-        "The requested hostname, usually taken from the ``Host`` header."
-    )
-    arguments = Attribute(
-        "GET/POST arguments are available in the arguments property, which "
-        "maps arguments names to lists of values (to support multiple values "
-        "for individual names). Names are of type `str`, while arguments "
-        "are byte strings. Note that this is different from "
-        ":method:`IHTTPRequest.get_argument`, which returns argument values as "
-        "unicode strings."
-    )
     files = Attribute(
         "File uploads are available in the files property, which maps file "
         "names to lists of :class:`HTTPFile`."
@@ -206,16 +215,42 @@ class IHTTPRequest( Interface ):
         "are typically kept open in HTTP/1.1, multiple requests can be handled "
         "sequentially on a single connection."
     )
+    cookies = Attribute(
+        "A dictionary of Cookie.Morsel objects."
+    )
+    receivedat = Attribute(
+        "Timestamp when request was recieved"
+    )
+    elapsedtime = Attribute(
+        "Amount of time, in floating seconds, elapsed since the request was "
+        "received. Call this method while servicing the request. To know the "
+        "final elapsed time, that is after servicing the request, use "
+        "``servicetime`` attribute."
+    )
+    servicetime = Attribute(
+        "Amount of time, in floating seconds, elapsed since the request was "
+        "received."
+    )
+    settings = Attribute(
+        "A copy of application settings dictionary. Settings are organised "
+        "into sections, special section `DEFAULT` provides as global "
+        "settings. Other sections are application specific settings for "
+        "modules and plugins."
+    )
+    rootsettings = Attribute(
+        "A copy of root settings common to all applications, plugins and "
+        "modules."
+    )
 
     def __init__( connection, method, uri, version, headers, remote_ip ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
-        essentially mean the entire request is recieved. Only when
+        essentially mean the entire request is received. Only when
         :method:`IHTTPRequest.handle` is called complete request is available
         and partially parsed.
 
         ``connection``,
-            HTTP socket connection that can recieve / transmit http packets.
+            HTTP socket connection that can receive / transmit http packets.
         ``method``,
             HTTP request method parsed from start_line.
         ``uri``,
@@ -235,11 +270,41 @@ class IHTTPRequest( Interface ):
     def handle():
         """Once complete request is available, handle the request. This is
         a potential point where actual request handling can be dispatched
-        to a process-pool."""
+        to a process-pool.
+        
+        Typically, applications are resolved at this point and the request is
+        passed on to the application."""
 
-class IRouter( Interface ):
+    def supports_http_1_1():
+        """Returns True if this request supports HTTP/1.1 semantics"""
+
+    def get_ssl_certificate():
+        """Returns the client's SSL certificate, if any.
+
+        To use client certificates, `cert_reqs` configuration value must be
+        set to ssl.CERT_REQUIRED,
+
+        The return value is a dictionary, see SSLSocket.getpeercert() in
+        the standard library for more details.
+        http://docs.python.org/library/ssl.html#sslsocket-objects
+        """
+
+class IURLRouter( Interface ):
 
     def route( request ):
+        pass
 
     def match( request ):
+        pass
+
+
+class IHTTPResponse( Interface ):
+
+    def __init__( request ):
+
+    def write( chunk, callback=None ):
+        """Writes the given chunk to the response stream."""
+
+    def finish():
+        """Finishes this HTTP request on the open connection."""
 

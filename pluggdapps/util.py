@@ -60,7 +60,7 @@ class ConfigDict( dict ):
 
     def __setitem__( self, name, value ):
         if not isinstance( value, (ConfigItem, dict) ) :
-            raise Exception( "Type recieved %r not `ConfigItem` or `dict`'" )
+            raise Exception( "Type received %r not `ConfigItem` or `dict`'" )
 
         value = value if isinstance(value, ConfigItem) else ConfigItem(value)
         self._spec[name] = value
@@ -158,6 +158,22 @@ class ObjectDict(dict):
 
     def __setattr__(self, name, value):
         self[name] = value
+
+
+class HTTPFile( ObjectDict ):
+    """Represents an HTTP file, whose instance variables are also accessible
+    as dictionary keys.
+
+    Instance variables,
+
+    ``filename``,
+        Uploaded file's name from HTTP request.
+    ``body``,
+        Request body.
+    ``content_type``,
+        This value comes from HTTP header and cannot be trusted outright given
+        that it can be easily forged.
+    """
 
 
 class HTTPHeaders( dict ):

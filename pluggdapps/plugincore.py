@@ -289,3 +289,7 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
 def plugin_names( interface ):
     """Return a list of plugin names implementing `interface`."""
     return PluginMeta._implementers[interface].keys()
+
+def pluginclass( interface, name ):
+    nm = pluginname( name )
+    return PluginMeta._implementers.get( interface, {} ).get( nm, None )
