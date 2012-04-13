@@ -178,6 +178,7 @@ class Plugin( PluginBase ):
     # Plugin constructor and instantiater methods.
     def __init__( self, appname, *args, **kwargs ):
         from  pluggdapps import appsettings
+        self.appname = appname
         sett = {}
         sett.update( appsettings[appname][pluginname(self)] )
         sett.update( kwargs.pop( 'settings', {} ))

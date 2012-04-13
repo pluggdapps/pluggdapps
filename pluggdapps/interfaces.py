@@ -138,24 +138,104 @@ class IApplication( Interface ):
     def query_plugin( interface, name, *args, **kwargs ):
 
 
-class IRequest( Interface ):
+class IHTTPRequest( Interface ):
     """Entry point for every request into the application code. Typically
     pluggdapps platform will provide a collection of request handler plugins
     implementing this interface. While the applications can simply derive
     their handler class from the base class and override necessary methods."""
 
-    methods = Attribute(
-        "Request handler can override this attribute to provide a sequence of "
-        "HTTP Methods supported by the class. "
-        "Default : ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS') "
-    )
     app = Attribute(
         "Application instance deriving from :class:`Plugin` implementing "
         ":class:`IApplication` interface."
     )
+    domethods = Attribute(
+        "Request handler can override this attribute to provide a sequence of "
+        "HTTP Methods supported by the class. "
+        "Default : ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS') "
+    )
+    method = Attribute(
+        "HTTP request method, e.g. 'GET' or 'POST'"
+    )
+    uri = Attribute(
+        "HTTP Request URI"
+    )
+    path = Attribute(
+        "Path portion of HTTP request URI"
+    )
+    query = Attribute(
+        "Query portion of HTTP request URI"
+    )
+    version = Attribute(
+        "HTTP protocol version specified in request, e.g. 'HTTP/1.1'"
+    )
+    headers = Attribute(
+       "Dictionary-like object for HTTP headers. Acts like a "
+       "case-insensitive dictionary."
+    )
+    body = Attribute(
+       "Request body, if present, as a byte string."
+    )
+    remote_ip = Attribure(
+       "Client's IP address as a string. If running behind a load-balancer "
+       "or a proxy, the real IP address provided by a load balancer will be "
+       "passed in the ``X-Real-Ip`` header."
+    )
+    protocol = Attribute(
+        "The protocol used, either 'http' or 'https'.  If running behind a "
+        "load-balancer or a proxy, the real scheme will be passed along via "
+        "via an `X-Scheme` header."
+    )
+    host = Attribute(
+        "The requested hostname, usually taken from the ``Host`` header."
+    )
+    arguments = Attribute(
+        "GET/POST arguments are available in the arguments property, which "
+        "maps arguments names to lists of values (to support multiple values "
+        "for individual names). Names are of type `str`, while arguments "
+        "are byte strings. Note that this is different from "
+        ":method:`IHTTPRequest.get_argument`, which returns argument values as "
+        "unicode strings."
+    )
+    files = Attribute(
+        "File uploads are available in the files property, which maps file "
+        "names to lists of :class:`HTTPFile`."
+    )
+    connection = Attribute(
+        "An HTTP request is attached to a single HTTP connection, which can "
+        "be accessed through the 'connection' attribute. Since connections "
+        "are typically kept open in HTTP/1.1, multiple requests can be handled "
+        "sequentially on a single connection."
+    )
 
-    def __init__( app ):
+    def __init__( connection, method, uri, version, headers, remote_ip ):
+        """Instance of plugin implementing this interface corresponds to a
+        single HTTP request. Note that instantiating this class does not
+        essentially mean the entire request is recieved. Only when
+        :method:`IHTTPRequest.handle` is called complete request is available
+        and partially parsed.
 
+        ``connection``,
+            HTTP socket connection that can recieve / transmit http packets.
+        ``method``,
+            HTTP request method parsed from start_line.
+        ``uri``,
+            HTTP request URI parsed from start_line.
+        ``version``,
+            HTTP protocol version, parsed from start_line
+        ``headers``,
+            HTTP request headers that comes after start_line and before an
+            optional body.
+        ``body``,
+            Optional HTTP body. If request body is not found pass this as
+            None.
+        ``remote_ip``,
+            IP address of the remote client making this request.
+        """
+
+    def handle():
+        """Once complete request is available, handle the request. This is
+        a potential point where actual request handling can be dispatched
+        to a process-pool."""
 
 class IRouter( Interface ):
 

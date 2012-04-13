@@ -5,26 +5,25 @@
 Typical applications have little direct interaction with the `HTTPIOServer`
 class except to start a server at the beginning of the process
 (and even that is often done indirectly via `Platform.listen`).
-
-This module also defines the `HTTPRequest` class which is exposed via
-`RequestHandler.request`.
 """
 
 from __future__ import absolute_import, division, with_statement
 
-import Cookie, logging, socket, time, urlparse
+import logging, socket
 import ssl  # Python 2.6+
 
-from pluggdapps.util                import ConfigDict, asbool
-from pluggdapps.evserver            import iostream
-from pluggdapps.evserver.tcpserver  import TCPServer
-from pluggdapps.evserver            import stack_context
-from pluggdapps.evserver.httputil   import utf8, native_str, parse_qs_bytes, \
-                                           HTTPHeaders, parse_multipart_form_data
+from   pluggdapps                     import Plugin, implements
+from   pluggdapps.interface           import IHTTPServer, IHTTPRequest
+from   pluggdapps.util                import ConfigDict, asbool, asint
+from   pluggdapps.evserver            import iostream
+from   pluggdapps.evserver.tcpserver  import TCPServer
+from   pluggdapps.evserver            import stack_context
+from   pluggdapps.evserver.httputil   import utf8, native_str, parse_qs_bytes, \
+                                             parse_multipart_form_data
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for event poll based HTTP server."""
+    "Configuration settings for event poll based HTTP server."
 
 _default_settings['multiprocess']  = {
     'default' : 1,
@@ -40,10 +39,15 @@ _default_settings['no_keep_alive']  = {
 _default_settings['xheaders']  = {
     'default' : False,
     'types'   : (bool,),
-    'help'    : "If `True`, `X-Real-Ip`` and `X-Scheme` headers are supperted, "
-                "which override the remote IP and HTTP scheme for all "
+    'help'    : "If `True`, `X-Real-Ip`` and `X-Scheme` headers are supported, "
+                "will override the remote IP and HTTP scheme for all "
                 "requests. These headers are useful when running pluggdapps "
                 "behind a reverse proxy or load balancer."
+}
+_default_settings['request_handler']  = {
+    'default' : 'httprequest',
+    'types'   : (str,),
+    'help'    : "Handler class (callable) to process completely read request."
 }
 _default_settings['ssloptions.certfile']  = {
     'default' : '',
@@ -66,11 +70,11 @@ class _BadRequestException(Exception):
 class HTTPIOServer( TCPServer, Plugin ):
     """Plugin deriving TCPServer, a non-blocking, single-threaded HTTP server.
 
-    A server is defined by a request callback that takes an HTTPRequest
-    instance as an argument and writes a valid HTTP response with
-    `HTTPRequest.write`. `HTTPRequest.finish` finishes the request (but does
+    A server is defined by a request callback that takes a plugin implementing
+    :class:`IHTTPRequest` interface as an argument and writes a valid HTTP 
+    response using :class:`IResponse` interface. Finishing the request does
     not necessarily close the connection in the case of HTTP/1.1 keep-alive
-    requests). A simple example server that echoes back the URI you
+    requests. A simple example server that echoes back the URI you
     requested::
 
         import httpserver
@@ -248,12 +252,14 @@ class HTTPConnection(object):
                 raise _BadRequestException("Malformed HTTP request line")
             if not version.startswith("HTTP/"):
                 raise _BadRequestException("Malformed HTTP version in HTTP Request-Line")
-            headers = httputil.HTTPHeaders.parse(data[eol:])
-            self._request = HTTPRequest(
-                connection=self, method=method, uri=uri, version=version,
-                headers=headers, remote_ip=self.address[0])
 
-            content_length = headers.get("Content-Length")
+            headers = HTTPHeaders.parse( data[eol:] )
+            self._request = query_plugin( 
+                "root", IHTTPRequest, 'httprequest'
+                self, method, uri, version, headers, self.address[0],
+                None, None, None )
+
+            content_length = headers.get( "Content-Length" )
             if content_length:
                 content_length = int(content_length)
                 if content_length > self.stream.max_buffer_size:
@@ -264,9 +270,10 @@ class HTTPConnection(object):
                 return
 
             self.request_callback(self._request)
+
         except _BadRequestException, e:
-            logging.info("Malformed HTTP request from %s: %s",
-                         self.address[0], e)
+            logging.info( "Malformed HTTP request from %s: %s",
+                          self.address[0], e )
             self.stream.close()
             return
 
@@ -293,200 +300,5 @@ class HTTPConnection(object):
                         break
                 else:
                     logging.warning("Invalid multipart/form-data")
-        self.request_callback(self._request)
 
-
-class HTTPRequest(object):
-    """A single HTTP request.
-
-    All attributes are type `str` unless otherwise noted.
-
-    .. attribute:: method
-
-       HTTP request method, e.g. "GET" or "POST"
-
-    .. attribute:: uri
-
-       The requested uri.
-
-    .. attribute:: path
-
-       The path portion of `uri`
-
-    .. attribute:: query
-
-       The query portion of `uri`
-
-    .. attribute:: version
-
-       HTTP version specified in request, e.g. "HTTP/1.1"
-
-    .. attribute:: headers
-
-       `HTTPHeader` dictionary-like object for request headers.  Acts like
-       a case-insensitive dictionary with additional methods for repeated
-       headers.
-
-    .. attribute:: body
-
-       Request body, if present, as a byte string.
-
-    .. attribute:: remote_ip
-
-       Client's IP address as a string.  If `HTTPIOServer.xheaders` is set,
-       will pass along the real IP address provided by a load balancer
-       in the ``X-Real-Ip`` header
-
-    .. attribute:: protocol
-
-       The protocol used, either "http" or "https".  If `HTTPIOServer.xheaders`
-       is set, will pass along the protocol used by a load balancer if
-       reported via an ``X-Scheme`` header.
-
-    .. attribute:: host
-
-       The requested hostname, usually taken from the ``Host`` header.
-
-    .. attribute:: arguments
-
-       GET/POST arguments are available in the arguments property, which
-       maps arguments names to lists of values (to support multiple values
-       for individual names). Names are of type `str`, while arguments
-       are byte strings.  Note that this is different from
-       `RequestHandler.get_argument`, which returns argument values as
-       unicode strings.
-
-    .. attribute:: files
-
-       File uploads are available in the files property, which maps file
-       names to lists of :class:`HTTPFile`.
-
-    .. attribute:: connection
-
-       An HTTP request is attached to a single HTTP connection, which can
-       be accessed through the "connection" attribute. Since connections
-       are typically kept open in HTTP/1.1, multiple requests can be handled
-       sequentially on a single connection.
-    """
-    def __init__(self, method, uri, version="HTTP/1.0", headers=None,
-                 body=None, remote_ip=None, protocol=None, host=None,
-                 files=None, connection=None):
-        self.method = method
-        self.uri = uri
-        self.version = version
-        self.headers = headers or httputil.HTTPHeaders()
-        self.body = body or ""
-        if connection and connection.xheaders:
-            # Squid uses X-Forwarded-For, others use X-Real-Ip
-            self.remote_ip = self.headers.get(
-                "X-Real-Ip", self.headers.get("X-Forwarded-For", remote_ip))
-            if not self._valid_ip(self.remote_ip):
-                self.remote_ip = remote_ip
-            # AWS uses X-Forwarded-Proto
-            self.protocol = self.headers.get(
-                "X-Scheme", self.headers.get("X-Forwarded-Proto", protocol))
-            if self.protocol not in ("http", "https"):
-                self.protocol = "http"
-        else:
-            self.remote_ip = remote_ip
-            if protocol:
-                self.protocol = protocol
-            elif connection and isinstance(connection.stream,
-                                           iostream.SSLIOStream):
-                self.protocol = "https"
-            else:
-                self.protocol = "http"
-        self.host = host or self.headers.get("Host") or "127.0.0.1"
-        self.files = files or {}
-        self.connection = connection
-        self._start_time = time.time()
-        self._finish_time = None
-
-        scheme, netloc, path, query, fragment = urlparse.urlsplit(native_str(uri))
-        self.path = path
-        self.query = query
-        arguments = parse_qs_bytes(query)
-        self.arguments = {}
-        for name, values in arguments.iteritems():
-            values = [v for v in values if v]
-            if values:
-                self.arguments[name] = values
-
-    def supports_http_1_1(self):
-        """Returns True if this request supports HTTP/1.1 semantics"""
-        return self.version == "HTTP/1.1"
-
-    @property
-    def cookies(self):
-        """A dictionary of Cookie.Morsel objects."""
-        if not hasattr(self, "_cookies"):
-            self._cookies = Cookie.SimpleCookie()
-            if "Cookie" in self.headers:
-                try:
-                    self._cookies.load(
-                        native_str(self.headers["Cookie"]))
-                except Exception:
-                    self._cookies = {}
-        return self._cookies
-
-    def write(self, chunk, callback=None):
-        """Writes the given chunk to the response stream."""
-        assert isinstance(chunk, bytes)
-        self.connection.write(chunk, callback=callback)
-
-    def finish(self):
-        """Finishes this HTTP request on the open connection."""
-        self.connection.finish()
-        self._finish_time = time.time()
-
-    def full_url(self):
-        """Reconstructs the full URL for this request."""
-        return self.protocol + "://" + self.host + self.uri
-
-    def request_time(self):
-        """Returns the amount of time it took for this request to execute."""
-        if self._finish_time is None:
-            return time.time() - self._start_time
-        else:
-            return self._finish_time - self._start_time
-
-    def get_ssl_certificate(self):
-        """Returns the client's SSL certificate, if any.
-
-        To use client certificates, the HTTPIOServer must have been constructed
-        with cert_reqs set in ssl_options, e.g.::
-
-            server = HTTPIOServer(app,
-                ssl_options=dict(
-                    certfile="foo.crt",
-                    keyfile="foo.key",
-                    cert_reqs=ssl.CERT_REQUIRED,
-                    ca_certs="cacert.crt"))
-
-        The return value is a dictionary, see SSLSocket.getpeercert() in
-        the standard library for more details.
-        http://docs.python.org/library/ssl.html#sslsocket-objects
-        """
-        try:
-            return self.connection.stream.socket.getpeercert()
-        except ssl.SSLError:
-            return None
-
-    def __repr__(self):
-        attrs = ("protocol", "host", "method", "uri", "version", "remote_ip",
-                 "body")
-        args = ", ".join(["%s=%r" % (n, getattr(self, n)) for n in attrs])
-        return "%s(%s, headers=%s)" % (
-            self.__class__.__name__, args, dict(self.headers))
-
-    def _valid_ip(self, ip):
-        try:
-            res = socket.getaddrinfo(ip, 0, socket.AF_UNSPEC,
-                                     socket.SOCK_STREAM,
-                                     0, socket.AI_NUMERICHOST)
-            return bool(res)
-        except socket.gaierror, e:
-            if e.args[0] == socket.EAI_NONAME:
-                return False
-            raise
-        return True
+        self.request_callback( self._request )
