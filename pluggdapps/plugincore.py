@@ -51,7 +51,7 @@ class PluginMeta( type ):
         if Interface in bases :
             # Interface's information dictionary
             PluginMeta._interfmap[name] = PluginMeta._interf( new_class, name, bases, d )
-        elif PluginBase in bases :
+        elif any([ issubclass(b, PluginBase) for b in bases ]) :
             # Plugin's information dictionary
             PluginMeta._pluginmap[nm] = PluginMeta._plugin( new_class, nm, bases, d )
             # Register deriving plugin for interfaces implemented by its base
@@ -184,11 +184,10 @@ def plugin_init():
             cls.normalize_settings( s ) if cls else None
             appsettings[appname][p] = s
     # Optimize _implementers for query_*
-    PluginMeta._implementers = dict([ 
-        ( i, dict([ (nm, PluginMeta._pluginmap[nm]['cls']) for nm in pmap ])
-        ) for i, pmap in PluginMeta._implementers.items()
-    ])
-        
+    d = {}
+    for i, pmap in PluginMeta._implementers.items()[:] :
+        d[i] = dict([ (nm, PluginMeta._pluginmap[nm]['cls']) for nm in pmap ])
+    PluginMeta._implementers = d
 
 def plugin_info( nm ):
     if isinstance( nm, basestring ) :

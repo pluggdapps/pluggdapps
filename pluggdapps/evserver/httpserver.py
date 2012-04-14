@@ -13,8 +13,7 @@ import logging, socket
 import ssl  # Python 2.6+
 
 from   pluggdapps.plugincore          import Plugin, implements
-from   pluggdapps.interface           import IServer, IRequest
-from   pluggdapps.evserver            import iostream
+from   pluggdapps.interfaces          import IServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
 from   pluggdapps.evserver            import stack_context
 from   pluggdapps.evserver.httputil   import utf8, native_str, parse_qs_bytes, \

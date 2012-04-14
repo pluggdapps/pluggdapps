@@ -34,8 +34,10 @@ setup(
     include_package_data=True,              # setuptools
     exclude_package_data={},                # setuptools
     zip_safe=False,                         # setuptools
-    entry_points={                          # setuptools
-    },
+    entry_points = """\
+    [pluggdapps]
+      package=pluggdapps:package
+    """
     install_requires=[                      # setuptools
     ],
     extras_require={},                      # setuptools

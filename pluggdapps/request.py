@@ -76,7 +76,7 @@ class HTTPRequest( Plugin ):
                 self.arguments[name] = values
 
         # Root settings
-        self.rootsettings = deepcopy( self.platform.appsettings.get('root', {}) )
+        self.rootsettings = deepcopy(self.platform.appsettings.get('root', {}))
 
     def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
@@ -86,9 +86,9 @@ class HTTPRequest( Plugin ):
         if not hasattr( self, "_cookies" ):
             self._cookies = Cookie.SimpleCookie()
             if "Cookie" in self.headers:
-                try:
-                    self._cookies.load( native_str( self.headers["Cookie"]  )
-                except Exception:
+                try :
+                    self._cookies.load( native_str( self.headers["Cookie"]  ))
+                except Exception :
                     self._cookies = {}
         return self._cookies
 

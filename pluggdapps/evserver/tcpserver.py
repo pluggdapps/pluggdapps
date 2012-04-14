@@ -7,11 +7,11 @@ from __future__ import absolute_import, division, with_statement
 import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
-import pluggdapps.util                as h
-from   pluggdapps.interfaces          import ISettings
-from   pluggdapps.evserver            import process
-from   pluggdapps.evserver.httpioloop import HTTPIOLoop
-from   pluggdapps.evserver.iostream   import HTTPIOStream, HTTPSSLIOStream
+import pluggdapps.util                  as h
+from   pluggdapps.plugincore            import ISettings
+from   pluggdapps.evserver              import process
+from   pluggdapps.evserver.httpioloop   import HTTPIOLoop
+from   pluggdapps.evserver.httpiostream import HTTPIOStream, HTTPSSLIOStream
 
 
 class TCPServer( object ):

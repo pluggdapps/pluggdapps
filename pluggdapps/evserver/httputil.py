@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, with_statement
 import sys, re, urllib, logging
 from   urlparse import parse_qs  # Python 2.6+
 
-from pluggapps.util import ObjectDict
+from   pluggdapps.util import ObjectDict
 
 _UTF8_TYPES = (bytes, type(None))
 def utf8( value ):

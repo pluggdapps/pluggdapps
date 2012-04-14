@@ -10,6 +10,7 @@ import sys
 from   optparse      import OptionParser
 
 import pluggdapps
+from   pluggdapps               import Platform, ROOTAPP
 from   pluggdapps.plugincore    import plugin_init, pluginnames, query_plugin
 from   pluggdapps.interfaces    import ICommand
 
@@ -23,9 +24,10 @@ def parse( usage ):
 
 def options( parser ):
     """Supported command options for master script."""
-    parser.add_option( '-c', '--config', action="append", dest='config',
+    parser.add_option( '-c', '--config', dest='config', default=None,
                        help="specify config file(s)" )
     parser.add_option( '-i', '--import', action="append", dest='imports',
+                       default=[],
                        help="specify modules to import")
     parser.add_option( '-e', '--environment', dest='environment', default=None,
                        help="apply the given config environment")
@@ -36,20 +38,17 @@ def options( parser ):
     return parser
 
 
-def docommand( command, argv ):
+def docommand( platform, command, argv ):
     """Handle sub-commands."""
-    comm = query_plugin( pluggdapps.ROOTAPP, ICommand, command, argv=argv )
+    comm = query_plugin( ROOTAPP, ICommand, command, argv=argv )
     comm.run()
 
 
-def doscript( paargs ):
+def doscript( platform, paargs ):
     """Default handling for master script."""
     from  pluggdapps        import appsettings
     parser = parse( usage )
     options, args = parser.parse_args( paargs )
-
-    # -c (config file)
-    boot( inifile=options.config )
 
     # --pa option
     [ sys.path.insert(0, p) for p in options.tostartpath ]
@@ -65,11 +64,15 @@ def doscript( paargs ):
     if options.environment is not None :
         appsettings['root']['environment'] = options.environment
 
+    # -c (config file)
+    platform.boot( options.config )
+
 
 if __name__ == '__main__' :
     paargs, cmd, cmdargs = [], None, sys.argv[1:]
     plugin_init()
     commands = pluginnames( ICommand )
+    platform = Platform()
     while cmdargs :
         arg = cmdargs.pop(0)
         if arg in commands :
@@ -77,5 +80,5 @@ if __name__ == '__main__' :
             break
         else :
             paargs.append( arg )
-    doscript( paargs )
-    docommand( cmd, cmdargs ) if cmd else None
+    doscript( platform, paargs )
+    docommand( platform, cmd, cmdargs ) if cmd else None

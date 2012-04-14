@@ -8,8 +8,10 @@ import pkg_resources         as pkg
 from   ConfigParser          import SafeConfigParser
 
 from   pluggdapps.plugincore import plugin_init, query_plugin, query_plugins,\
-                                    pluginname, pluginclass
+                                    pluginname, pluginclass, ISettings
 import pluggdapps.config     as config
+from   pluggdapps.interfaces import *
+from   pluggdapps.util       import call_entrypoint
 
 # Load all interface specifications and plugins defined by this package.
 import pluggdapps.interfaces
@@ -61,7 +63,7 @@ appsettings = { 'root' : {} }
 
 class Platform( object ):
 
-    def boot( inifile=None ):
+    def boot( self, inifile=None ):
         """Do the following,
         * Boot platform using an optional master configuration file `inifile`.
         * Load pluggdapps packages.
@@ -71,18 +73,18 @@ class Platform( object ):
         appsett = config.loadsettings( inifile ) if inifile else {}
         appsettings['root'].update( appsett.pop('root', {}) )
         appsettings.update( appsett )
+        self.appsettings = appsettings
 
         # Parse master ini file for application mount rules and generate a map
         self.map_subdomains, self.map_scripts = self._mountmap()
         # Load packages specific to pluggdapps
-        self._loadpackages()
+        self._loadpackages( appsettings )
         # Initialize plugin data structures
         plugin_init()
         # Boot applications
         [ a.boot( appsettings.get( pluginname(app), {} )) 
           for a in query_plugins(ROOTAPP, IApplication) ]
 
-        self.appsettings = appsettings
         return appsettings
 
     def serve( self ):
@@ -112,13 +114,19 @@ class Platform( object ):
                 appname = self.map_scripts['/']
         return appname
 
-    def _loadpackages( self ):
+    def _loadpackages( self, appsettings ):
         """Import all packages from this python environment.
 
         TODO : Only import packages specific to pluggdapps"""
-        pkgnames = pkg.WorkingSet().by_key.keys()
-        [ __import__(pkgname) for pkgname in sorted( pkgnames ) ]
-        logging.info( "%s pluggdapps packages loaded" % len( _package.keys() ))
+        packages = []
+        pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
+        for pkgname, d in sorted( pkgs.items(), key=lambda x : x[0] ) :
+            info = call_entrypoint( d,  'pluggdapps', 'package', appsettings )
+            if info == None : continue
+            __import__( pkgname )
+            packages.append( pkgname )
+        #log.info( "%s pluggdapps packages loaded" % len(packages) )
+        return packages
 
     def _mountmap( self ):
         subdomains, scripts = {}, {}
@@ -132,3 +140,9 @@ class Platform( object ):
                 if script :
                     script.setdefault( script, [] ).append( appname )
         return subdomains, scripts
+
+def package( appsettings ) :
+    """Entry point that returns a dictionary of key,value details about the
+    package.
+    """
+    return {}

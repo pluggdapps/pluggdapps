@@ -8,7 +8,10 @@ import socket
 
 from   pluggdapps.plugincore     import Interface, Attribute
 
-__all__ = [ 'ICommand' ]
+__all__ = [ 
+    'ICommand', 'IServer', 'IRequest', 'IApplication', 'IRequestHandler',
+    'IRouter', 'IResponse',
+]
 
 class ICommand( Interface ):
     """Handle sub-commands issued from command line script. The general

@@ -312,3 +312,19 @@ class HTTPHeaders( dict ):
             return normalized
 
 
+def call_entrypoint( distribution, group, name, *args, **kwargs ):
+    """If an entrypoint is callable, use this api to both identify the entry
+    point, evaluate them by loading and calling it. 
+    
+    Return the result from the called function. Note that the entrypoint must be
+    uniquely identified using
+        ``dist``, ``group`` and ``name``.
+    """
+    devmod = kwargs.pop( 'devmod', False )
+    try :
+        ep = distribution.get_entry_info( group, name )
+        return ep.load()( *args, **kwargs ) if ep else None
+    except :
+        if devmod : raise
+    return None
+
