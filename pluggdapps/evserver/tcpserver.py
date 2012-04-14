@@ -113,13 +113,15 @@ class TCPServer( object ):
         self._started = True
         multiprocess = self['multiprocess']
         port, host = self['port'], self['host']
-        if multiprocess <= 0:  # Single process
+
+        if multiprocess <= 0:   # Single process
             self.listen( port, address )
-        else :  # multi-process
+        else :                  # multi-process
             sockets = bind_sockets( port, address )
             process.fork_processes( multiprocess )
             self.add_sockets( sockets )
-        self.ioloop.start()
+
+        self.ioloop.start() # Block !
 
     def stop(self):
         """Stops listening for new connections.

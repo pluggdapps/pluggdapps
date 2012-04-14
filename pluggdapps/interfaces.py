@@ -69,7 +69,7 @@ class ISettings( Interface ):
         * To persist new `settings` in a backend data-store."""
 
 
-class IHTTPServer( Interface ):
+class IServer( Interface ):
     """Interface to bind, listen, accept HTTP server."""
 
     def __init__( platform, *args, **kwargs ):
@@ -119,32 +119,7 @@ class IHTTPServer( Interface ):
         """To handle a new connection stream."""
 
 
-class IApplication( Interface ):
-    """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
-    of configuration parameters implementing one or more interface
-    specification."""
-
-    appname = Attribute( "Application name" )
-
-    def boot( inifile ):
-        """Every application boots from an inifile which is a one time
-        activity. Configuration settings from this inifile overrides
-        application package's default settings. The implementer of this method
-        can also can be
-        settings from the original inifile can be overriden using settings derived from """
-
-    def start( request ):
-
-    def finish( request ):
-
-    def router( request ):
-
-    def query_plugins( interface, name, *args, **kwargs ):
-
-    def query_plugin( interface, name, *args, **kwargs ):
-
-
-class IHTTPRequest( Interface ):
+class IRequest( Interface ):
     """Entry point for every request into the application code. Typically
     pluggdapps platform will provide a collection of request handler plugins
     implementing this interface. While the applications can simply derive
@@ -182,7 +157,7 @@ class IHTTPRequest( Interface ):
         "maps arguments names to lists of values (to support multiple values "
         "for individual names). Names are of type `str`, while arguments "
         "are byte strings. Note that this is different from "
-        ":method:`IHTTPRequest.get_argument`, which returns argument values as "
+        ":method:`IRequest.get_argument`, which returns argument values as "
         "unicode strings."
     )
     version = Attribute(
@@ -246,7 +221,7 @@ class IHTTPRequest( Interface ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
-        :method:`IHTTPRequest.handle` is called complete request is available
+        :method:`IRequest.handle` is called complete request is available
         and partially parsed.
 
         ``connection``,
@@ -267,14 +242,6 @@ class IHTTPRequest( Interface ):
             IP address of the remote client making this request.
         """
 
-    def handle():
-        """Once complete request is available, handle the request. This is
-        a potential point where actual request handling can be dispatched
-        to a process-pool.
-        
-        Typically, applications are resolved at this point and the request is
-        passed on to the application."""
-
     def supports_http_1_1():
         """Returns True if this request supports HTTP/1.1 semantics"""
 
@@ -286,10 +253,49 @@ class IHTTPRequest( Interface ):
 
         The return value is a dictionary, see SSLSocket.getpeercert() in
         the standard library for more details.
-        http://docs.python.org/library/ssl.html#sslsocket-objects
-        """
+        http://docs.python.org/library/ssl.html#sslsocket-objects."""
 
-class IURLRouter( Interface ):
+    def query_plugins( interface, name, *args, **kwargs ):
+        """Query plugins in the request's context. Since every request is
+        under the context of an application, appname will be used to make the
+        actual query. Will be using `IRequest.app` attribute"""
+
+    def query_plugin( interface, name, *args, **kwargs ):
+        """Query plugin in the request's context. Since every request is
+        under the context of an application, appname will be used to make the
+        actual query. Will be using `IRequest.app` attribute"""
+
+
+class IApplication( Interface ):
+    """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
+    of configuration parameters implementing one or more interface
+    specification."""
+
+    appname = Attribute( "Application name" )
+
+    def boot( settings ):
+        """Do necessary activities to boot this applications."""
+
+    def start( request ):
+        """Start handling the request. Typically this method will be
+        implemented by :class:`Application` class which automatically does
+        url route-mapping and invokes the configured request handler."""
+
+    def finish( request ):
+        """Finish this request. Reverse of start."""
+
+    def shutdown( settings ):
+        """Shutdown this application. Reverse of boot."""
+
+    def router( request ):
+        """Return the router plugin implementing :class:`IRouter` 
+        interface."""
+
+
+class IRequestHandler( Interface ):
+
+
+class IRouter( Interface ):
 
     def route( request ):
         pass
@@ -298,7 +304,7 @@ class IURLRouter( Interface ):
         pass
 
 
-class IHTTPResponse( Interface ):
+class IResponse( Interface ):
 
     def __init__( request ):
 

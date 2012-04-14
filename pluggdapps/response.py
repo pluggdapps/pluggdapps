@@ -6,15 +6,15 @@
 
 
 from   pluggdapps               import Plugin, implements
-from   pluggdapps.interfaces    import IHTTPResponse
+from   pluggdapps.interfaces    import IResponse
 from   pluggdapps.util          import ConfigDict, asbool
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for HTTPResponse implementing IHTTPResponse interface."
+    "Configuration settings for HTTPResponse implementing IResponse interface."
 
 class HTTPResponse( Plugin ):
-    implements( IHTTPResponse )
+    implements( IResponse )
 
     def __init__( self, appname, request ):
         super(Plugin, self).__init__( appname )

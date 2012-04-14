@@ -6,15 +6,16 @@
 
 import pkg_resources    as pkg
 
-from   ConfigParser     import SafeConfigParser
-from   plugincore       import plugin_init, query_plugin, query_plugins, \
-                               pluginclass
-from   plugincore       import Plugin, Attribute, Interface, implements
+from   ConfigParser          import SafeConfigParser
+from   plugincore            import plugin_init, query_plugin, query_plugins, \
+                                    pluginclass
+from   plugincore            import Plugin, Attribute, Interface, implements
+from   pluggdapps.interfaces import IServer
 import config
 # Load all interface specifications defined by this package.
-import plugincore
-import interfaces
-import commands
+import pluggdapps.plugincore
+import pluggdapps.interfaces
+import pluggdapps.commands
 
 __version__ = '0.1dev'
 ROOTAPP = 'root'
@@ -74,6 +75,9 @@ class Platform( object ):
         self._loadpackages()
         # Initialize plugin data structures
         plugin_init()
+        # Boot applications
+        [ a.boot( appsettings.get( pluginname(app), {} )) 
+          for a in query_plugins(ROOTAPP, IApplication) )]
 
         self.appsettings = appsettings
         return appsettings
@@ -81,8 +85,27 @@ class Platform( object ):
     def serve( self ):
         rootsett = self.appsettings['root']
         servername = rootsett.get('servername', DEFAULT_SERVER)
-        self.server = query_plugin( ROOTAPP, IHTTPServer, servername, self )
+        self.server = query_plugin( ROOTAPP, IServer, servername, self )
         server.start()  # Blocks !
+
+    def appfor( self, request ):
+        if ':' in request.host :
+            host, port = request.host.split(':', 1)
+            port = int(port)
+        else :
+            port = 80 if request.protocol == 'http' else 443
+
+        try    : subdomain, site, tld = host.rsplit('.', 3)
+        except : subdomain = None
+
+        for subdom, appname in self.map_subdomains.items() :
+            if subdom == subdomain : break
+        else :
+            for script, appname in self.map_scripts.items() :
+                if request.path.startswith( script ) : break
+            else :
+                appname = self.map_scripts['/']
+        return appname
 
     def _loadpackages( self ):
         """Import all packages from this python environment.
@@ -104,3 +127,4 @@ class Platform( object ):
                 if script :
                     script.setdefault( script, [] ).append( appname )
         return subdomains, scripts
+

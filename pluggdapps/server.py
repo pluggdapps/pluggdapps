@@ -8,7 +8,7 @@ import time, socket, fcntl
 
 from   pluggdapps import __version__
 from   pluggdapps.plugincore import Plugin, implements
-from   pluggdapps.interfaces import IHTTPServer
+from   pluggdapps.interfaces import IServer
 from   pluggdapps.util import ConfigDict
                     
 _default_settings = ConfigDict()
@@ -97,7 +97,7 @@ _default_settings['nodelay']                    = {
 
 class HTTPServer( Plugin ):
 
-    implements( IHTTPServer )
+    implements( IServer )
 
     _interrupt  = False
 

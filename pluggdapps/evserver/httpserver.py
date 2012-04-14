@@ -12,8 +12,8 @@ from __future__ import absolute_import, division, with_statement
 import logging, socket
 import ssl  # Python 2.6+
 
-from   pluggdapps                     import Plugin, implements
-from   pluggdapps.interface           import IHTTPServer, IHTTPRequest
+from   pluggdapps                     import Plugin, implements, ROOTAPP
+from   pluggdapps.interface           import IServer, IRequest
 from   pluggdapps.util                import ConfigDict, asbool, asint
 from   pluggdapps.evserver            import iostream
 from   pluggdapps.evserver.tcpserver  import TCPServer
@@ -47,7 +47,8 @@ _default_settings['xheaders']  = {
 _default_settings['request_factory']  = {
     'default' : 'httprequest',
     'types'   : (str,),
-    'help'    : "Handler class (callable) to process fully read request.",
+    'help'    : "Request class whose instance will be the single argument "
+                "passed on to request handler callable.",
 }
 _default_settings['ssloptions.certfile']  = {
     'default' : '',
@@ -91,7 +92,7 @@ class HTTPIOServer( TCPServer, Plugin ):
     """Plugin deriving TCPServer, a non-blocking, single-threaded HTTP server.
 
     A server is defined by a request callback that takes a plugin implementing
-    :class:`IHTTPRequest` interface as an argument and writes a valid HTTP 
+    :class:`IRequest` interface as an argument and writes a valid HTTP 
     response using :class:`IResponse` interface. Finishing the request does
     not necessarily close the connection in the case of HTTP/1.1 keep-alive
     requests. A simple example server that echoes back the URI you
@@ -131,7 +132,7 @@ class HTTPIOServer( TCPServer, Plugin ):
     implementation is available via base class TCPServer.
 
     """
-    implements( IHTTPServer )
+    implements( IServer )
 
     def __init__( self, appname, platform, **kwargs ):
         super( Plugin, self ).__init__( appname, platform, **kwargs )
@@ -139,10 +140,8 @@ class HTTPIOServer( TCPServer, Plugin ):
         self.platform = platform
 
     def handle_stream( self, stream, address ):
-        HTTPConnection( stream, address, self.platform,
-                        request_factory=self['request_factory'],
-                        no_keep_alive=self['no_keep_alive'],
-                        xheaders=self['xheaders'] )
+        settings = dict([ (k,self[k]) for k in self ])
+        HTTPConnection( stream, address, self.platform, settings=settings )
 
     # ISettings interface methods
     def default_settings( self ):
@@ -158,24 +157,22 @@ class HTTPIOServer( TCPServer, Plugin ):
         return settings
 
 
-
 class HTTPConnection(object):
     """Handles a connection to an HTTP client, executing HTTP requests.
 
     We parse HTTP headers and bodies, and execute the request callback
     until the HTTP conection is closed.
     """
-    def __init__( self, stream, address, platform, request_factory, 
-                  no_keep_alive=False, xheaders=False ):
+    def __init__( self, stream, address, platform, settings ={} ):
         self.stream = stream
         if self.stream.socket.family not in (socket.AF_INET, socket.AF_INET6):
             # Unix (or other) socket; fake the remote address
             address = ('0.0.0.0', 0)
         self.address = address
         self.platform = platform
-        self.request_factory = request_factory
-        self.no_keep_alive = no_keep_alive
-        self.xheaders = xheaders
+        self.request_factory = settings['request_factory']
+        self.no_keep_alive = settings['no_keep_alive']
+        self.xheaders = settings['xheaders']
         self._request = None
         self._request_finished = False
         # Save stack context here, outside of any request.  This keeps
@@ -184,19 +181,22 @@ class HTTPConnection(object):
         self.stream.read_until( b"\r\n\r\n", self._header_callback )
         self._write_callback = None
 
-    def write(self, chunk, callback=None):
-        """Writes a chunk of output to the stream."""
+    def write( self, chunk, callback=None ):
         assert self._request, "Request closed"
         if not self.stream.closed():
             self._write_callback = stack_context.wrap(callback)
             self.stream.write(chunk, self._on_write_complete)
 
-    def finish(self):
-        """Finishes the request."""
+    def finish( self ):
         assert self._request, "Request closed"
         self._request_finished = True
         if not self.stream.writing():
             self._finish_request()
+
+    def dispatch( self, request ):
+        appname = self.platform.appfor( request )
+        request.app = query_plugin( appname, 'IApplication', appname )
+        request.app.start( request )
 
     def _on_write_complete(self):
         if self._write_callback is not None:
@@ -248,7 +248,7 @@ class HTTPConnection(object):
 
             headers = HTTPHeaders.parse( data[eol:] )
             self._request = query_plugin( 
-                "root", IHTTPRequest, self.request_factory,
+                ROOTAPP, IRequest, self.request_factory,
                 self, method, uri, version, headers, self.address[0],
                 None, None, None )
 
@@ -262,7 +262,7 @@ class HTTPConnection(object):
                 self.stream.read_bytes(content_length, self._on_request_body)
                 return
 
-            self._request.handle()
+            self.dispatch( self._request )
 
         except _BadRequestException, e:
             logging.info( "Malformed HTTP request from %s: %s",
@@ -294,4 +294,4 @@ class HTTPConnection(object):
                 else:
                     logging.warning("Invalid multipart/form-data")
 
-        self._request.handle()
+        self.dispatch( _request )

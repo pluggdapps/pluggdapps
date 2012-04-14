@@ -8,21 +8,21 @@ import Cookie, socket, time, urlparse
 from   copy import deepcopy
 
 from   pluggdapps               import Plugin, implements
-from   pluggdapps.interfaces    import IHTTPRequest
+from   pluggdapps.interfaces    import IRequest
 from   pluggdapps.evserver      import httpiostream
 from   pluggdapps.util          import ConfigDict, asbool, pluginname
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for HTTPRequest implementing IHTTPRequest interface."
+    "Configuration settings for HTTPRequest implementing IRequest interface."
 
 class HTTPRequest( Plugin ):
-    implements( IHTTPRequest )
+    implements( IRequest )
 
     do_methods = ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS')
 
-    # IHTTPRequest interface methods and attributes
-    def __init__( self, application, connection, method, uri, version, headers,
+    # IRequest interface methods and attributes
+    def __init__( self, appname, connection, method, uri, version, headers,
                   remote_ip, host, protocol, files ):
 
         super(Plugin, self).__init__( pluginname(application) )
@@ -77,13 +77,6 @@ class HTTPRequest( Plugin ):
 
         # Root settings
         self.rootsettings = deepcopy( self.platform.appsettings.get('root', {}) )
-
-    def handle( self ):
-        sett = self.rootsettings
-        for key, sett in sett.items() :
-            if key.startswith('app:') :
-                subdomain = sett.get('mount_subdomain', None)
-                script = sett.get('mount_script', None)
 
     def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
