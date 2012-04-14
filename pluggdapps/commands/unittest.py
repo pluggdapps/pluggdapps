@@ -4,10 +4,10 @@
 
 # -*- coding: utf-8 -*-
 
-from   optparse      import OptionParser
+from   optparse              import OptionParser
 
-from   plugincore    import Plugin, implements
-from   interfaces    import ICommand
+from   pluggdapps.plugincore import Plugin, implements
+from   pluggdapps.interfaces import ICommand
 
 
 class UnitTest( Plugin ):

@@ -7,13 +7,12 @@ from __future__ import absolute_import, division, with_statement
 import sys, re, collections, errno, logging, socket
 import ssl  # Python 2.6+
 
-from   pluggdapps           import Plugin
-from   pluggdapps.util      import ConfigDict
-import pluggdapps.evserver  import httpioloop
-import pluggdapps.evserver  import stack_context
+from   pluggdapps.plugincore import Plugin
+from   pluggdapps.evserver   import stack_context
+import pluggdapps.util       as h
 
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for event poll based HTTP connection stream HTTPIOStream"
 

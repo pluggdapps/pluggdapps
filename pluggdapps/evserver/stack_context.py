@@ -54,7 +54,6 @@ Here are a few rules of thumb for when it's necessary:
 """
 
 from __future__ import absolute_import, division, with_statement
-
 import contextlib, functools, itertools, sys, threading
 
 

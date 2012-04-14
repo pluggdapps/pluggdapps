@@ -4,7 +4,9 @@
 
 # -*- coding: utf-8 -*-
 
-from plugincore     import Interface, Attribute
+import socket
+
+from   pluggdapps.plugincore     import Interface, Attribute
 
 __all__ = [ 'ICommand' ]
 
@@ -30,43 +32,6 @@ class ICommand( Interface ):
         parameters, `args`. If either or both `options` and `args` are None 
         then previously parsed `options` and `args` using argparse() will be
         used."""
-
-
-class ISettings( Interface ):
-    """ISettings is a mixin interface that can be implemented of any plugin.
-    Especially plugins that support configuration. Note that a plugin is a
-    bunch of configuration parameters implementing one or more interface
-    specification.
-    """
-
-    def normalize_settings( settings ):
-        """Static interface method.
-        `settings` is a dictionary of configuration parameters. This method 
-        will be called after aggregating all configuration parameters for a
-        plugin and before updating the plugin instance with its configuration
-        parameters.
-
-        Use this method to do any post processing on plugin's configuration
-        parameter and return the final form of configuration parameters.
-        Processed parameters are updated in-pace"""
-
-    def default_settings():
-        """Static interface method.
-        Return instance of :class:`ConfigDict` providing meta data
-        associated with each configuration parameters supported by the plugin.
-        Like - default value, value type, help text, wether web configuration
-        is allowed, optional values, etc ...
-        
-        To be implemented by classed deriving :class:`Plugin`.
-        """
-
-    def web_admin( settings ):
-        """Plugin settings can be configured via web interfaces and stored in
-        a backend like database, files etc ... Use this method for the
-        following,
-        
-        * To update the in-memory configuration settings with new `settings`
-        * To persist new `settings` in a backend data-store."""
 
 
 class IServer( Interface ):
@@ -170,7 +135,7 @@ class IRequest( Interface ):
     body = Attribute(
        "Request body, if present, as a byte string."
     )
-    remote_ip = Attribure(
+    remote_ip = Attribute(
        "Client's IP address as a string. If running behind a load-balancer "
        "or a proxy, the real IP address provided by a load balancer will be "
        "passed in the ``X-Real-Ip`` header."
@@ -293,6 +258,7 @@ class IApplication( Interface ):
 
 
 class IRequestHandler( Interface ):
+    pass
 
 
 class IRouter( Interface ):
@@ -307,10 +273,12 @@ class IRouter( Interface ):
 class IResponse( Interface ):
 
     def __init__( request ):
+        pass
 
     def write( chunk, callback=None ):
         """Writes the given chunk to the response stream."""
+        pass
 
     def finish():
         """Finishes this HTTP request on the open connection."""
-
+        pass

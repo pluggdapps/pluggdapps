@@ -10,8 +10,8 @@ import sys
 from   optparse      import OptionParser
 
 import pluggdapps
-from   plugincore    import plugin_init, plugin_names, query_plugin
-from   interfaces    import ICommand
+from   pluggdapps.plugincore    import plugin_init, pluginnames, query_plugin
+from   pluggdapps.interfaces    import ICommand
 
 usage = "pa [options] <command> [command_options]"
 
@@ -20,11 +20,6 @@ def parse( usage ):
     """Parse master script options."""
     return options( OptionParser( usage=usage ))
 
-
-    parser.add_option( '-d', action="store_true", dest='daemonize',
-                       help="run server as a daemon")
-    parser.add_option( '-p', '--pidfile', dest='pidfile', default=None,
-                       help="store the process id in the given file")
 
 def options( parser ):
     """Supported command options for master script."""
@@ -63,8 +58,8 @@ def doscript( paargs ):
     [ sys.path.append(p) for p in options.toendpath ]
 
     # -i (import)
-    sys.path.insert( 0, '' )
-    [ exec( "import %s" % i ) for i in imports or [] ]
+    sys.path.insert(0, '')
+    for i in options.imports : exec( "import %s" % i )
 
     # -e environment, setupt cmd-line environment options to appsetting's root
     if options.environment is not None :
@@ -74,7 +69,7 @@ def doscript( paargs ):
 if __name__ == '__main__' :
     paargs, cmd, cmdargs = [], None, sys.argv[1:]
     plugin_init()
-    commands = plugin_names( ICommand )
+    commands = pluginnames( ICommand )
     while cmdargs :
         arg = cmdargs.pop(0)
         if arg in commands :

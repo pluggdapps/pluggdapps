@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, with_statement
 
 import os, sys, time, logging, errno, random
 from   binascii import hexlify
-
 import multiprocessing  # Python 2.6+
 
 

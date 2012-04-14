@@ -1,7 +1,6 @@
 # Derived work from Facebook's tornado server.
 
 from __future__ import absolute_import, division, with_statement
-
 import sys, re, urllib, logging
 from   urlparse import parse_qs  # Python 2.6+
 

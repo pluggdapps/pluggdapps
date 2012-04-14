@@ -12,16 +12,16 @@ from __future__ import absolute_import, division, with_statement
 import logging, socket
 import ssl  # Python 2.6+
 
-from   pluggdapps                     import Plugin, implements, ROOTAPP
+from   pluggdapps.plugincore          import Plugin, implements
 from   pluggdapps.interface           import IServer, IRequest
-from   pluggdapps.util                import ConfigDict, asbool, asint
 from   pluggdapps.evserver            import iostream
 from   pluggdapps.evserver.tcpserver  import TCPServer
 from   pluggdapps.evserver            import stack_context
 from   pluggdapps.evserver.httputil   import utf8, native_str, parse_qs_bytes, \
                                              parse_multipart_form_data
+import pluggdapps.util                as h 
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for event poll based HTTP server."
 
@@ -148,11 +148,11 @@ class HTTPIOServer( TCPServer, Plugin ):
         return _default_settings
 
     def normalize_settings( self, settings ):
-        settings['multiprocess']  = asint( 
+        settings['multiprocess']  = h.asint( 
             settings['multiprocess'], _default_settings['multiprocess'] )
-        settings['no_keep_alive'] = asbool(
+        settings['no_keep_alive'] = h.asbool(
             settings['no_keep_alive'], _default_settings['no_keep_alive'] )
-        settings['xheaders']      = asbool(
+        settings['xheaders']      = h.asbool(
             settings['xheaders'], _default_settings['xheaders'] )
         return settings
 
@@ -235,6 +235,7 @@ class HTTPConnection(object):
         self.stream.read_until(b"\r\n\r\n", self._header_callback)
 
     def _on_headers(self, data):
+        from pluggdapps import ROOTAPP
         try:
             data = native_str(data.decode('latin1'))
             eol = data.find("\r\n")
@@ -294,4 +295,4 @@ class HTTPConnection(object):
                 else:
                     logging.warning("Invalid multipart/form-data")
 
-        self.dispatch( _request )
+        self.dispatch( self._request )

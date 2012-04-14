@@ -7,7 +7,7 @@
 from   pprint                   import pprint
 from   optparse                 import OptionParser
 
-from   pluggdapps.plugincore    import Plugin, implements, PluginMeta
+from   pluggdapps.plugincore    import PluginMeta, Plugin, implements
 from   pluggdapps.interfaces    import ICommand
 
 

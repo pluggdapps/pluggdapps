@@ -15,13 +15,11 @@ from __future__ import absolute_import, division, with_statement
 import datetime, errno, heapq, logging, time
 import os, select, thread, threading, traceback, signal
 
-from   pluggdapps.util      import set_close_exec, set_nonblocking, \
-                                   timedelta_to_seconds, ConfigDict, \
-                                   asint, asfloat
-import pluggdapps.evserver  import stack_context
-from   pluggdapps           import Plugin
+from   pluggdapps.plugincore import Plugin
+import pluggdapps.util       as h
+from   pluggdapps.evserver   import stack_context
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for poll based event handling for HTTP sockets"
 
@@ -38,11 +36,11 @@ _default_settings['poll_timeout']       = {
                 "and perform callbacks (if any) and start a fresh poll.",
 }
 
-class Waker(interface.Waker):
+class Waker( object ):
     def __init__(self):
         r, w = os.pipe()
-        set_nonblocking(r, w)
-        set_close_exec(r, w)
+        h.set_nonblocking(r, w)
+        h.set_close_exec(r, w)
         self.reader = os.fdopen(r, "rb", 0)
         self.writer = os.fdopen(w, "wb", 0)
 
@@ -54,8 +52,11 @@ class Waker(interface.Waker):
         except IOError: pass
 
     def consume(self):
-        try           : while self.reader.read() : pass
-        except IOError: pass
+        try :
+            while self.reader.read() :
+                pass
+        except IOError:
+            pass
 
     def close(self):
         self.reader.close()
@@ -110,7 +111,7 @@ class HTTPIOLoop( Plugin ):
         super(Plugin, self).__init__( appname, impl=impl )
         self._impl = impl or _poll()
         if hasattr(self._impl, 'fileno'):
-            set_close_exec( self._impl.fileno() )
+            h.set_close_exec( self._impl.fileno() )
 
         # Book keeping
         self._handlers = {}
@@ -409,9 +410,9 @@ class HTTPIOLoop( Plugin ):
 
     @classmethod
     def normalize_settings( cls, settings ):
-        settings['poll_threshold'] = asint(
+        settings['poll_threshold'] = h.asint(
             settings['poll_threshold'], _default_settings['poll_threshold'] )
-        settings['poll_timeout']   = asfloat( 
+        settings['poll_timeout']   = h.asfloat( 
             settings['poll_timeout'], _default_settings['poll_timeout'] )
         return settings
 
@@ -426,7 +427,7 @@ class _Timeout( object ):
         if isinstance(deadline, (int, long, float)):
             self.deadline = deadline
         elif isinstance(deadline, datetime.timedelta):
-            self.deadline = time.time() + timedelta_to_seconds(deadline)
+            self.deadline = time.time() + h.timedelta_to_seconds(deadline)
         else:
             raise TypeError("Unsupported deadline %r" % deadline)
         self.callback = callback

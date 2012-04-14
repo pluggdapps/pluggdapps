@@ -22,6 +22,7 @@ cleanall : clean
 	rm -rf pa-env
 
 clean :
+	rm -rf `find ./ -name "*.pyc"`;
 	rm -rf build;
 	rm -rf dist;
 	rm -rf pluggdapps.egg-info;

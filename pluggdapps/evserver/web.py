@@ -426,9 +426,9 @@ class RequestHandler(object):
         http://haacked.com/archive/2008/11/20/anatomy-of-a-subtle-json-vulnerability.aspx
         """
         if self._finished:
-            raise RuntimeError("Cannot write() after finish().  May be caused "
-                               "by using async operations without the "
-                               "@asynchronous decorator.")
+            raise RuntimeError( "Cannot write() after finish().  May be caused "
+                                "by using async operations without the "
+                                "@asynchronous decorator." )
         if isinstance(chunk, dict):
             chunk = escape.json_encode(chunk)
             self.set_header("Content-Type", "application/json; charset=UTF-8")

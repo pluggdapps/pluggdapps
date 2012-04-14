@@ -7,7 +7,7 @@
 # TODO :
 #   * Improve function asbool() implementation.
 
-import sys
+import sys, re
 
 def whichmodule( attr ):
     """Try to fetch the module name in which `attr` is defined."""
@@ -34,18 +34,6 @@ def subclassof( cls, supers ):
     for sup in supers :
         if issubclass( cls, sup ) : return sup
     return None
-
-
-def pluginname( o ):
-    """Plugin names are nothing but normalized form of plugin's class name,
-    where normalization is done by lower casing plugin's class name."""
-    from pluggdapps import Plugin
-    if isinstance(o, basestring) :
-        return o
-    elif issubclass(o, Plugin) :
-        return o.__name__.lower()
-    else :
-        return o.__class__.__name__.lower()
 
 
 class ConfigDict( dict ):
@@ -174,6 +162,7 @@ class HTTPFile( ObjectDict ):
         This value comes from HTTP header and cannot be trusted outright given
         that it can be easily forged.
     """
+    pass
 
 
 class HTTPHeaders( dict ):

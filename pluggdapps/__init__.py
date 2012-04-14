@@ -4,18 +4,21 @@
 
 # -*- coding: utf-8 -*-
 
-import pkg_resources    as pkg
-
+import pkg_resources         as pkg
 from   ConfigParser          import SafeConfigParser
-from   plugincore            import plugin_init, query_plugin, query_plugins, \
-                                    pluginclass
-from   plugincore            import Plugin, Attribute, Interface, implements
-from   pluggdapps.interfaces import IServer
-import config
-# Load all interface specifications defined by this package.
-import pluggdapps.plugincore
+
+from   pluggdapps.plugincore import plugin_init, query_plugin, query_plugins,\
+                                    pluginname, pluginclass
+import pluggdapps.config     as config
+
+# Load all interface specifications and plugins defined by this package.
 import pluggdapps.interfaces
+import pluggdapps.plugincore
 import pluggdapps.commands
+import pluggdapps.evserver
+import pluggdapps.request
+import pluggdapps.response
+import pluggdapps.application
 
 __version__ = '0.1dev'
 ROOTAPP = 'root'
@@ -77,12 +80,14 @@ class Platform( object ):
         plugin_init()
         # Boot applications
         [ a.boot( appsettings.get( pluginname(app), {} )) 
-          for a in query_plugins(ROOTAPP, IApplication) )]
+          for a in query_plugins(ROOTAPP, IApplication) ]
 
         self.appsettings = appsettings
         return appsettings
 
     def serve( self ):
+        from pluggdapps.interfaces import IServer
+
         rootsett = self.appsettings['root']
         servername = rootsett.get('servername', DEFAULT_SERVER)
         self.server = query_plugin( ROOTAPP, IServer, servername, self )
@@ -127,4 +132,3 @@ class Platform( object ):
                 if script :
                     script.setdefault( script, [] ).append( appname )
         return subdomains, scripts
-

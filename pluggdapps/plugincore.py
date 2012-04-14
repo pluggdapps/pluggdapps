@@ -5,8 +5,8 @@
 # -*- coding: utf-8 -*-
 
 import sys, types
-from   pluggdapps      import ROOTAPP
-from   pluggdapps.util import whichmodule, subclassof, pluginname
+
+import pluggdapps.util       as h
 
 # TODO :
 #   1. How to check for multiple plugins by name defined for same Interface.
@@ -14,11 +14,11 @@ from   pluggdapps.util import whichmodule, subclassof, pluginname
 __all__ = [ 
     # API functions
     'implements', 'plugin_init', 'plugin_info',
-    'query_plugin', 'query_plugins', 'plugin_names',
+    'query_plugin', 'query_plugins', 'pluginname', 'pluginnames',
+    'pluginclass',
     # Classes
-    'Interface', 'Plugin', 'Attribute'
+    'Interface', 'Attribute'
 ]
-
 
 class PluginMeta( type ):
     """Plugin component manager."""
@@ -58,7 +58,8 @@ class PluginMeta( type ):
             # classes
             [ pmap.setdefault( nm, '-na-' )
               for b in bases 
-              for (i,pmap) in _implementers.items() if pluginname(b) in pmap ]
+              for (i,pmap) in PluginMeta._implementers.items() 
+                if pluginname(b) in pmap ]
         return new_class
 
     @classmethod
@@ -76,7 +77,7 @@ class PluginMeta( type ):
         """`new_class` is class deriving from Interface baseclass and provides 
         specification for interface `name`.
         """
-        clsmod = whichmodule( new_class )
+        clsmod = h.whichmodule( new_class )
         info = {
             'cls' : new_class,
             'name' : name,
@@ -101,7 +102,7 @@ class PluginMeta( type ):
         """`new_class` is class deriving from Plugin baseclass and implements
         interface specifications.
         """
-        clsmod = whichmodule( new_class )
+        clsmod = h.whichmodule( new_class )
         info = {
             'cls'    : new_class,
             'name'   : nm,
@@ -139,60 +140,6 @@ class PluginBase( object ):
 
     def __new__( cls, *args, **kwargs ):
         return super( PluginBase, cls ).__new__( cls )
-
-
-class Plugin( PluginBase ):
-    """Every plugin must derive from this class.
-
-    A plugin is a dictionary of configuration parameters, that also implements
-    one or more interface. Note that class:`Plugin` does not directly derive
-    from built in type :type:`dict` because dictionary methods from dict
-    type might clash with one or more interface methods implemented by the
-    derving plugin class.
-    """
-
-    implements( ISettings )
-
-    # Dictionary like interface to plugin instances
-    def __len__( self ):
-        return self._settngx.__len__()
-
-    def __nonzero__( self ):
-        return self._settngx.__nonzero__()
-
-    def __getitem__( self, key ):
-        return self._settngx[item]
-
-    def __setitem__( self, key, value ):
-        return self._settngx.__setitem__( key, value )
-
-    def __delitem__( self, key ):
-        return self._settngx.__delitem__( key )
-
-    def __iter__( self ):
-        return self._settngx.__iter__()
-
-    def __contains__( self, item ):
-        return self._settngx.__contains__( item )
-
-    # Plugin constructor and instantiater methods.
-    def __init__( self, appname, *args, **kwargs ):
-        from  pluggdapps import appsettings
-        self.appname = appname
-        sett = {}
-        sett.update( appsettings[appname][pluginname(self)] )
-        sett.update( kwargs.pop( 'settings', {} ))
-        self._settngx = sett
-
-    # :class:`ISettings` interface methods
-    def normalize_settings( self, settings ):
-        return settings
-
-    def default_settings( self ):
-        return {}
-
-    def web_admin( self, settings ):
-        pass
 
 
 class Attribute( object ):
@@ -253,6 +200,118 @@ def plugin_info( nm ):
         raise Exception( "Could not get plugin information for %r " % nm )
 
 
+def pluginnames( interface ):
+    """Return a list of plugin names implementing `interface`."""
+    return PluginMeta._implementers[interface].keys()
+
+def pluginclass( interface, name ):
+    nm = pluginname( name )
+    return PluginMeta._implementers.get( interface, {} ).get( nm, None )
+
+def pluginname( o ):
+    """Plugin names are nothing but normalized form of plugin's class name,
+    where normalization is done by lower casing plugin's class name."""
+    if isinstance(o, basestring) :
+        return o
+    elif issubclass(o, PluginBase) :
+        return o.__name__.lower()
+    else :
+        return o.__class__.__name__.lower()
+
+
+# Plugin base class
+
+class ISettings( Interface ):
+    """ISettings is a mixin interface that can be implemented of any plugin.
+    Especially plugins that support configuration. Note that a plugin is a
+    bunch of configuration parameters implementing one or more interface
+    specification.
+    """
+
+    def normalize_settings( settings ):
+        """Static interface method.
+        `settings` is a dictionary of configuration parameters. This method 
+        will be called after aggregating all configuration parameters for a
+        plugin and before updating the plugin instance with its configuration
+        parameters.
+
+        Use this method to do any post processing on plugin's configuration
+        parameter and return the final form of configuration parameters.
+        Processed parameters are updated in-pace"""
+
+    def default_settings():
+        """Static interface method.
+        Return instance of :class:`ConfigDict` providing meta data
+        associated with each configuration parameters supported by the plugin.
+        Like - default value, value type, help text, wether web configuration
+        is allowed, optional values, etc ...
+        
+        To be implemented by classed deriving :class:`Plugin`.
+        """
+
+    def web_admin( settings ):
+        """Plugin settings can be configured via web interfaces and stored in
+        a backend like database, files etc ... Use this method for the
+        following,
+        
+        * To update the in-memory configuration settings with new `settings`
+        * To persist new `settings` in a backend data-store."""
+
+
+class Plugin( PluginBase ):
+    """Every plugin must derive from this class.
+
+    A plugin is a dictionary of configuration parameters, that also implements
+    one or more interface. Note that class:`Plugin` does not directly derive
+    from built in type :type:`dict` because dictionary methods from dict
+    type might clash with one or more interface methods implemented by the
+    derving plugin class.
+    """
+
+    implements( ISettings )
+
+    # Dictionary like interface to plugin instances
+    def __len__( self ):
+        return self._settngx.__len__()
+
+    def __nonzero__( self ):
+        return self._settngx.__nonzero__()
+
+    def __getitem__( self, key ):
+        return self._settngx[item]
+
+    def __setitem__( self, key, value ):
+        return self._settngx.__setitem__( key, value )
+
+    def __delitem__( self, key ):
+        return self._settngx.__delitem__( key )
+
+    def __iter__( self ):
+        return self._settngx.__iter__()
+
+    def __contains__( self, item ):
+        return self._settngx.__contains__( item )
+
+    # Plugin constructor and instantiater methods.
+    def __init__( self, appname, *args, **kwargs ):
+        from  pluggdapps import appsettings
+        self.appname = appname
+        sett = {}
+        sett.update( appsettings[appname][pluginname(self)] )
+        sett.update( kwargs.pop( 'settings', {} ))
+        self._settngx = sett
+
+    # :class:`ISettings` interface methods
+    def normalize_settings( self, settings ):
+        return settings
+
+    def default_settings( self ):
+        return {}
+
+    def web_admin( self, settings ):
+        pass
+
+
 def query_plugins( appname, interface, *args, **kwargs ):
     """Use this API to query for plugins using the `interface` class it
     implements. Positional and keyword arguments will be used to instantiate
@@ -263,11 +322,10 @@ def query_plugins( appname, interface, *args, **kwargs ):
 
     Returns a list of plugin instance implementing `interface`
     """
+    from pluggdapps import ROOTAPP
     appname = appname or ROOTAPP
-    plugins = []
-    for pcls in PluginMeta._implementers.get(interface, {}).values() : 
-        plugin.append( cls( appname, *args, **kwargs ))
-    return plugins
+    return [ cls( appname, *args, **kwargs )
+             for pcls in PluginMeta._implementers.get(interface, {}).values() ]
 
 
 def query_plugin( appname, interface, name, *args, **kwargs ):
@@ -280,16 +338,10 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
 
     Return a single Plugin instance.
     """
+    from pluggdapps import ROOTAPP
     appname = appname or ROOTAPP
     nm = pluginname( name )
     cls = PluginMeta._implementers.get( interface, {} ).get( nm, None )
     return cls( appname, *args, **kwargs ) if cls else None
 
 
-def plugin_names( interface ):
-    """Return a list of plugin names implementing `interface`."""
-    return PluginMeta._implementers[interface].keys()
-
-def pluginclass( interface, name ):
-    nm = pluginname( name )
-    return PluginMeta._implementers.get( interface, {} ).get( nm, None )

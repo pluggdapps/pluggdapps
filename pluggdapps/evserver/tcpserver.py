@@ -7,11 +7,11 @@ from __future__ import absolute_import, division, with_statement
 import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
-from pluggdapps.interfaces          import ISettings
-from pluggdapps.evserver            import process
-from pluggdapps.evserver.httpioloop import HTTPIOLoop
-from pluggdapps.evserver.iostream   import HTTPIOStream, HTTPSSLIOStream
-from pluggdapps.util                import set_close_exec, settingsfor
+import pluggdapps.util                as h
+from   pluggdapps.interfaces          import ISettings
+from   pluggdapps.evserver            import process
+from   pluggdapps.evserver.httpioloop import HTTPIOLoop
+from   pluggdapps.evserver.iostream   import HTTPIOStream, HTTPSSLIOStream
 
 
 class TCPServer( object ):
@@ -140,7 +140,7 @@ class TCPServer( object ):
     def _handle_connection( self, conn, address ):
         from pluggdapps import query_plugin, ROOTAPP
 
-        ssloptions = settingsfor( 'ssloptions.', self )
+        ssloptions = h.settingsfor( 'ssloptions.', self )
         if ssloptions :
             assert ssl, "Python 2.6+ and OpenSSL required for SSL"
             try:
@@ -202,7 +202,7 @@ def bind_sockets(port, address=None, family=socket.AF_UNSPEC, backlog=128):
                                   0, flags)):
         af, socktype, proto, canonname, sockaddr = res
         sock = socket.socket(af, socktype, proto)
-        set_close_exec(sock.fileno())
+        h.set_close_exec(sock.fileno())
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if af == socket.AF_INET6:
             # On linux, ipv6 sockets accept ipv4 too by default,

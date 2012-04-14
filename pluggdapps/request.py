@@ -7,12 +7,12 @@
 import Cookie, socket, time, urlparse
 from   copy import deepcopy
 
-from   pluggdapps               import Plugin, implements
-from   pluggdapps.interfaces    import IRequest
-from   pluggdapps.evserver      import httpiostream
-from   pluggdapps.util          import ConfigDict, asbool, pluginname
+from   pluggdapps.plugincore import Plugin, implements, pluginname
+from   pluggdapps.interfaces import IRequest
+from   pluggdapps.evserver   import httpiostream
+import pluggdapps.util       as h
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPRequest implementing IRequest interface."
 

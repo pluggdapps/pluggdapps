@@ -4,12 +4,11 @@
 
 # -*- coding: utf-8 -*-
 
+from   pluggdapps.plugincore import Plugin, implements
+from   pluggdapps.interfaces import IResponse
+import pluggdapps.util       as h
 
-from   pluggdapps               import Plugin, implements
-from   pluggdapps.interfaces    import IResponse
-from   pluggdapps.util          import ConfigDict, asbool
-
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPResponse implementing IResponse interface."
 
