@@ -4,7 +4,7 @@
 
 # -*- coding: utf-8 -*-
 
-import sys, inspect
+import sys, inspect, logging
 
 import pluggdapps.util       as h
 
@@ -19,6 +19,8 @@ __all__ = [
     # Classes
     'Interface', 'Attribute'
 ]
+
+log = logging.getLogger(__name__)
 
 class PluginMeta( type ):
     """Plugin component manager."""
@@ -177,6 +179,9 @@ def plugin_init():
     for i, pmap in PluginMeta._implementers.items()[:] :
         d[i] = dict([ (nm, PluginMeta._pluginmap[nm]['cls']) for nm in pmap ])
     PluginMeta._implementers = d
+    log.info( '%r plugins implementing %r interfaces', 
+              len(PluginMeta._pluginmap.keys()),
+              len(PluginMeta._interfmap.keys()) )
 
 def plugin_info( nm ):
     if isinstance( nm, basestring ) :
@@ -281,7 +286,7 @@ class Plugin( PluginBase ):
         return self._settngx.__nonzero__()
 
     def __getitem__( self, key ):
-        return self._settngx[item]
+        return self._settngx[key]
 
     def __setitem__( self, key, value ):
         return self._settngx.__setitem__( key, value )
@@ -330,7 +335,7 @@ def query_plugins( appname, interface, *args, **kwargs ):
     """
     from pluggdapps import ROOTAPP
     appname = appname or ROOTAPP
-    return [ cls( appname, *args, **kwargs )
+    return [ pcls( appname, *args, **kwargs )
              for pcls in PluginMeta._implementers.get(interface, {}).values() ]
 
 

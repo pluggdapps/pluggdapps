@@ -270,10 +270,19 @@ class IRequestHandler( Interface ):
 
 class IRouter( Interface ):
 
+    def boot( request ):
+        pass
+
     def route( request ):
         pass
 
     def match( request ):
+        pass
+
+    def url( request ):
+        pass
+
+    def urlpath( request ):
         pass
 
 

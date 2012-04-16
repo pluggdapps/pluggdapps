@@ -6,24 +6,27 @@
 
 
 import pkg_resources         as pkg
+import logging
 
 from   pluggdapps.plugin     import Plugin, query_plugin, query_plugins, \
                                     pluginname, plugin_init
 import pluggdapps.config     as config
-import pluggdapps.log        as log
+import pluggdapps.log        as logm
 from   pluggdapps.interfaces import IApplication
-from   pluggdapps.util       import call_entrypoint, ConfigDict, asbool, asint
+import pluggdapps.util       as h
+
+log = logging.getLogger(__name__)
 
 DEFAULT_SERVER = 'httpioserver'
 DEFAULT_HOST = '127.0.0.1'
 DEFAULT_PORT = 5000
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "pluggdapps global configuration settings."
 
 _default_settings['logging.level']  = {
-    'default' : 'info',
+    'default' : 'debug',
     'types'   : (str,),
     'options' : [ 'debug', 'info', 'warning', 'error', 'none' ],
     'help'    : "Set Python log level. If 'none', logging configuration won't "
@@ -62,11 +65,14 @@ _default_settings['logging.color'] = {
 class Platform( Plugin ):
 
     @classmethod
-    def boot( cls, inifile=None ):
+    def boot( cls, inifile=None, level=None ):
         """Do the following,
         * Boot platform using an optional master configuration file `inifile`.
         * Load pluggdapps packages.
         * Init plugins
+
+        ``gs``,
+            Global settings
         """
         from  pluggdapps import appsettings, ROOTAPP
         appsett = config.loadsettings( inifile )
@@ -75,6 +81,11 @@ class Platform( Plugin ):
         cls.appsettings = appsettings
 
         # Setup logger 
+        logsett = h.settingsfor( 'logging.', appsettings['root']['platform'] )
+        logsett['level'] = level or logsett['level']
+        logm.setup( logsett )
+        log.info( 'Loaded application settings for %r', appsettings.keys() )
+
         # Parse master ini file for application mount rules and generate a map
         cls.map_subdomains, cls.map_scripts = cls._mountmap()
         # Load packages specific to pluggdapps
@@ -82,8 +93,12 @@ class Platform( Plugin ):
         # Initialize plugin data structures
         plugin_init()
         # Boot applications
-        [ a.boot( appsettings.get( pluginname(app), {} )) 
-          for a in query_plugins( ROOTAPP, IApplication ) ]
+        apps = query_plugins( ROOTAPP, IApplication )
+        log.info( "%d applications found, booting them ..." % len(apps) )
+        for a in apps :
+            appname = pluginname(a)
+            log.debug( 'Booting application %r ...', appname )
+            a.boot( appsettings.get( appname, {} )) 
 
         return appsettings
 
@@ -123,11 +138,11 @@ class Platform( Plugin ):
         packages = []
         pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
         for pkgname, d in sorted( pkgs.items(), key=lambda x : x[0] ) :
-            info = call_entrypoint( d,  'pluggdapps', 'package', appsettings )
+            info = h.call_entrypoint(d,  'pluggdapps', 'package', appsettings)
             if info == None : continue
             __import__( pkgname )
             packages.append( pkgname )
-        #log.info( "%s pluggdapps packages loaded" % len(packages) )
+        log.info( "%s pluggdapps packages loaded" % len(packages) )
         return packages
 
     @classmethod
@@ -151,11 +166,11 @@ class Platform( Plugin ):
 
     @classmethod
     def normalize_settings( cls, settings ):
-        settings['logging.stderr'] = asbool( settings['logging.stderr'] )
+        settings['logging.stderr'] = h.asbool( settings['logging.stderr'] )
         settings['logging.file_maxsize'] = \
-                asint( settings['logging.file_maxsize'] )
+                h.asint( settings['logging.file_maxsize'] )
         settings['logging.file_maxbackups'] = \
-                asint( settings['logging.file_maxbackups'] )
-        settings['logging.color'] = asbool( settings['logging.color'] )
+                h.asint( settings['logging.file_maxbackups'] )
+        settings['logging.color'] = h.asbool( settings['logging.color'] )
         return settings
 

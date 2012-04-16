@@ -15,10 +15,10 @@ class List( Plugin ):
     implements( ICommand )
 
     description = "list of plugins, interfaces."
-    usage = "usage: pa list [options] <module>"
+    usage = "usage: pa [options] list [list_options] <module>"
 
     def __init__( self, appname, argv=[] ):
-        super(Plugin, self).__init__( appname, argv=argv )
+        Plugin.__init__( self, appname, argv=argv )
         parser = self._parse( List.usage )
         self.options, self.args = parser.parse_args( argv )
 

@@ -47,7 +47,7 @@ def docommand( platform, command, argv ):
     comm.run()
 
 
-def doscript( paargs ):
+def doscript( paargs, cmd ):
     """Default handling for master script."""
     from  pluggdapps        import appsettings
     parser = parse( usage )
@@ -67,8 +67,14 @@ def doscript( paargs ):
     if options.environment is not None :
         appsettings['root']['environment'] = options.environment
 
-    # -c (config file)
-    Platform.boot( options.config )
+    if cmd :
+        level = 'warning' if cmd == 'commands' else None
+        # -c (config file)
+        Platform.boot( options.config, level=level )
+        platform = query_plugin( ROOTAPP, ISettings, 'platform' )
+        docommand( platform, cmd, cmdargs )
+    else :
+        parser.print_help()
 
 
 if __name__ == '__main__' :
@@ -81,6 +87,4 @@ if __name__ == '__main__' :
             break
         else :
             paargs.append( arg )
-    doscript( paargs )
-    platform = query_plugin( ROOTAPP, ISettings, 'platform' )
-    docommand( platform, cmd, cmdargs ) if cmd else None
+    doscript( paargs, cmd )

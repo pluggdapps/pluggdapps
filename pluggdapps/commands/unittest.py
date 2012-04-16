@@ -13,11 +13,11 @@ from   pluggdapps.interfaces import ICommand
 class UnitTest( Plugin ):
     implements( ICommand )
 
-    description = "Run unittest."
-    usage = "usage: pa unittest [options] <module>"
+    description = "Run one or more unittest."
+    usage = "usage: pa [options] unittest [test_options] <module>"
 
     def __init__( self, appname, argv=[] ):
-        super(Plugin, self).__init__( appname, argv=argv )
+        Plugin.__init__( self, appname, argv=argv )
         parser = self._parse( UnitTest.usage )
         self.options, self.args = parser.parse_args( argv )
 

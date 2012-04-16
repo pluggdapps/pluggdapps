@@ -11,10 +11,10 @@ class Serve( Plugin ):
     implements( ICommand )
 
     description = "Start http server."
-    usage = "usage: pa list [options] <module>"
+    usage = "usage: pa [options] serve [serve_options]"
 
     def __init__( self, appname, argv=[] ):
-        super(Plugin, self).__init__( appname, argv=argv )
+        Plugin.__init__( self, appname, argv=argv )
 
     def argparse( self, argv ):
         pass

@@ -37,7 +37,7 @@ setup(
     entry_points = """\
     [pluggdapps]
       package=pluggdapps:package
-    """
+    """,
     install_requires=[                      # setuptools
     ],
     extras_require={},                      # setuptools

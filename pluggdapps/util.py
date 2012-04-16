@@ -120,7 +120,9 @@ def asfloat( val, default=None ):
 def settingsfor( prefix, settings ):
     """Parse `settings` keys starting with `prefix` and return a dictionary of
     corresponding options."""
-    return dict([ (k, v) for k, v in settings.items() if k.startswith(prefix) ])
+    l = len(prefix)
+    return dict([ (k[l:], v) 
+                  for k, v in settings.items() if k.startswith(prefix) ])
 
 def timedelta_to_seconds( td ) :
     """Equivalent to td.total_seconds() (introduced in python 2.7)."""
