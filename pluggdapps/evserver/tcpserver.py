@@ -8,7 +8,7 @@ import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
 import pluggdapps.util                  as h
-from   pluggdapps.plugincore            import ISettings
+from   pluggdapps.plugin                import ISettings, query_plugin
 from   pluggdapps.evserver              import process
 from   pluggdapps.evserver.httpioloop   import HTTPIOLoop
 from   pluggdapps.evserver.httpiostream import HTTPIOStream, HTTPSSLIOStream
@@ -52,7 +52,8 @@ class TCPServer( object ):
         method and `process.fork_processes` to provide greater
         control over the initialization of a multi-process server.
         """
-        from pluggdapps import query_plugin, ROOTAPP
+        from pluggdapps import ROOTAPP
+
         if self.ioloop == None :
             self.ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
         for sock in sockets:
@@ -138,7 +139,7 @@ class TCPServer( object ):
         raise NotImplementedError()
 
     def _handle_connection( self, conn, address ):
-        from pluggdapps import query_plugin, ROOTAPP
+        from pluggdapps import ROOTAPP
 
         ssloptions = h.settingsfor( 'ssloptions.', self )
         if ssloptions :

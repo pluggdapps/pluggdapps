@@ -6,10 +6,10 @@
 
 import time, socket, fcntl
 
-from   pluggdapps import __version__
-from   pluggdapps.plugincore import Plugin, implements
+from   pluggdapps            import __version__
+from   pluggdapps.plugin     import Plugin, implements
 from   pluggdapps.interfaces import IServer
-from   pluggdapps.util import ConfigDict
+from   pluggdapps.util       import ConfigDict
                     
 _default_settings = ConfigDict()
 _default_settings.__doc__ = "Pluggdapps native HTTP Server configuration"
@@ -189,15 +189,17 @@ class HTTPServer( Plugin ):
                 # TODO : Log error message
 
     # ISettings interface methods.
-    def normalize_settings( self, settings ):
+    @classmethod
+    def default_settings( cls ):
+        return _default_settings
+
+    @classmethod
+    def normalize_settings( cls, settings ):
         return settings
 
-    def default_settings():
-        return _default_settings.items()
-
-    def web_admin( self, settings ):
-        """Web admin interface is not allowed for this plugin."""
-        pass
+    @classmethod
+    def web_admin( cls, settings ):
+        return settings
 
 
 class RequestHandler( BaseHTTPServer.BaseHTTPRequestHandler ):

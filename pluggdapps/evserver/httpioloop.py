@@ -15,7 +15,7 @@ from __future__ import absolute_import, division, with_statement
 import datetime, errno, heapq, logging, time
 import os, select, thread, threading, traceback, signal
 
-from   pluggdapps.plugincore import Plugin
+from   pluggdapps.plugin     import Plugin
 import pluggdapps.util       as h
 from   pluggdapps.evserver   import stack_context
 
@@ -405,7 +405,8 @@ class HTTPIOLoop( Plugin ):
         logging.error("Exception in callback %r", callback, exc_info=True)
 
     # `ISettings` interface methods
-    def default_settings( self ):
+    @classmethod
+    def default_settings( cls ):
         return _default_settings
 
     @classmethod

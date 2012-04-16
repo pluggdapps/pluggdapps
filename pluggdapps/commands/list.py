@@ -7,13 +7,14 @@
 from   pprint                   import pprint
 from   optparse                 import OptionParser
 
-from   pluggdapps.plugincore    import PluginMeta, Plugin, implements
+from   pluggdapps.plugin        import PluginMeta, Plugin, implements
 from   pluggdapps.interfaces    import ICommand
 
 
 class List( Plugin ):
     implements( ICommand )
 
+    description = "list of plugins, interfaces."
     usage = "usage: pa list [options] <module>"
 
     def __init__( self, appname, argv=[] ):

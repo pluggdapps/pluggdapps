@@ -4,7 +4,7 @@
 
 # -*- coding: utf-8 -*-
 
-import sys, types
+import sys, inspect
 
 import pluggdapps.util       as h
 
@@ -15,7 +15,7 @@ __all__ = [
     # API functions
     'implements', 'plugin_init', 'plugin_info',
     'query_plugin', 'query_plugins', 'pluginname', 'pluginnames',
-    'pluginclass',
+    'pluginclass', 'default_settings', 'applications',
     # Classes
     'Interface', 'Attribute'
 ]
@@ -57,9 +57,9 @@ class PluginMeta( type ):
             # Register deriving plugin for interfaces implemented by its base
             # classes
             [ pmap.setdefault( nm, '-na-' )
-              for b in bases 
+              for b in map( None, new_class.mro() )
               for (i,pmap) in PluginMeta._implementers.items() 
-                if pluginname(b) in pmap ]
+              if pluginname(b) in pmap ]
         return new_class
 
     @classmethod
@@ -93,7 +93,7 @@ class PluginMeta( type ):
             v = getattr(new_class, k)
             if isinstance(v, Attribute) :
                 info['attributes'][k] = v
-            elif isinstance(v, types.MethodType) :
+            elif inspect.ismethod(v) :
                 info['methods'][k] = v
         return info
 
@@ -172,17 +172,6 @@ def plugin_init():
       dictionary is populated so that configuration values gathered from
       different sources are normalized to python data types.
     """
-    from pluggdapps import appsettings
-    # Normalize plugin settings
-    for appname, setts in appsettings.items()[:] :
-        for p, sett in setts :
-            info = PluginMeta._pluginmap.get( p, {} )
-            cls = info.get('cls', None)
-            s = {}
-            s.update( cls.default_settings() ) if cls else None
-            s.update( sett )
-            cls.normalize_settings( s ) if cls else None
-            appsettings[appname][p] = s
     # Optimize _implementers for query_*
     d = {}
     for i, pmap in PluginMeta._implementers.items()[:] :
@@ -211,11 +200,25 @@ def pluginname( o ):
     """Plugin names are nothing but normalized form of plugin's class name,
     where normalization is done by lower casing plugin's class name."""
     if isinstance(o, basestring) :
-        return o
-    elif issubclass(o, PluginBase) :
+        return o.lower()
+    elif inspect.isclass(o) :
         return o.__name__.lower()
     else :
         return o.__class__.__name__.lower()
+    return name
+
+def default_settings():
+    """Return dictionary default settings for every loaded plugin."""
+    psetts = [ ( info['name'], info['cls'].default_settings() )
+               for info in PluginMeta._pluginmap.values() ]
+    return psetts
+
+def applications():
+    """Return a list of application names (which are actually plugins
+    implementing :class:`IApplication` interface."""
+    from  pluggdapps import ROOTAPP
+    from  pluggdapps.interfaces import IApplication
+    return [ROOTAPP] + PluginMeta._implementers.get( IApplication, {} ).keys()
 
 
 # Plugin base class
@@ -228,7 +231,7 @@ class ISettings( Interface ):
     """
 
     def normalize_settings( settings ):
-        """Static interface method.
+        """Class method.
         `settings` is a dictionary of configuration parameters. This method 
         will be called after aggregating all configuration parameters for a
         plugin and before updating the plugin instance with its configuration
@@ -239,7 +242,7 @@ class ISettings( Interface ):
         Processed parameters are updated in-pace"""
 
     def default_settings():
-        """Static interface method.
+        """Class method.
         Return instance of :class:`ConfigDict` providing meta data
         associated with each configuration parameters supported by the plugin.
         Like - default value, value type, help text, wether web configuration
@@ -249,7 +252,8 @@ class ISettings( Interface ):
         """
 
     def web_admin( settings ):
-        """Plugin settings can be configured via web interfaces and stored in
+        """Class method.
+        Plugin settings can be configured via web interfaces and stored in
         a backend like database, files etc ... Use this method for the
         following,
         
@@ -301,14 +305,17 @@ class Plugin( PluginBase ):
         self._settngx = sett
 
     # :class:`ISettings` interface methods
-    def normalize_settings( self, settings ):
-        return settings
-
-    def default_settings( self ):
+    @classmethod
+    def default_settings( cls ):
         return {}
 
-    def web_admin( self, settings ):
-        pass
+    @classmethod
+    def normalize_settings( cls, settings ):
+        return settings
+
+    @classmethod
+    def web_admin( cls, settings ):
+        return settings
 
 
 def query_plugins( appname, interface, *args, **kwargs ):
@@ -342,5 +349,6 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
     nm = pluginname( name )
     cls = PluginMeta._implementers.get( interface, {} ).get( nm, None )
     return cls( appname, *args, **kwargs ) if cls else None
+
 
 

@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, with_statement
 import sys, re, collections, errno, logging, socket
 import ssl  # Python 2.6+
 
-from   pluggdapps.plugincore import Plugin
+from   pluggdapps.plugin     import Plugin
 from   pluggdapps.evserver   import stack_context
 import pluggdapps.util       as h
 
@@ -575,10 +575,12 @@ class HTTPIOStream( Plugin ):
             self.ioloop.update_handler(self.socket.fileno(), self._state)
 
     # ISettings interface methods
-    def default_settings( self ):
+    @classmethod
+    def default_settings( cls ):
         return _default_settings
 
-    def normalize_settings( self, settings ):
+    @classmethod
+    def normalize_settings( cls, settings ):
         settings['max_buffer_size'] = asint(
             settings['max_buffer_size'], _default_settings['max_buffer_size'] )
         settings['read_chunk_size'] = asint(

@@ -10,8 +10,11 @@ import sys
 from   optparse      import OptionParser
 
 import pluggdapps
-from   pluggdapps               import Platform, ROOTAPP
-from   pluggdapps.plugincore    import plugin_init, pluginnames, query_plugin
+from   pluggdapps               import ROOTAPP
+from   pluggdapps.platform      import Platform
+from   pluggdapps.plugin        import plugin_init, pluginnames, \
+                                       query_plugin, ISettings
+from   pluggdapps.platform      import Platform
 from   pluggdapps.interfaces    import ICommand
 
 usage = "pa [options] <command> [command_options]"
@@ -44,7 +47,7 @@ def docommand( platform, command, argv ):
     comm.run()
 
 
-def doscript( platform, paargs ):
+def doscript( paargs ):
     """Default handling for master script."""
     from  pluggdapps        import appsettings
     parser = parse( usage )
@@ -65,14 +68,12 @@ def doscript( platform, paargs ):
         appsettings['root']['environment'] = options.environment
 
     # -c (config file)
-    platform.boot( options.config )
+    Platform.boot( options.config )
 
 
 if __name__ == '__main__' :
     paargs, cmd, cmdargs = [], None, sys.argv[1:]
-    plugin_init()
     commands = pluginnames( ICommand )
-    platform = Platform()
     while cmdargs :
         arg = cmdargs.pop(0)
         if arg in commands :
@@ -80,5 +81,6 @@ if __name__ == '__main__' :
             break
         else :
             paargs.append( arg )
-    doscript( platform, paargs )
+    doscript( paargs )
+    platform = query_plugin( ROOTAPP, ISettings, 'platform' )
     docommand( platform, cmd, cmdargs ) if cmd else None

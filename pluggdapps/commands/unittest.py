@@ -6,13 +6,14 @@
 
 from   optparse              import OptionParser
 
-from   pluggdapps.plugincore import Plugin, implements
+from   pluggdapps.plugin     import Plugin, implements
 from   pluggdapps.interfaces import ICommand
 
 
 class UnitTest( Plugin ):
     implements( ICommand )
 
+    description = "Run unittest."
     usage = "usage: pa unittest [options] <module>"
 
     def __init__( self, appname, argv=[] ):

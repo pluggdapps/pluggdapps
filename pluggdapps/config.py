@@ -8,23 +8,42 @@
 #   1. Right now all packages in the environment are loaded. Instead filter
 #      for pluggdapps packages and load them.
 
-from   ConfigParser     import SafeConfigParser
+from   ConfigParser         import SafeConfigParser
 
-def loadsettings( inifile ):
+from   pluggdapps.plugin    import default_settings, applications, plugin_info
+
+def loadsettings( inifile={} ):
     """Load root settings, application settings, and section-wise settings for
     each application. Every plugin will have its own section."""
-    appsettings, cp = {}, SafeConfigParser()
+    inisettings = load_inisettings( inifile ) if inifile else {}
+    # Initialize appsettings with plugin defaults.
+    defsettings = default_settings()
+    appsettings = { 'root' : { 'DEFAULT' : {} } }
+    for appname in applications() :
+        appsettings[appname] = { 'DEFAULT' : {} }
+        appsettings[appname].update( defsettings )
+    # Override plugin defaults for each application with configuration from its
+    # ini-file
+    for appname, sections in inisettings.items() :
+        for p, sett in sections.items() :
+            appsettings[appname].setdefault(p, {}).update( sett )
+            plugin_info(p)['cls'].normalize_settings( appsettings[appname][p] )
+    return appsettings
+
+
+def load_inisettings( inifile ):
+    inisettings, cp = {}, SafeConfigParser()
     cp.read( inifile )
     rootsett = { 'DEFAULT' : cp.defaults() }
     for secname in cp.sections() :
         secname = secname.strip()
         if secname.startswith( 'app:' ) :
             appname = secname[4:].lower() 
-            appsettings[appname] = loadapp( dict(cp.options( secname )))
+            inisettings[appname] = loadapp( dict(cp.options( secname )))
         else :
             rootsett[secname] = deepload( dict( cp.options( secname )))
-    appsettings['root'] = rootsett
-    return appsettings
+    inisettings['root'] = rootsett
+    return inisettings
          
 
 def loadapp( options ):

@@ -6,11 +6,11 @@
 
 import socket
 
-from   pluggdapps.plugincore     import Interface, Attribute
+from   pluggdapps.plugin import Interface, Attribute
 
 __all__ = [ 
-    'ICommand', 'IServer', 'IRequest', 'IApplication', 'IRequestHandler',
-    'IRouter', 'IResponse',
+    'ICommand', 'IServer', 'IRequest', 'IApplication', 'IRouter',
+    'IResponse'
 ]
 
 class ICommand( Interface ):
@@ -18,6 +18,10 @@ class ICommand( Interface ):
     purpose is to parse the command line string arguments into `options` and
     `arguments` and then perform the sub-command in the user desired 
     fashion."""
+
+    description = Attribute(
+        "Description about this command"
+    )
 
     def __init__( argv=[], settings={} ):
         """Parse command line arguments using argv list and return a tuple of

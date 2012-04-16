@@ -4,7 +4,7 @@
 
 # -*- coding: utf-8 -*-
 
-from   pluggdapps.plugincore import Plugin, implements
+from   pluggdapps.plugin     import Plugin, implements
 from   pluggdapps.interfaces import IResponse
 import pluggdapps.util       as h
 

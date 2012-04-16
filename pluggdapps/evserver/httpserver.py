@@ -12,7 +12,7 @@ from __future__ import absolute_import, division, with_statement
 import logging, socket
 import ssl  # Python 2.6+
 
-from   pluggdapps.plugincore          import Plugin, implements
+from   pluggdapps.plugin              import Plugin, implements
 from   pluggdapps.interfaces          import IServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
 from   pluggdapps.evserver            import stack_context
@@ -143,10 +143,12 @@ class HTTPIOServer( TCPServer, Plugin ):
         HTTPConnection( stream, address, self.platform, settings=settings )
 
     # ISettings interface methods
-    def default_settings( self ):
+    @classmethod
+    def default_settings( cls ):
         return _default_settings
 
-    def normalize_settings( self, settings ):
+    @classmethod
+    def normalize_settings( cls, settings ):
         settings['multiprocess']  = h.asint( 
             settings['multiprocess'], _default_settings['multiprocess'] )
         settings['no_keep_alive'] = h.asbool(

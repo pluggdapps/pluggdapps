@@ -7,7 +7,7 @@
 import Cookie, socket, time, urlparse
 from   copy import deepcopy
 
-from   pluggdapps.plugincore import Plugin, implements, pluginname
+from   pluggdapps.plugin     import Plugin, implements, pluginname
 from   pluggdapps.interfaces import IRequest
 from   pluggdapps.evserver   import httpiostream
 import pluggdapps.util       as h
@@ -126,9 +126,11 @@ class HTTPRequest( Plugin ):
         return True
 
     # ISettings interface methods
-    def default_settings( self ):
+    @classmethod
+    def default_settings( cls ):
         return _default_settings
 
-    def normalize_settings( self, settings ):
+    @classmethod
+    def normalize_settings( cls, settings ):
         return settings
 
