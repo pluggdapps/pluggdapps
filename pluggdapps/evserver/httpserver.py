@@ -12,7 +12,7 @@ from __future__ import absolute_import, division, with_statement
 import logging, socket
 import ssl  # Python 2.6+
 
-from   pluggdapps.plugin              import Plugin, implements
+from   pluggdapps.plugin              import Plugin, implements, pluginname
 from   pluggdapps.interfaces          import IServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
 from   pluggdapps.evserver            import stack_context
@@ -20,10 +20,22 @@ from   pluggdapps.evserver.httputil   import utf8, native_str, parse_qs_bytes, \
                                              parse_multipart_form_data
 import pluggdapps.util                as h 
 
+log = logging.getLogger( __name__ )
+
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for event poll based HTTP server."
 
+_default_settings['host']  = {
+    'default' : '127.0.0.1',
+    'types'   : (str,),
+    'help'    : "Host addres to bind the http server."
+}
+_default_settings['port']  = {
+    'default' : 5000,
+    'types'   : (int,),
+    'help'    : "Port addres to bind the http server."
+}
 _default_settings['multiprocess']  = {
     'default' : 0,
     'types'   : (int,),
@@ -134,13 +146,18 @@ class HTTPIOServer( TCPServer, Plugin ):
     implements( IServer )
 
     def __init__( self, appname, platform, **kwargs ):
-        super( Plugin, self ).__init__( appname, platform, **kwargs )
-        super( TCPServer, self ).__init__()
+        Plugin.__init__( self, appname, platform, **kwargs )
+        TCPServer.__init__( self )
         self.platform = platform
 
     def handle_stream( self, stream, address ):
         settings = dict([ (k,self[k]) for k in self ])
         HTTPConnection( stream, address, self.platform, settings=settings )
+
+    def start( self, *args, **kwargs ):
+        log.info( "Starting server %r at '%s:%s'", 
+                  pluginname(self), self['host'], self['port'] )
+        TCPServer.start( self, *args, **kwargs )
 
     # ISettings interface methods
     @classmethod

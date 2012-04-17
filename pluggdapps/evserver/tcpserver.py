@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, with_statement
 import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
+import pluggdapps.log                   as logm
 import pluggdapps.util                  as h
 from   pluggdapps.plugin                import ISettings, query_plugin
 from   pluggdapps.evserver              import process
@@ -40,7 +41,7 @@ class TCPServer( object ):
         `TCPServer.start` afterwards.  It is, however, necessary to start
         the `HTTPIOLoop`.
         """
-        sockets = bind_sockets(port, address=address)
+        sockets = bind_sockets( port, address=address )
         self.add_sockets(sockets)
 
     def add_sockets( self, sockets ):
@@ -113,14 +114,15 @@ class TCPServer( object ):
         assert not self._started
         self._started = True
         multiprocess = self['multiprocess']
-        port, host = self['port'], self['host']
+        host, port = self['host'], self['port']
 
         if multiprocess <= 0:   # Single process
-            self.listen( port, address )
+            self.listen( port, host )
         else :                  # multi-process
-            sockets = bind_sockets( port, address )
+            sockets = bind_sockets( port, host )
             process.fork_processes( multiprocess )
             self.add_sockets( sockets )
+        # TODO : Setup logging for multiple process ?
 
         self.ioloop.start() # Block !
 

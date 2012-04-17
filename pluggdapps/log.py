@@ -4,7 +4,7 @@
 
 # -*- coding: utf-8 -*-
 
-import logging, sys, time
+import logging, sys, time, os.path
 import logging.handlers
 
 # For pretty log messages, if available
@@ -21,8 +21,12 @@ def setup( logsett ):
     logging.getLogger().setLevel( level ) if level != 'none' else None
 
     root_logger = logging.getLogger()
-    filename = logsett['filename']
+    filename = logfileusing( None, logsett['filename'] )
+
+    # Set up color if we are in a tty and curses is installed
     color = logsett['color']
+    color = color if color_available() else False
+
     stderr = logsett['stderr']
     if filename :
         channel = logging.handlers.RotatingFileHandler(
@@ -34,8 +38,6 @@ def setup( logsett ):
 
     stderr = logsett['stderr']
     if stderr or (not root_logger.handlers) :
-        # Set up color if we are in a tty and curses is installed
-        color = color if color_available() else False
         channel = logging.StreamHandler()
         channel.setFormatter( LogFormatter(color=color) )
         root_logger.addHandler( channel )
@@ -50,6 +52,11 @@ def color_available() :
         except Exception :
             pass
     return False
+
+
+def logfileusing( index, filename ):
+    name, ext = os.path.splitext(filename)
+    return name + str(index) + ext if index else filename
 
 class LogFormatter( logging.Formatter ):
     def __init__(self, color, *args, **kwargs):

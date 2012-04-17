@@ -65,12 +65,12 @@ def doscript( paargs, cmd ):
 
     # -e environment, setupt cmd-line environment options to appsetting's root
     if options.environment is not None :
-        appsettings['root']['environment'] = options.environment
+        appsettings[ROOTAPP]['environment'] = options.environment
 
     if cmd :
-        level = 'warning' if cmd == 'commands' else None
+        level = 'warning' if cmd != 'serve' else None
         # -c (config file)
-        Platform.boot( options.config, level=level )
+        Platform.boot( options.config, loglevel=level )
         platform = query_plugin( ROOTAPP, ISettings, 'platform' )
         docommand( platform, cmd, cmdargs )
     else :

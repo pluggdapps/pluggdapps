@@ -108,7 +108,7 @@ class HTTPIOLoop( Plugin ):
     ERROR = _EPOLLERR | _EPOLLHUP
 
     def __init__( self, appname, impl=None ):
-        super(Plugin, self).__init__( appname, impl=impl )
+        Plugin.__init__( self, appname, impl=impl )
         self._impl = impl or _poll()
         if hasattr(self._impl, 'fileno'):
             h.set_close_exec( self._impl.fileno() )

@@ -30,8 +30,8 @@ class PluginMeta( type ):
     class) to its information dictionary."""
 
     _interfmap = {}
-    """A map from interface names (which is name of the class deriving Interface
-    base class) to its information dictionary."""
+    """A map from interface names (which is name of the class deriving 
+    Interface base class) to its information dictionary."""
 
     _implementers = {}
     """A map from interface class object to a map of plugin names and its 
@@ -52,10 +52,12 @@ class PluginMeta( type ):
         nm = pluginname(name)
         if Interface in bases :
             # Interface's information dictionary
-            PluginMeta._interfmap[name] = PluginMeta._interf( new_class, name, bases, d )
+            PluginMeta._interfmap[name] = \
+                    PluginMeta._interf( new_class, name, bases, d )
         elif any([ issubclass(b, PluginBase) for b in bases ]) :
             # Plugin's information dictionary
-            PluginMeta._pluginmap[nm] = PluginMeta._plugin( new_class, nm, bases, d )
+            PluginMeta._pluginmap[nm] = \
+                    PluginMeta._plugin( new_class, nm, bases, d )
             # Register deriving plugin for interfaces implemented by its base
             # classes
             [ pmap.setdefault( nm, '-na-' )
@@ -66,7 +68,7 @@ class PluginMeta( type ):
 
     @classmethod
     def _sanitizecls( _cls, cls, name, bases, d ):
-        """Perform sanitory checks on plugin implementers."""
+        """Perform sanitory checks on :class:`Plugin` derived classes."""
         if Interface in bases :
             if PluginBase in bases :
                 raise Exception( PluginMeta.err1 % name )
@@ -77,8 +79,7 @@ class PluginMeta( type ):
     @classmethod
     def _interf( _cls, new_class, name, bases, d ):
         """`new_class` is class deriving from Interface baseclass and provides 
-        specification for interface `name`.
-        """
+        specification for interface `name`."""
         clsmod = h.whichmodule( new_class )
         info = {
             'cls' : new_class,
@@ -115,13 +116,12 @@ class PluginMeta( type ):
 
 
 class Interface( object ):
-    """Base class for interface specifying classes. All interface-classes are
-    metaclassed by PluginMeta.
+    """Base class for all interface specifications. All interface
+    specification classes are metaclassed by PluginMeta.
 
-    An interface is a bunch of attributes and methods that provides an
-    agreement between the implementing plugins and the host that is going to
-    consume the plugin functionality.
-    """
+    Interface is specifying a bunch of attributes and methods that provides 
+    an agreement between the implementing plugins and the host that is going 
+    to consume the plugin's functionality."""
     __metaclass__ = PluginMeta
 
     def __new__( cls, *args, **kwargs ):
@@ -130,14 +130,7 @@ class Interface( object ):
 
 class PluginBase( object ):
     """Base class for plugin classes. All plugin-classes are metaclassed by
-    PluginMeta.
-    
-    A plugin is a dictionary of configuration parameters, that also implements
-    one or more interface. Note that class:`Plugin` does not directly derive
-    from built in type :type:`dict` because dictionary methods from dict
-    type might clash with one or more interface methods implemented by the
-    derving plugin class.
-    """
+    PluginMeta."""
     __metaclass__ = PluginMeta
 
     def __new__( cls, *args, **kwargs ):
@@ -151,8 +144,9 @@ class Attribute( object ):
 
 
 def implements( *interfaces ):
-    """Declare interfaces implemented by class. This function can be called
-    only in the context of a class deriving from Plugin class."""
+    """Plugin classes can use this function to declare interfaces that are 
+    implemented by them. This function can be called only in the context 
+    of a class deriving from :class:`Plugin`."""
     frame = sys._getframe(1)
     nm = pluginname( frame.f_code.co_name )
     for i in interfaces :
@@ -184,6 +178,8 @@ def plugin_init():
               len(PluginMeta._interfmap.keys()) )
 
 def plugin_info( nm ):
+    """Return the information dictionary gathered by :class:`PluginMeta` for 
+    a plugin class."""
     if isinstance( nm, basestring ) :
         return PluginMeta._pluginmap.get( nm, {} )
     elif issubclass(type(nm), PluginBase) :
@@ -198,6 +194,7 @@ def pluginnames( interface ):
     return PluginMeta._implementers[interface].keys()
 
 def pluginclass( interface, name ):
+    """Return the plugin class by ``name`` implementing interface."""
     nm = pluginname( name )
     return PluginMeta._implementers.get( interface, {} ).get( nm, None )
 
@@ -214,8 +211,8 @@ def pluginname( o ):
 
 def default_settings():
     """Return dictionary default settings for every loaded plugin."""
-    psetts = [ ( info['name'], info['cls'].default_settings() )
-               for info in PluginMeta._pluginmap.values() ]
+    psetts = dict([ ( info['name'], info['cls'].default_settings() )
+                    for info in PluginMeta._pluginmap.values() ])
     return psetts
 
 def applications():
@@ -229,10 +226,10 @@ def applications():
 # Plugin base class
 
 class ISettings( Interface ):
-    """ISettings is a mixin interface that can be implemented of any plugin.
-    Especially plugins that support configuration. Note that a plugin is a
-    bunch of configuration parameters implementing one or more interface
-    specification.
+    """ISettings is a mixin interface implemented by the base class 
+    :class:`Plugin`. Deriving plugin classes can override this interface
+    methods. Since every plugin is nothing but a bunch of configuration
+    settings, this interface is implemented by the base class :class:`Plugin`.
     """
 
     def normalize_settings( settings ):
@@ -274,6 +271,12 @@ class Plugin( PluginBase ):
     from built in type :type:`dict` because dictionary methods from dict
     type might clash with one or more interface methods implemented by the
     derving plugin class.
+
+    Every other plugin class ``must`` derive from this class and can override
+    the interface specification methods defined by :class:`ISettings`.
+    Deriving plugins can also assume that plugin's settings will be
+    consolidated from ini files and other sources and made available on the
+    plugin's instance object.
     """
 
     implements( ISettings )
@@ -304,8 +307,9 @@ class Plugin( PluginBase ):
     def __init__( self, appname, *args, **kwargs ):
         from  pluggdapps import appsettings
         self.appname = appname
-        sett = {}
-        sett.update( appsettings[appname][pluginname(self)] )
+        sett = {} 
+        pluginnm = 'plugin:'+pluginname(self)
+        sett.update( appsettings[appname][pluginnm] )
         sett.update( kwargs.pop( 'settings', {} ))
         self._settngx = sett
 
@@ -354,6 +358,3 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
     nm = pluginname( name )
     cls = PluginMeta._implementers.get( interface, {} ).get( nm, None )
     return cls( appname, *args, **kwargs ) if cls else None
-
-
-

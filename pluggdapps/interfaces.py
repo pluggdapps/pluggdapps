@@ -270,7 +270,7 @@ class IRequestHandler( Interface ):
 
 class IRouter( Interface ):
 
-    def boot( request ):
+    def boot( settings ):
         pass
 
     def route( request ):

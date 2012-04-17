@@ -7,7 +7,7 @@
 # TODO :
 #   * Improve function asbool() implementation.
 
-import sys, re
+import os, sys, re, fcntl
 
 def whichmodule( attr ):
     """Try to fetch the module name in which `attr` is defined."""
@@ -41,6 +41,9 @@ class ConfigDict( dict ):
     configuration parameter is added to this dictionary, it can be provided
     as `ConfigItem` object or as a dictionary containing key,value pairs
     supported by ConfigItem.
+
+    Used as return type for default_settings() method specified in 
+    :class:`ISettings`
     """
     def __init__( self, *args, **kwargs ):
         self._spec = {}
@@ -78,9 +81,6 @@ class ConfigItem( dict ):
     ``options``,
         List of optional values that can be used for configuring this 
         parameter.
-
-    Method call ``html(request=request)`` can be used to translate help text
-    into html.
     """
     fmt2str = {
         str     : 'str', unicode : 'unicode',  bool : 'bool', int   : 'int',
@@ -98,6 +98,7 @@ class ConfigItem( dict ):
     options = property( _options )
 
 def asbool( val, default=None ):
+    """Convert a string representation of boolean value to boolean type."""
     try :
         if isinstance(val, basestring) :
             v = True if val.lower() == 'true' else False
@@ -108,11 +109,13 @@ def asbool( val, default=None ):
     return v
 
 def asint( val, default=None ):
+    """Convert string representation of integer value to integer type."""
     try    : v = int( val )
     except : v = default
     return v
 
 def asfloat( val, default=None ):
+    """Convert string representation of float value to floating type."""
     try    : v = float( val )
     except : v = default
     return v
@@ -330,3 +333,6 @@ def call_entrypoint( distribution, group, name, *args, **kwargs ):
         if devmod : raise
     return None
 
+def docstr( obj ):
+    """Return the doc-string for the object."""
+    return getattr( obj, '__doc__', '' ) or ''

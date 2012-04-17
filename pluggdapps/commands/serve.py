@@ -4,7 +4,8 @@
 
 # -*- coding: utf-8 -*-
 
-from   pluggdapps.plugin        import Plugin, implements
+from   pluggdapps.plugin        import Plugin, implements, query_plugin, \
+                                       ISettings
 from   pluggdapps.interfaces    import ICommand
 
 class Serve( Plugin ):
@@ -20,4 +21,6 @@ class Serve( Plugin ):
         pass
 
     def run( self, options=None, args=[] ):
-        pass
+        from pluggdapps import ROOTAPP
+        platform = query_plugin( ROOTAPP, ISettings, 'platform' )
+        platform.serve()

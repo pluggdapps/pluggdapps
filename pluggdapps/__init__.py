@@ -17,7 +17,7 @@ import pluggdapps.application
 __version__ = '0.1dev'
 ROOTAPP = 'root'
 
-appsettings = { 'root' : {} }
+appsettings = {}
 """Dictionary of plugin configurations. Note that,
 
   * Every mountable application is a plugin object implementing

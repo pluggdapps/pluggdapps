@@ -8,6 +8,7 @@ from   pprint                   import pprint
 from   optparse                 import OptionParser
 
 from   pluggdapps.plugin        import PluginMeta, Plugin, implements
+from   pluggdapps.util          import docstr
 from   pluggdapps.interfaces    import ICommand
 
 
@@ -40,7 +41,10 @@ class List( Plugin ):
 
     def _listinterfs( self, options, args ):
         for iname, info in PluginMeta._interfmap.items() :
-            print "%-15s, defined as %r in %r" % (iname, info['name'], info['file'])
+            print "%s in %r" % (iname, info['file'])
+            for line in docstr( info['cls'] ).splitlines() :
+                print "    ", line.strip()
+            print
 
     def _listplugins( self, options, args ):
         for pname, info in PluginMeta._pluginmap.items() :

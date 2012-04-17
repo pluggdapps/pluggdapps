@@ -75,9 +75,6 @@ class HTTPRequest( Plugin ):
             if values:
                 self.arguments[name] = values
 
-        # Root settings
-        self.rootsettings = deepcopy(self.platform.appsettings.get('root', {}))
-
     def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
 

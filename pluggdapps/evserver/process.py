@@ -8,6 +8,7 @@ import os, sys, time, logging, errno, random
 from   binascii import hexlify
 import multiprocessing  # Python 2.6+
 
+log = logging.getLogger( __name__ )
 
 def cpu_count():
     """Returns the number of processors on this machine."""
@@ -17,7 +18,7 @@ def cpu_count():
         try:
             return os.sysconf("SC_NPROCESSORS_CONF")
         except ValueError:
-            logging.error("Could not detect number of processors; assuming 1")
+            log.error( "Could not detect number of processors; assuming 1" )
     return 1
 
 
@@ -65,7 +66,7 @@ def fork_processes( num_processes, max_restarts ):
     assert _task_id is None
     if num_processes is None or num_processes <= 0:
         num_processes = cpu_count()
-    logging.info("Starting %d processes", num_processes)
+    log.info( "Starting %d processes", num_processes )
     children = {}
 
     def start_child(i):
@@ -95,13 +96,13 @@ def fork_processes( num_processes, max_restarts ):
             continue
         id = children.pop(pid)
         if os.WIFSIGNALED(status):
-            logging.warning("child %d (pid %d) killed by signal %d, restarting",
-                            id, pid, os.WTERMSIG(status))
+            log.warning( "child %d (pid %d) killed by signal %d, restarting",
+                         id, pid, os.WTERMSIG(status) )
         elif os.WEXITSTATUS(status) != 0:
-            logging.warning("child %d (pid %d) exited with status %d, restarting",
-                            id, pid, os.WEXITSTATUS(status))
+            log.warning( "child %d (pid %d) exited with status %d, restarting",
+                         id, pid, os.WEXITSTATUS(status) )
         else:
-            logging.info("child %d (pid %d) exited normally", id, pid)
+            log.info( "child %d (pid %d) exited normally", id, pid )
             continue
         num_restarts += 1
         if num_restarts > max_restarts:
