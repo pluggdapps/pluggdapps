@@ -128,7 +128,7 @@ class HTTPIOLoop( Plugin ):
         # Create a pipe that we send bogus data to when we want to wake
         # the I/O loop when it is idle
         self._waker = Waker()
-        log.debug("Adding poll-loop waker ...")
+        log.debug( "Adding poll-loop waker ..." )
         self.add_handler(
             self._waker.fileno(), lambda fd, events: self._waker.consume(),
             self.READ )

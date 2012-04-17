@@ -87,9 +87,9 @@ class Platform( Plugin ):
             loglevel to use. This will override default 'logging.level'.
         """
         from  pluggdapps import appsettings, ROOTAPP
+        log.info( 'Booting platform ...' )
         appsettings.update( loadsettings( inifile ))
         cls.appsettings = appsettings
-        log.info( 'Loaded application settings for %r', appsettings.keys() )
 
         # Setup logger 
         cls.setuplog( level=loglevel )
@@ -102,11 +102,10 @@ class Platform( Plugin ):
         plugin_init()
         # Boot applications
         apps = query_plugins( ROOTAPP, IApplication )
-        log.info( "%d applications found, booting them ..." % len(apps) )
-        for a in apps :
-            appname = pluginname(a)
-            log.debug( 'Booting application %r ...', appname )
-            a.boot( appsettings[appname] ) 
+        for app in apps :
+            appname = pluginname(app)
+            log.debug( "Booting application %r ...", appname )
+            app.boot( appsettings[appname] ) 
 
         return appsettings
 
@@ -119,6 +118,14 @@ class Platform( Plugin ):
         servername = getsettings(ROOTAPP, plugin='platform', key='servername')
         self.server = query_plugin( ROOTAPP, IServer, servername, self )
         self.server.start()  # Blocks !
+
+    def shutdown( self ):
+        from pluggdapps import ROOTAPP
+        log.info( "Shutting down platform ..." )
+        for app in query_plugin( ROOTAPP, IApplication ) :
+            appname = pluginname(app)
+            log.debug( "Shutting down application %r ...", appname )
+            app.shutdown( appsettings[appname] )
 
     def appfor( self, request ):
         """Resolve applications for `request`."""
@@ -148,8 +155,6 @@ class Platform( Plugin ):
         logsett['level'] = level or logsett['level']
         logsett['filename'] = logm.logfileusing( procid, logsett['filename'] )
         logm.setup( logsett )
-        log.debug( "Setup log file %r, for process %s, pid:%s ",
-                   logsett['filename'], procid, os.getpid() )
 
     @classmethod
     def _loadpackages( self, appsettings ):
@@ -161,7 +166,7 @@ class Platform( Plugin ):
             if info == None : continue
             __import__( pkgname )
             packages.append( pkgname )
-        log.info( "%s pluggdapps packages loaded" % len(packages) )
+        log.debug( "%s pluggdapps packages loaded" % len(packages) )
         return packages
 
     @classmethod
@@ -174,8 +179,8 @@ class Platform( Plugin ):
             script = sett.get('DEFAULT', {}).get('mount_script', None)
             if script :
                 script.setdefault( script, [] ).append( appname )
-        log.info( "%s applications mountable on subdomains", len(subdomains) )
-        log.info( "%s applications mountable on script-path", len(scripts) )
+        log.debug( "%s applications mountable on subdomains", len(subdomains) )
+        log.debug( "%s applications mountable on script-path", len(scripts) )
         return subdomains, scripts
 
     # ISettings interface methods

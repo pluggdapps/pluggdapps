@@ -16,6 +16,8 @@ except ImportError:
 # TODO :
 #   1. Examine more formatting options for message loging. 
 
+log = logging.getLogger(__name__)
+
 def setup( logsett ):
     level = getattr( logging, logsett['level'].upper() )
     logging.getLogger().setLevel( level ) if level != 'none' else None
@@ -33,14 +35,16 @@ def setup( logsett ):
                         filename=filename,
                         maxBytes=logsett['file_maxsize'],
                         backupCount=logsett['file_maxbackups'] )
-        channel.setFormatter( LogFormatter(color=color) )
+        channel.setFormatter( LogFormatter(color=False) )
         root_logger.addHandler( channel )
+        log.debug( "Setting up log file %r", filename )
 
     stderr = logsett['stderr']
     if stderr or (not root_logger.handlers) :
         channel = logging.StreamHandler()
         channel.setFormatter( LogFormatter(color=color) )
         root_logger.addHandler( channel )
+        log.debug( "Setting up log stream in stderr" )
 
 
 def color_available() :
@@ -55,8 +59,11 @@ def color_available() :
 
 
 def logfileusing( index, filename ):
-    name, ext = os.path.splitext(filename)
-    return name + str(index) + ext if index else filename
+    if filename :
+        name, ext = os.path.splitext(filename)
+        filename = name + str(index) + ext if index else filename
+    return filename
+
 
 class LogFormatter( logging.Formatter ):
     def __init__(self, color, *args, **kwargs):
@@ -92,9 +99,9 @@ class LogFormatter( logging.Formatter ):
         except Exception, e:
             record.message = "Bad message (%r): %r" % (e, record.__dict__)
         record.asctime = time.strftime(
-            "%y%m%d %H:%M:%S", self.converter(record.created))
-        prefix = '[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d]' % \
-            record.__dict__
+            "%y:%m:%d %H:%M:%S", self.converter(record.created))
+        prefix = '[%(levelname)1.1s proc:%(process)d %(asctime)s ' \
+                 '%(module)s:%(lineno)d]' % record.__dict__
         if self._color:
             prefix = (self._colors.get(record.levelno, self._normal) +
                       prefix + self._normal)

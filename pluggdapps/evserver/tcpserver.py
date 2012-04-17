@@ -248,6 +248,6 @@ def add_accept_handler(sock, callback, ioloop):
                 if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                     return
                 raise
-            log.info("Accepting new connection from %s", address)
+            log.info( "Accepting new connection from %s", address )
             callback(connection, address)
     ioloop.add_handler( sock.fileno(), accept_handler, HTTPIOLoop.READ )

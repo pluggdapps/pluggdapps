@@ -246,22 +246,30 @@ class IApplication( Interface ):
     appname = Attribute( "Application name" )
 
     def boot( settings ):
-        """Do necessary activities to boot this applications."""
+        """Do necessary activities to boot this applications.
+
+        ``settings``,
+            configuration settings for this application.
+        """
 
     def start( request ):
         """Start handling the request. Typically this method will be
         implemented by :class:`Application` class which automatically does
         url route-mapping and invokes the configured request handler."""
 
+    def router( request ):
+        """Return the router plugin implementing :class:`IRouter` 
+        interface."""
+
     def finish( request ):
         """Finish this request. Reverse of start."""
 
     def shutdown( settings ):
-        """Shutdown this application. Reverse of boot."""
-
-    def router( request ):
-        """Return the router plugin implementing :class:`IRouter` 
-        interface."""
+        """Shutdown this application. Reverse of boot.
+        
+        ``settings``,
+            configuration settings for this application.
+        """
 
 
 class IRequestHandler( Interface ):
