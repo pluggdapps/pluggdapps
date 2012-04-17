@@ -12,7 +12,8 @@ from __future__ import absolute_import, division, with_statement
 import logging, socket
 import ssl  # Python 2.6+
 
-from   pluggdapps.plugin              import Plugin, implements, pluginname
+from   pluggdapps.plugin              import Plugin, implements, pluginname, \
+                                             query_plugin
 from   pluggdapps.interfaces          import IServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
 from   pluggdapps.evserver            import stack_context
@@ -41,11 +42,23 @@ _default_settings['multiprocess']  = {
     'types'   : (int,),
     'help'    : "Number process to fork and listen for HTTP connections.",
 }
+_default_settings['max_restart']  = {
+    'default' : 5,
+    'types'   : (int,),
+    'help'    : "In multi-process mode, maximum number of times to restart "
+                "the child process.",
+}
 _default_settings['no_keep_alive']  = {
     'default' : False,
     'types'   : (bool,),
     'help'    : "HTTP /1.1, whether to close the connection after every "
                 "request.",
+}
+_default_settings['backlog']  = {
+    'default' : 128,
+    'types'   : (int,),
+    'help'    : "Back log of http request that can be queued at listening "
+                "port. This option is directly passed to socket.listen()."
 }
 _default_settings['xheaders']  = {
     'default' : False,
@@ -155,8 +168,6 @@ class HTTPIOServer( TCPServer, Plugin ):
         HTTPConnection( stream, address, self.platform, settings=settings )
 
     def start( self, *args, **kwargs ):
-        log.info( "Starting server %r at '%s:%s'", 
-                  pluginname(self), self['host'], self['port'] )
         TCPServer.start( self, *args, **kwargs )
 
     # ISettings interface methods
@@ -265,7 +276,7 @@ class HTTPConnection(object):
             if not version.startswith("HTTP/"):
                 raise _BadRequestException("Malformed HTTP version in HTTP Request-Line")
 
-            headers = HTTPHeaders.parse( data[eol:] )
+            headers = h.HTTPHeaders.parse( data[eol:] )
             self._request = query_plugin( 
                 ROOTAPP, IRequest, self.request_factory,
                 self, method, uri, version, headers, self.address[0],

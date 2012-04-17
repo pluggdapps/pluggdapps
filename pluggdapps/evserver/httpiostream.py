@@ -11,6 +11,7 @@ from   pluggdapps.plugin     import Plugin
 from   pluggdapps.evserver   import stack_context
 import pluggdapps.util       as h
 
+log = logging.getLogger( __name__ )
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
@@ -72,7 +73,7 @@ class HTTPIOStream( Plugin ):
 
     """
     def __init__( self, appname, socket, ioloop ):
-        super(Plugin, self).__init__( appname, socket, ioloop )
+        Plugin.__init__( self, appname, socket, ioloop )
         self.socket = socket
         self.socket.setblocking(False)
         self.ioloop = ioloop
@@ -121,8 +122,8 @@ class HTTPIOStream( Plugin ):
             # localhost, so handle them the same way as an error
             # reported later in _handle_connect.
             if e.args[0] not in (errno.EINPROGRESS, errno.EWOULDBLOCK):
-                logging.warning("Connect error on fd %d: %s",
-                                self.socket.fileno(), e)
+                log.warning(
+                        "Connect error on fd %d: %s", self.socket.fileno(), e )
                 self.close()
                 return
         self._connect_callback = stack_context.wrap(callback)
@@ -198,6 +199,7 @@ class HTTPIOStream( Plugin ):
 
     def close(self):
         """Close this stream."""
+        log.debug("Closing the stream on server side ...")
         if self.socket is not None:
             if self._read_until_close:
                 callback = self._read_callback
@@ -235,7 +237,7 @@ class HTTPIOStream( Plugin ):
 
     def _handle_events(self, fd, events):
         if not self.socket:
-            logging.warning("Got events for closed stream %d", fd)
+            log.warning("Got events for closed stream %d", fd)
             return
         try:
             if events & self.ioloop.READ:
@@ -267,8 +269,7 @@ class HTTPIOStream( Plugin ):
                 self._state = state
                 self.ioloop.update_handler(self.socket.fileno(), self._state)
         except Exception:
-            logging.error("Uncaught exception, closing connection.",
-                          exc_info=True)
+            log.error("Uncaught exception, closing connection.", exc_info=True)
             self.close()
             raise
 
@@ -278,8 +279,8 @@ class HTTPIOStream( Plugin ):
             try:
                 callback(*args)
             except Exception:
-                logging.error("Uncaught exception, closing connection.",
-                              exc_info=True)
+                log.error(
+                    "Uncaught exception, closing connection.", exc_info=True )
                 # Close the socket on an uncaught exception from a user callback
                 # (It would eventually get closed when the socket object is
                 # gc'd, but we don't want to rely on gc happening before we
@@ -332,7 +333,7 @@ class HTTPIOStream( Plugin ):
             finally:
                 self._pending_callbacks -= 1
         except Exception:
-            logging.warning("error on read", exc_info=True)
+            log.warning( "error on read", exc_info=True )
             self.close()
             return
         if self._read_from_buffer():
@@ -393,8 +394,7 @@ class HTTPIOStream( Plugin ):
             chunk = self._read_from_socket()
         except socket.error, e:
             # ssl.SSLError is a subclass of socket.error
-            logging.warning("Read error on %d: %s",
-                            self.socket.fileno(), e)
+            log.warning( "Read error on %d: %s", self.socket.fileno(), e )
             self.close()
             raise
         if chunk is None:
@@ -402,7 +402,7 @@ class HTTPIOStream( Plugin ):
         self._read_buffer.append(chunk)
         self._read_buffer_size += len(chunk)
         if self._read_buffer_size >= self['max_buffer_size'] :
-            logging.error("Reached maximum read buffer size")
+            log.error( "Reached maximum read buffer size" )
             self.close()
             raise IOError("Reached maximum read buffer size")
         return len(chunk)
@@ -474,8 +474,9 @@ class HTTPIOStream( Plugin ):
             # an error state before the socket becomes writable, so
             # in that case a connection failure would be handled by the
             # error path in _handle_events instead of here.
-            logging.warning( "Connect error on fd %d: %s",
-                             self.socket.fileno(), errno.errorcode[err] )
+            log.warning( 
+                "Connect error on fd %d: %s", self.socket.fileno(), 
+                errno.errorcode[err] )
             self.close()
             return
         if self._connect_callback is not None:
@@ -514,8 +515,8 @@ class HTTPIOStream( Plugin ):
                     self._write_buffer_frozen = True
                     break
                 else:
-                    logging.warning("Write error on %d: %s",
-                                    self.socket.fileno(), e)
+                    log.warning(
+                            "Write error on %d: %s", self.socket.fileno(), e )
                     self.close()
                     return
         if not self._write_buffer and self._write_callback:
@@ -607,16 +608,16 @@ class HTTPSSLIOStream( HTTPIOStream ):
         it will be used as additional keyword arguments to ssl.wrap_socket.
         """
         self.ssloptions = kwargs.pop('ssloptions', {})
-        super(HTTPSSLIOStream, self).__init__( appname, *args, **kwargs )
+        HTTPSSLIOStream.__init__( self, appname, *args, **kwargs )
         self._ssl_accepting = True
         self._handshake_reading = False
         self._handshake_writing = False
 
     def reading(self):
-        return self._handshake_reading or super(HTTPSSLIOStream, self).reading()
+        return self._handshake_reading or HTTPSSLIOStream.reading(self)
 
     def writing(self):
-        return self._handshake_writing or super(HTTPSSLIOStream, self).writing()
+        return self._handshake_writing or HTTPSSLIOStream.writing(self)
 
     def _do_ssl_handshake(self):
         # Based on code from test_ssl.py in the python stdlib
@@ -635,7 +636,7 @@ class HTTPSSLIOStream( HTTPIOStream ):
                                  ssl.SSL_ERROR_ZERO_RETURN):
                 return self.close()
             elif err.args[0] == ssl.SSL_ERROR_SSL:
-                logging.warning("SSL Error on %d: %s", self.socket.fileno(), err)
+                log.warning( "SSL Error on %d: %s", self.socket.fileno(), err )
                 return self.close()
             raise
         except socket.error, err:
@@ -643,19 +644,19 @@ class HTTPSSLIOStream( HTTPIOStream ):
                 return self.close()
         else:
             self._ssl_accepting = False
-            super(HTTPSSLIOStream, self)._handle_connect()
+            HTTPSSLIOStream._handle_connect(self)
 
     def _handle_read(self):
         if self._ssl_accepting:
             self._do_ssl_handshake()
             return
-        super(HTTPSSLIOStream, self)._handle_read()
+        HTTPSSLIOStream._handle_read(self)
 
     def _handle_write(self):
         if self._ssl_accepting:
             self._do_ssl_handshake()
             return
-        super(HTTPSSLIOStream, self)._handle_write()
+        HTTPSSLIOStream._handle_write(self)
 
     def _handle_connect(self):
         self.socket = ssl.wrap_socket(self.socket,

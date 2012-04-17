@@ -19,6 +19,8 @@ from   pluggdapps.plugin     import Plugin
 import pluggdapps.util       as h
 from   pluggdapps.evserver   import stack_context
 
+log = logging.getLogger( __name__ )
+
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for poll based event handling for HTTP sockets"
@@ -89,7 +91,6 @@ class HTTPIOLoop( Plugin ):
         callback = functools.partial(connection_ready, sock)
         ioloop.add_handler(sock.fileno(), callback, ioloop.READ)
         ioloop.start()
-
     """
     # Constants from the epoll module
     _EPOLLIN    = 0x001
@@ -127,9 +128,10 @@ class HTTPIOLoop( Plugin ):
         # Create a pipe that we send bogus data to when we want to wake
         # the I/O loop when it is idle
         self._waker = Waker()
-        self.add_handler(self._waker.fileno(),
-                         lambda fd, events: self._waker.consume(),
-                         self.READ)
+        log.debug("Adding poll-loop waker ...")
+        self.add_handler(
+            self._waker.fileno(), lambda fd, events: self._waker.consume(),
+            self.READ )
 
     def close(self, all_fds=False):
         """Closes the HTTPIOLoop, freeing any resources used.
@@ -157,7 +159,7 @@ class HTTPIOLoop( Plugin ):
                 try:
                     os.close(fd)
                 except Exception:
-                    logging.debug("error closing fd %s", fd, exc_info=True)
+                    log.debug("error closing fd %s", fd, exc_info=True)
         self._waker.close()
         self._impl.close()
 
@@ -167,8 +169,8 @@ class HTTPIOLoop( Plugin ):
         self._impl.register(fd, events | self.ERROR)
         poll_threshold = self['poll_threshold']
         if len(self._handlers) > poll_threshold :
-            logging.warning( "Polled descriptors exceeded threshold %r",
-                             poll_threshold )
+            log.warning( 
+                "Polled descriptors exceeded threshold %r", poll_threshold )
 
     def update_handler(self, fd, events):
         """Changes the events we listen for fd."""
@@ -181,7 +183,7 @@ class HTTPIOLoop( Plugin ):
         try:
             self._impl.unregister(fd)
         except (OSError, IOError):
-            logging.debug("Error deleting fd from HTTPIOLoop", exc_info=True)
+            log.debug("Error deleting fd from HTTPIOLoop", exc_info=True)
 
     def set_blocking_signal_threshold(self, seconds, action):
         """Sends a signal if the ioloop is blocked for more than s seconds.
@@ -195,8 +197,8 @@ class HTTPIOLoop( Plugin ):
         too long.
         """
         if not hasattr(signal, "setitimer"):
-            logging.error("set_blocking_signal_threshold requires a signal module "
-                       "with the setitimer method")
+            log.error( "set_blocking_signal_threshold requires a signal module "
+                       "with the setitimer method" )
             return
         self._blocking_signal_threshold = seconds
         if seconds is not None:
@@ -214,9 +216,9 @@ class HTTPIOLoop( Plugin ):
 
         For use with set_blocking_signal_threshold.
         """
-        logging.warning('HTTPIOLoop blocked for %f seconds in\n%s',
-                        self._blocking_signal_threshold,
-                        ''.join(traceback.format_stack(frame)))
+        log.warning( 'HTTPIOLoop blocked for %f seconds in\n%s',
+                     self._blocking_signal_threshold, 
+                     ''.join(traceback.format_stack(frame)) )
 
     def start(self):
         """Starts the I/O loop.
@@ -300,11 +302,11 @@ class HTTPIOLoop( Plugin ):
                         # Happens when the client closes the connection
                         pass
                     else:
-                        logging.error("Exception in I/O handler for fd %s",
-                                      fd, exc_info=True)
+                        log.error( "Exception in I/O handler for fd %s",
+                                   fd, exc_info=True )
                 except Exception:
-                    logging.error("Exception in I/O handler for fd %s",
-                                  fd, exc_info=True)
+                    log.error( "Exception in I/O handler for fd %s",
+                               fd, exc_info=True )
         # reset the stopped flag so another start/stop pair can be issued
         self._stopped = False
         if self._blocking_signal_threshold is not None:
@@ -328,6 +330,7 @@ class HTTPIOLoop( Plugin ):
         Note that even after `stop` has been called, the HTTPIOLoop is not
         completely stopped until `HTTPIOLoop.start` has also returned.
         """
+        log.debug("Stopping poll loop ...")
         self._running = False
         self._stopped = True
         self._waker.wake()
@@ -402,7 +405,7 @@ class HTTPIOLoop( Plugin ):
         The exception itself is not passed explicitly, but is available
         in sys.exc_info.
         """
-        logging.error("Exception in callback %r", callback, exc_info=True)
+        log.error("Exception in callback %r", callback, exc_info=True)
 
     # `ISettings` interface methods
     @classmethod
@@ -479,7 +482,7 @@ class PeriodicCallback( object ):
         try:
             self.callback()
         except Exception:
-            logging.error("Error in periodic callback", exc_info=True)
+            log.error("Error in periodic callback", exc_info=True)
         self._schedule_next()
 
     def _schedule_next( self ):

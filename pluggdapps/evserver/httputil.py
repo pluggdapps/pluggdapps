@@ -4,7 +4,9 @@ from __future__ import absolute_import, division, with_statement
 import sys, re, urllib, logging
 from   urlparse import parse_qs  # Python 2.6+
 
-from   pluggdapps.util import ObjectDict
+from   pluggdapps.util import ObjectDict, HTTPHeaders
+
+log = logging.getLogger( __name__ )
 
 _UTF8_TYPES = (bytes, type(None))
 def utf8( value ):
@@ -151,17 +153,17 @@ def parse_multipart_form_data(boundary, data, arguments, files):
             continue
         eoh = part.find(b"\r\n\r\n")
         if eoh == -1:
-            logging.warning("multipart/form-data missing headers")
+            log.warning( "multipart/form-data missing headers" )
             continue
         headers = HTTPHeaders.parse(part[:eoh].decode("utf-8"))
         disp_header = headers.get("Content-Disposition", "")
         disposition, disp_params = _parse_header(disp_header)
         if disposition != "form-data" or not part.endswith(b"\r\n"):
-            logging.warning("Invalid multipart/form-data")
+            log.warning( "Invalid multipart/form-data" )
             continue
         value = part[eoh + 4:-2]
         if not disp_params.get("name"):
-            logging.warning("multipart/form-data value missing name")
+            log.warning( "multipart/form-data value missing name" )
             continue
         name = disp_params["name"]
         if disp_params.get("filename"):

@@ -66,10 +66,10 @@ def fork_processes( num_processes, max_restarts ):
     assert _task_id is None
     if num_processes is None or num_processes <= 0:
         num_processes = cpu_count()
-    log.info( "Starting %d processes", num_processes )
     children = {}
 
     def start_child(i):
+        log.info( "Starting http connection process process, taskid %s", i )
         pid = os.fork()
         if pid == 0:
             # child process

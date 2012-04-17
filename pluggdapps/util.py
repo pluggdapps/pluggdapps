@@ -120,12 +120,11 @@ def asfloat( val, default=None ):
     except : v = default
     return v
 
-def settingsfor( prefix, settings ):
+def settingsfor( prefix, sett ):
     """Parse `settings` keys starting with `prefix` and return a dictionary of
     corresponding options."""
     l = len(prefix)
-    return dict([ (k[l:], v) 
-                  for k, v in settings.items() if k.startswith(prefix) ])
+    return dict([ (k[l:], sett[k]) for k in sett if k.startswith(prefix) ])
 
 def timedelta_to_seconds( td ) :
     """Equivalent to td.total_seconds() (introduced in python 2.7)."""
@@ -200,15 +199,17 @@ class HTTPHeaders( dict ):
     def __init__( self, *args, **kwargs ):
         # Don't pass args or kwargs to dict.__init__, as it will bypass
         # our __setitem__
-        super(HTTPHeaders, self).__init__()
+        dict.__init__( self )
         self._as_list = {}
         self._last_key = None
-        if isinstance(args[0], HTTPHeaders) :
-            x = args.pop(0)
-            [ self.add(k,v) for k,v in x.get_all() ] # Copy constructor
+        if (len(args) == 1 and len(kwargs) == 0 and
+            isinstance(args[0], HTTPHeaders)):
+            # Copy constructor
+            for k,v in args[0].get_all():
+                self.add(k,v)
         else:
-            self.update(*args, **kwargs) # Dict-style initialization
-
+            # Dict-style initialization
+            self.update(*args, **kwargs)
 
     # Additional public methods
     def add( self, name, value ):

@@ -16,7 +16,7 @@ class HTTPResponse( Plugin ):
     implements( IResponse )
 
     def __init__( self, appname, request ):
-        super(Plugin, self).__init__( appname )
+        Plugin.__init__( self, appname )
         self.connection = request.connection
 
     def write(self, chunk, callback=None):

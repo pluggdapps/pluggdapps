@@ -25,7 +25,7 @@ class HTTPRequest( Plugin ):
     def __init__( self, appname, connection, method, uri, version, headers,
                   remote_ip, host, protocol, files ):
 
-        super(Plugin, self).__init__( pluginname(application) )
+        Plugin.__init__( self, pluginname(application) )
         if connection :
             stream, xheaders = connection.stream, connection.xheaders
         else :
@@ -37,7 +37,7 @@ class HTTPRequest( Plugin ):
         # Startline
         self.method, self.uri, self.version = method, uri, version
         # Header
-        self.headers = headers or httputil.HTTPHeaders()
+        self.headers = headers or h.HTTPHeaders()
         # Body
         self.body = ""
 

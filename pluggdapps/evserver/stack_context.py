@@ -54,8 +54,9 @@ Here are a few rules of thumb for when it's necessary:
 """
 
 from __future__ import absolute_import, division, with_statement
-import contextlib, functools, itertools, sys, threading
+import contextlib, functools, itertools, sys, threading, logging
 
+log = logging.getLogger( __name__ )
 
 class _State(threading.local):
     def __init__(self):
