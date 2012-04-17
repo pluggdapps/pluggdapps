@@ -138,14 +138,14 @@ class Platform( Plugin ):
         try    : subdomain, site, tld = host.rsplit('.', 3)
         except : subdomain = None
 
-        for subdom, appname in cls.map_subdomains.items() :
+        for subdom, appnames in cls.map_subdomains.items() :
             if subdom == subdomain : break
         else :
-            for script, appname in cls.map_scripts.items() :
+            for script, appnames in cls.map_scripts.items() :
                 if request.path.startswith( script ) : break
             else :
-                appname = cls.map_scripts['/']
-        return appname
+                appnames = [ cls.map_scripts['/'] ]
+        return appnames[0]
 
     @classmethod
     def setuplog( cls, level=None, procid=None ):
@@ -178,9 +178,10 @@ class Platform( Plugin ):
                 subdomain.setdefault( subdomain, [] ).append( appname )
             script = sett.get('DEFAULT', {}).get('mount_script', None)
             if script :
-                script.setdefault( script, [] ).append( appname )
+                scripts.setdefault( script, [] ).append( appname )
         log.debug( "%s applications mountable on subdomains", len(subdomains) )
         log.debug( "%s applications mountable on script-path", len(scripts) )
+        scripts.setdefault( '/', [] ).append( 'rootapp' )
         return subdomains, scripts
 
     # ISettings interface methods

@@ -91,19 +91,81 @@ class IServer( Interface ):
         """To handle a new connection stream."""
 
 
+class IApplication( Interface ):
+    """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
+    of configuration parameters implementing one or more interface
+    specification."""
+
+    def boot( settings ):
+        """Do necessary activities to boot this applications. Called at
+        platform boot-time.
+
+        ``settings``,
+            configuration dictionary for this application. Dictionary is a
+            collection of sections and its settings. Plugin section names will
+            follow the following format, 'plugin:<pluginname>'. There is a
+            special section by name 'DEFAULT', whose settings are global to
+            all other section settings.
+        """
+
+    def start( request ):
+        """Once a `request` is resolved for an application, this method is the
+        entry point for the request into the resolved application. Typically 
+        this method will be implemented by :class:`Application` base class 
+        which automatically does url route-mapping and invokes the configured 
+        request handler."""
+
+    def router( request ):
+        """Return the router plugin implementing :class:`IRouter` 
+        interface."""
+
+    def finish( request ):
+        """Finish this request. Reverse of start."""
+
+    def shutdown( settings ):
+        """Shutdown this application. Reverse of boot.
+        
+        ``settings``,
+            configuration dictionary for this application. Dictionary is a
+            collection of sections and its settings. Plugin section names will
+            follow the following format, 'plugin:<pluginname>'. There is a
+            special section by name 'DEFAULT', whose settings are global to
+            all other section settings.
+        """
+
+
+class IRouter( Interface ):
+        """Every `IRouter` plugin must either treat a request's url as a chain
+        of resource and resolve them based on the next path component or 
+        the plugin must resolve the request's url by mapping rules."""
+
+    def onboot( settings ):
+        """During application boot time, every router object will be resolved,
+        if available, using :method:`IApplication.router' or 
+        :method:`IRouter.route` methods, which will return an instance of 
+        plugin implementing this interface. And `onboot` will be called on
+        those plugins.
+        
+        Typically url route mapping is initialized here.
+        """
+
+    def route( request ):
+        """If a `request` url is treated as a chain of resource and resolved 
+        based on the next path component. Return a `IRouter` plugin that will
+        be used for further url resolution."""
+
+    def match( request ):
+        """If route() method should return None, then match must succeed in 
+        resolving the `request` url based on mapping urls."""
+
+
 class IRequest( Interface ):
-    """Entry point for every request into the application code. Typically
-    pluggdapps platform will provide a collection of request handler plugins
-    implementing this interface. While the applications can simply derive
-    their handler class from the base class and override necessary methods."""
+    """Request object, the only parameter that will be passed to
+    :class:`IRquestHandler`."""
 
     app = Attribute(
         "Application instance deriving from :class:`Plugin` implementing "
         ":class:`IApplication` interface."
-    )
-    do_methods = Attribute(
-        "Request handler can override this attribute to provide a sequence of "
-        "HTTP Methods supported by the class. "
     )
     method = Attribute(
         "HTTP request method, e.g. 'GET' or 'POST'"
@@ -180,13 +242,14 @@ class IRequest( Interface ):
     )
     settings = Attribute(
         "A copy of application settings dictionary. Settings are organised "
-        "into sections, special section `DEFAULT` provides as global "
-        "settings. Other sections are application specific settings for "
-        "modules and plugins."
+        "into sections, special section `DEFAULT` provides global "
+        "settings for all application sectionw. Other sections are "
+        "application specific settings for modules and plugins."
     )
-    rootsettings = Attribute(
-        "A copy of root settings common to all applications, plugins and "
-        "modules."
+    appsettings = Attribute(
+        "A copy of global appsettings containing settings configuration for "
+        "all applications, including root-application. Read only data
+        structure."
     )
 
     def __init__( connection, method, uri, version, headers, remote_ip ):
@@ -237,67 +300,23 @@ class IRequest( Interface ):
         under the context of an application, appname will be used to make the
         actual query. Will be using `IRequest.app` attribute"""
 
+    def url( *args, **kwargs ) :
+        """Generate url for same application handling the current request."""
 
-class IApplication( Interface ):
-    """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
-    of configuration parameters implementing one or more interface
-    specification."""
+    def path( *args, **kwargs ) :
+        """Generate url-path for same application handling the current 
+        request."""
 
-    appname = Attribute( "Application name" )
+    def appurl( appname, *args, **kwargs ) :
+        """Generate url for different application other than the one handling 
+        the current request."""
 
-    def boot( settings ):
-        """Do necessary activities to boot this applications.
-
-        ``settings``,
-            configuration settings for this application.
-        """
-
-    def start( request ):
-        """Start handling the request. Typically this method will be
-        implemented by :class:`Application` class which automatically does
-        url route-mapping and invokes the configured request handler."""
-
-    def router( request ):
-        """Return the router plugin implementing :class:`IRouter` 
-        interface."""
-
-    def finish( request ):
-        """Finish this request. Reverse of start."""
-
-    def shutdown( settings ):
-        """Shutdown this application. Reverse of boot.
-        
-        ``settings``,
-            configuration settings for this application.
-        """
-
-
-class IRequestHandler( Interface ):
-    pass
-
-
-class IRouter( Interface ):
-
-    def boot( settings ):
-        pass
-
-    def route( request ):
-        pass
-
-    def match( request ):
-        pass
-
-    def url( request ):
-        pass
-
-    def urlpath( request ):
-        pass
+    def path( appname, *args, **kwargs ) :
+        """Generate url-path for the same application handling this request."""
 
 
 class IResponse( Interface ):
-
-    def __init__( request ):
-        pass
+    """Response object to send reponse status, headers and body."""
 
     def write( chunk, callback=None ):
         """Writes the given chunk to the response stream."""
@@ -306,3 +325,46 @@ class IResponse( Interface ):
     def finish():
         """Finishes this HTTP request on the open connection."""
         pass
+
+
+class IRequestHandler( Interface ):
+
+    methods = Attribute(
+        "Request handler can override this attribute to provide a sequence of "
+        "HTTP Methods supported by the plugin. "
+    )
+
+    def head( request ):
+        """Callback method for HEAD request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        """
+
+    def get( request ):
+        """Callback method for GET request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        """
+
+    def post( request ):
+        """Callback method for POST request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        """
+
+    def delete( request ):
+        """Callback method for DELETE request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        """
+
+    def put( request ):
+        """Callback method for PUT request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        """
