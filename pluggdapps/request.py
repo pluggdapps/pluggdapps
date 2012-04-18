@@ -7,8 +7,9 @@
 import Cookie, socket, time, urlparse, logging
 from   copy import deepcopy
 
-from   pluggdapps.plugin     import Plugin, implements, pluginname
-from   pluggdapps.interfaces import IRequest
+from   pluggdapps.plugin     import Plugin, implements, pluginname, \
+                                    query_plugin
+from   pluggdapps.interfaces import IRequest, IResponse
 from   pluggdapps.evserver   import httpiostream
 import pluggdapps.util       as h
 
@@ -18,41 +19,82 @@ _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPRequest implementing IRequest interface."
 
+_default_settings['default_host']  = {
+    'default' : '127.0.0.1',
+    'types'   : (str,),
+    'help'    : "Default host name to use in the absence of host name not "
+                "available from request headers."
+}
+
 class HTTPRequest( Plugin ):
     implements( IRequest )
 
     do_methods = ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS')
 
+    elapsedtime = property( lambda self : time.time() - self.receivedat )
+    servicetime = property( lambda self : (time.time() - self.receivedat )
+
     # IRequest interface methods and attributes
     def __init__( self, appname, app, conn, address, startline, headers, body ):
-        Plugin.__init__( self, pluginname(application) )
+        Plugin.__init__( self, appname )
+        self.appname = appname
+        self.receivedat = time.time()
+
         if conn :
             stream, xheaders = conn.stream, conn.xheaders
         else :
             stream, xheaders = None, None
-        self.application = application
+        self.app = app
         self.connection = conn
         self.platform = conn.platform
         
-        # Startline
         self.method, self.uri, self.version = self._parse_startline(startline)
-        # Header
         self.headers = headers or h.HTTPHeaders()
-        # Body
-        self.body = ""
+        self.body = body or ""
 
         self.protocol = self._parse_protocol( stream, headers, xheaders )
         self.remote_ip = self._parse_remoteip( address, headers, xheaders )
-        self.host = self.headers.get("Host") or "127.0.0.1"
+        self.cookies = self._parse_cookies( self.headers )
+        self.host = self.headers.get("Host") or self['default_host']
         self.files = {}
-        self.received = time.time()
         self.full_url = self.protocol + "://" + self.host + self.uri
 
-        scheme, netloc, self.path, self.query, fragment = \
-                urlparse.urlsplit( native_str(uri) )
+        _, _, self.path, self.query, _ = urlparse.urlsplit( native_str(uri) )
         self.arguments = self._parse_query( query )
         # Updates self.arguments and self.files based on request-body
         self._parse_body( method, headers, body ) 
+
+        # Reponse object
+        self.response = query_plugin( 
+                appname, IResponse, app['response_factory'], self )
+
+    def supports_http_1_1( self ):
+        return self.version == "HTTP/1.1"
+
+    def get_ssl_certificate(self):
+        try:
+            return self.connection.stream.socket.getpeercert()
+        except ssl.SSLError:
+            return None
+
+    def __repr__(self):
+        attrs = ("protocol", "host", "method", "uri", "version", "remote_ip",
+                 "body")
+        args = ", ".join(["%s=%r" % (n, getattr(self, n)) for n in attrs])
+        return "%s(%s, headers=%s)" % (
+            self.__class__.__name__, args, dict(self.headers))
+
+    def _valid_ip(self, ip):
+        try:
+            res = socket.getaddrinfo(ip, 0, socket.AF_UNSPEC,
+                                     socket.SOCK_STREAM,
+                                     0, socket.AI_NUMERICHOST)
+            return bool(res)
+        except socket.gaierror, e:
+            if e.args[0] == socket.EAI_NONAME:
+                return False
+            raise
+        return True
 
     def _parse_startline( self, startline ):
         method, uri, version = h.parse_startline( startline )
@@ -83,6 +125,12 @@ class HTTPRequest( Plugin ):
             remote_ip = address
         return remote_ip
 
+    def _parse_cookies( self, headers ):
+        cookies = Cookie.SimpleCookie()
+        try    : cookies.load( native_str( headers["Cookie"]  ))
+        except : pass
+        return cookies
+
     def _parse_query( self, query ):
         arguments = {}
         for name, values in parse_qs_bytes(query).iteritems():
@@ -110,53 +158,6 @@ class HTTPRequest( Plugin ):
                         break
                 else:
                     log.warning( "Invalid multipart/form-data" )
-
-    def supports_http_1_1( self ):
-        return self.version == "HTTP/1.1"
-
-    @property
-    def cookies( self ):
-        if not hasattr( self, "_cookies" ):
-            self._cookies = Cookie.SimpleCookie()
-            if "Cookie" in self.headers:
-                try :
-                    self._cookies.load( native_str( self.headers["Cookie"]  ))
-                except Exception :
-                    self._cookies = {}
-        return self._cookies
-
-    @property
-    def elapsedtime( self ):
-        return time.time() - self.receivedat
-
-    @property
-    def servicetime( self ):
-        return time.time() - self.receivedat
-
-    def get_ssl_certificate(self):
-        try:
-            return self.connection.stream.socket.getpeercert()
-        except ssl.SSLError:
-            return None
-
-    def __repr__(self):
-        attrs = ("protocol", "host", "method", "uri", "version", "remote_ip",
-                 "body")
-        args = ", ".join(["%s=%r" % (n, getattr(self, n)) for n in attrs])
-        return "%s(%s, headers=%s)" % (
-            self.__class__.__name__, args, dict(self.headers))
-
-    def _valid_ip(self, ip):
-        try:
-            res = socket.getaddrinfo(ip, 0, socket.AF_UNSPEC,
-                                     socket.SOCK_STREAM,
-                                     0, socket.AI_NUMERICHOST)
-            return bool(res)
-        except socket.gaierror, e:
-            if e.args[0] == socket.EAI_NONAME:
-                return False
-            raise
-        return True
 
     # ISettings interface methods
     @classmethod

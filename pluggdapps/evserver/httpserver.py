@@ -66,12 +66,6 @@ _default_settings['xheaders']  = {
                 "requests. These headers are useful when running pluggdapps "
                 "behind a reverse proxy or load balancer.",
 }
-_default_settings['request_factory']  = {
-    'default' : 'httprequest',
-    'types'   : (str,),
-    'help'    : "Request class whose instance will be the single argument "
-                "passed on to request handler callable.",
-}
 _default_settings['ssloptions.certfile']  = {
     'default' : '',
     'types'   : (str,),
@@ -200,7 +194,6 @@ class HTTPConnection(object):
         self.settings = settings
         self.no_keep_alive = settings['no_keep_alive']
         self.xheaders = settings['xheaders']
-        self.request_factory = settings['request_factory']
 
         # Per request attributes
         self.startline = None
@@ -214,6 +207,9 @@ class HTTPConnection(object):
         self._header_callback = stack_context.wrap(self._on_headers)
         self.stream.read_until( b"\r\n\r\n", self._header_callback )
         self._write_callback = None
+
+        # on-connection
+        self.stream.set_close_callback( self._on_connection_close )
 
     def write( self, chunk, callback=None ):
         assert self._request, "Request closed"
@@ -230,11 +226,18 @@ class HTTPConnection(object):
     def dispatch( self ):
         appname = self.platform.appfor(self.startline, self.headers, self.body)
         app = query_plugin( appname, IApplication, appname )
-        request = query_plugin( 
-                    appname, IRequest, self.request_factory,
-                    app, self, self.address[0], 
-                    self.startline, self.headers, self.body )
-        app.start( request )
+        self._request = query_plugin( 
+                            appname, IRequest, app['request_factory'],
+                            app, self, self.address[0], 
+                            self.startline, self.headers, self.body )
+        app.start( self._request )
+
+        # Flush and finish the response
+
+        # Reset request attributes
+        self.startline = None
+        self.headers = None
+        self.body = None
 
     def _on_write_complete(self):
         if self._write_callback is not None:
@@ -300,3 +303,6 @@ class HTTPConnection(object):
     def _on_request_body( self, data ):
         self.body = data
         self.dispatch()
+
+    def _on_connection_close( self ):
+        self._request.on_connection_close() if self._request else None

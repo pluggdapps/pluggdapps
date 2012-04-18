@@ -167,32 +167,20 @@ class IRequest( Interface ):
         "Application instance deriving from :class:`Plugin` implementing "
         ":class:`IApplication` interface."
     )
+    appname = Attribute(
+        "Should be same as pluginm(app)."
+    )
+    connection = Attribute(
+        "An HTTP request is attached to a single HTTP connection, which can "
+        "be accessed through the 'connection' attribute. Since connections "
+        "are typically kept open in HTTP/1.1, multiple requests can be handled "
+        "sequentially on a single connection."
+    )
     method = Attribute(
         "HTTP request method, e.g. 'GET' or 'POST'"
     )
-    host = Attribute(
-        "The requested hostname, usually taken from the ``Host`` header."
-    )
     uri = Attribute(
         "HTTP Request URI"
-    )
-    full_url = Attribute(
-        "Reconstructs the full URL for this request, which is, "
-        "protocol + host + uri"
-    )
-    path = Attribute(
-        "Path portion of HTTP request URI"
-    )
-    query = Attribute(
-        "Query portion of HTTP request URI"
-    )
-    arguments = Attribute(
-        "GET/POST arguments are available in the arguments property, which "
-        "maps arguments names to lists of values (to support multiple values "
-        "for individual names). Names are of type `str`, while arguments "
-        "are byte strings. Note that this is different from "
-        ":method:`IRequest.get_argument`, which returns argument values as "
-        "unicode strings."
     )
     version = Attribute(
         "HTTP protocol version specified in request, e.g. 'HTTP/1.1'"
@@ -204,28 +192,49 @@ class IRequest( Interface ):
     body = Attribute(
        "Request body, if present, as a byte string."
     )
-    remote_ip = Attribute(
-       "Client's IP address as a string. If running behind a load-balancer "
-       "or a proxy, the real IP address provided by a load balancer will be "
-       "passed in the ``X-Real-Ip`` header."
+    host = Attribute(
+        "The requested hostname, usually taken from the ``Host`` header."
+    )
+    path = Attribute(
+        "Path portion of HTTP request URI"
+    )
+    query = Attribute(
+        "Query portion of HTTP request URI"
+    )
+    full_url = Attribute(
+        "Reconstructs the full URL for this request, which is, "
+        "protocol + host + uri"
     )
     protocol = Attribute(
         "The protocol used, either 'http' or 'https'.  If running behind a "
         "load-balancer or a proxy, the real scheme will be passed along via "
         "via an `X-Scheme` header."
     )
+    remote_ip = Attribute(
+       "Client's IP address as a string. If running behind a load-balancer "
+       "or a proxy, the real IP address provided by a load balancer will be "
+       "passed in the ``X-Real-Ip`` header."
+    )
+    arguments = Attribute(
+        "GET/POST arguments are available in the arguments property, which "
+        "maps arguments names to lists of values (to support multiple values "
+        "for individual names). Names are of type `str`, while arguments "
+        "are byte strings. Note that this is different from "
+        ":method:`IRequest.get_argument`, which returns argument values as "
+        "unicode strings."
+    )
     files = Attribute(
         "File uploads are available in the files property, which maps file "
         "names to lists of :class:`HTTPFile`."
     )
-    connection = Attribute(
-        "An HTTP request is attached to a single HTTP connection, which can "
-        "be accessed through the 'connection' attribute. Since connections "
-        "are typically kept open in HTTP/1.1, multiple requests can be handled "
-        "sequentially on a single connection."
-    )
     cookies = Attribute(
         "A dictionary of Cookie.Morsel objects."
+    )
+    settings = Attribute(
+        "A copy of application settings dictionary. Settings are organised "
+        "into sections, special section `DEFAULT` provides global "
+        "settings for all application sectionw. Other sections are "
+        "application specific settings for modules and plugins."
     )
     receivedat = Attribute(
         "Timestamp when request was recieved"
@@ -240,16 +249,9 @@ class IRequest( Interface ):
         "Amount of time, in floating seconds, elapsed since the request was "
         "received."
     )
-    settings = Attribute(
-        "A copy of application settings dictionary. Settings are organised "
-        "into sections, special section `DEFAULT` provides global "
-        "settings for all application sectionw. Other sections are "
-        "application specific settings for modules and plugins."
-    )
-    appsettings = Attribute(
-        "A copy of global appsettings containing settings configuration for "
-        "all applications, including root-application. Read only data "
-        "structure."
+    response = Attribute(
+        "Response object corresponding to this request. The object is an "
+        "instance of plugin implementing :class:`IResponse` interface."
     )
 
     def __init__( app, connection, address, startline, headers, body ):
@@ -259,6 +261,9 @@ class IRequest( Interface ):
         :method:`IRequest.handle` is called complete request is available
         and partially parsed.
 
+        ``app``,
+            application plugin implementing :class:`IApplication` interface
+            in whose context the current request is processed.
         ``connection``,
             HTTP socket returned as a result of accepting the connection.
         ``address``
@@ -350,9 +355,23 @@ class IRequest( Interface ):
     def path( appname, *args, **kwargs ) :
         """Generate url-path for the same application handling this request."""
 
+    def on_connection_close():
+        """Called back when remote client close the connection on this request
+        currently processed."""
+
 
 class IResponse( Interface ):
     """Response object to send reponse status, headers and body."""
+
+    def __init__( request ):
+        """
+        ``request``,
+            is an instance object for plugin implementing :class:`IResponse`
+            interface.
+        """
+
+    def clear():
+        """Resets all headers and content for this response."""
 
     def set_status( status_code ):
         """Sets the status code for our response."""
@@ -366,8 +385,7 @@ class IResponse( Interface ):
 
         If a datetime is given, we automatically format it according to the
         HTTP specification. If the value is not a string, we convert it to
-        a string. All header values are then encoded as UTF-8.
-        """
+        a string. All header values are then encoded as UTF-8."""
 
     def add_header( name, value ):
         """Adds the given response header and value.
@@ -414,14 +432,14 @@ class IResponse( Interface ):
         as a cookie use the optional value argument to get_secure_cookie.
         """
 
-    def render(self, template_name, **kwargs):
+    def render( template_name, **kwargs ):
         """Renders the template with the given arguments as the response."""
 
     def write( chunk, callback=None ):
         """Writes the given chunk to the response stream."""
         pass
 
-    def flush(self, include_footers=False, callback=None):
+    def flush( include_footers=False, callback=None ):
         """Flushes the current output buffer to the network.
 
         The ``callback`` argument, if given, can be used for flow control:
@@ -434,9 +452,6 @@ class IResponse( Interface ):
     def finish():
         """Finishes this HTTP request on the open connection."""
         pass
-
-    def clear(self):
-        """Resets all headers and content for this response."""
 
     def redirect( url, permanent=False, status=None ):
         """Sends a redirect to the given (optionally relative) URL.
@@ -485,6 +500,18 @@ class IRequestHandler( Interface ):
         "Request handler can override this attribute to provide a sequence of "
         "HTTP Methods supported by the plugin. "
     )
+    default_headers = Attribute(
+        "Default HTTP headers to be set automatically for every reponse."
+    )
+
+    def __call__( request ):
+        """In the absence of method specific attributes or if the resolver
+        cannot find an instance attribute to apply the handler call back, the
+        object will simply be called.
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        """
 
     def head( request ):
         """Callback method for HEAD request. 

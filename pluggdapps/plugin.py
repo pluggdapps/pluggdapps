@@ -232,6 +232,13 @@ class ISettings( Interface ):
     settings, this interface is implemented by the base class :class:`Plugin`.
     """
 
+    settings = Attribute(
+        "Every plugin is invoked in an application's context. If no "
+        "application is involved (or resolved) then ROOTAPP is used as the "
+        "plugin's application context. This attribute is a copy of plugin's "
+        "application settings from ``pluggdapps.appsettings``."
+    )
+
     def normalize_settings( settings ):
         """Class method.
         `settings` is a dictionary of configuration parameters. This method 
@@ -308,12 +315,13 @@ class Plugin( PluginBase ):
         from  pluggdapps import appsettings
         from  pluggdapps.interfaces import IApplication
         self.appname = appname
-        sett = {} 
+        self.settings = deepcopy( appsettings[appname] )
+        sett = {}
         pluginnm = pluginname(self)
         if pluginnm in PluginMeta._implementers[IApplication] :
-            sett.update( appsettings[appname]['DEFAULT'] )
+            sett.update( self.settings['DEFAULT'] )
         else :
-            sett.update( appsettings[appname]['plugin:'+pluginnm] )
+            sett.update( self.settings['plugin:'+pluginnm] )
         sett.update( kwargs.pop( 'settings', {} ))
         self._settngx = sett
 
