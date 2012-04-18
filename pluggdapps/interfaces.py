@@ -135,9 +135,9 @@ class IApplication( Interface ):
 
 
 class IRouter( Interface ):
-        """Every `IRouter` plugin must either treat a request's url as a chain
-        of resource and resolve them based on the next path component or 
-        the plugin must resolve the request's url by mapping rules."""
+    """Every `IRouter` plugin must either treat a request's url as a chain
+    of resource and resolve them based on the next path component or 
+    the plugin must resolve the request's url by mapping rules."""
 
     def onboot( settings ):
         """During application boot time, every router object will be resolved,
@@ -248,11 +248,11 @@ class IRequest( Interface ):
     )
     appsettings = Attribute(
         "A copy of global appsettings containing settings configuration for "
-        "all applications, including root-application. Read only data
-        structure."
+        "all applications, including root-application. Read only data "
+        "structure."
     )
 
-    def __init__( connection, method, uri, version, headers, remote_ip ):
+    def __init__( app, connection, address, startline, headers, body ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
@@ -260,22 +260,58 @@ class IRequest( Interface ):
         and partially parsed.
 
         ``connection``,
-            HTTP socket connection that can receive / transmit http packets.
-        ``method``,
-            HTTP request method parsed from start_line.
-        ``uri``,
-            HTTP request URI parsed from start_line.
-        ``version``,
-            HTTP protocol version, parsed from start_line
+            HTTP socket returned as a result of accepting the connection.
+        ``address``
+            Remote client-ip address initiating the connection.
+        ``startline``,
+            HTTP request startline.
         ``headers``,
             HTTP request headers that comes after start_line and before an
             optional body.
         ``body``,
             Optional HTTP body. If request body is not found pass this as
             None.
-        ``remote_ip``,
-            IP address of the remote client making this request.
         """
+
+    def get_argument( name, default=None, strip=True ):
+        """Returns the value of the argument with the given name.
+
+        If default is not provided, the argument is considered to be
+        required, and we throw an HTTP 400 exception if it is missing.
+
+        If the argument appears in the url more than once, we return the
+        last value.
+
+        The returned value is always unicode.
+        """
+
+    def get_arguments( name, default=[], strip=True ):
+        """Returns a list of the arguments with the given name.
+
+        If the argument is not present, returns an empty list.
+
+        The returned values are always unicode.
+        """
+
+    def decode_argument( value, name=None ):
+        """Decodes an argument from the request.
+
+        The argument has been percent-decoded and is now a byte string.
+        By default, this method decodes the argument as utf-8 and returns
+        a unicode string, but this may be overridden in subclasses.
+
+        This method is used as a filter for both get_argument() and for
+        values extracted from the url and passed to get()/post()/etc.
+
+        The name of the argument is provided if known, but may be None
+        (e.g. for unnamed groups in the url regex).
+        """
+
+    def get_cookie( name, default=None ):
+        """Gets the value of the cookie with the given name, else default."""
+
+    def get_secure_cookie( name, value=None, max_age_days=31 ):
+        """Returns the given signed cookie if it validates, or None."""
 
     def supports_http_1_1():
         """Returns True if this request supports HTTP/1.1 semantics"""
@@ -318,13 +354,129 @@ class IRequest( Interface ):
 class IResponse( Interface ):
     """Response object to send reponse status, headers and body."""
 
+    def set_status( status_code ):
+        """Sets the status code for our response."""
+        pass
+
+    def get_status():
+        """Returns the status code for our response."""
+
+    def set_header( name, value ):
+        """Sets the given response header name and value.
+
+        If a datetime is given, we automatically format it according to the
+        HTTP specification. If the value is not a string, we convert it to
+        a string. All header values are then encoded as UTF-8.
+        """
+
+    def add_header( name, value ):
+        """Adds the given response header and value.
+
+        Unlike `set_header`, `add_header` may be called multiple times
+        to return multiple values for the same header.
+        """
+
+    def set_cookie( name, value, domain=None, expires=None, path="/",
+                    expires_days=None, **kwargs ):
+        """Sets the given cookie name/value with the given options.
+
+        Additional keyword arguments are set on the Cookie.Morsel
+        directly.
+        See http://docs.python.org/library/cookie.html#morsel-objects
+        for available attributes.
+        """
+
+    def clear_cookie( name, path="/", domain=None ):
+        """Deletes the cookie with the given name."""
+
+    def clear_all_cookies():
+        """Deletes all the cookies the user sent with this request."""
+
+    def set_secure_cookie( name, value, expires_days=30, **kwargs ):
+        """Signs and timestamps a cookie so it cannot be forged.
+
+        You must specify the ``cookie_secret`` setting in your Application
+        to use this method. It should be a long, random sequence of bytes
+        to be used as the HMAC secret for the signature.
+
+        To read a cookie set with this method, use `get_secure_cookie()`.
+
+        Note that the ``expires_days`` parameter sets the lifetime of the
+        cookie in the browser, but is independent of the ``max_age_days``
+        parameter to `get_secure_cookie`.
+        """
+
+    def create_signed_value( name, value ):
+        """Signs and timestamps a string so it cannot be forged.
+
+        Normally used via set_secure_cookie, but provided as a separate
+        method for non-cookie uses.  To decode a value not stored
+        as a cookie use the optional value argument to get_secure_cookie.
+        """
+
+    def render(self, template_name, **kwargs):
+        """Renders the template with the given arguments as the response."""
+
     def write( chunk, callback=None ):
         """Writes the given chunk to the response stream."""
         pass
 
+    def flush(self, include_footers=False, callback=None):
+        """Flushes the current output buffer to the network.
+
+        The ``callback`` argument, if given, can be used for flow control:
+        it will be run when all flushed data has been written to the socket.
+        Note that only one flush callback can be outstanding at a time;
+        if another flush occurs before the previous flush's callback
+        has been run, the previous callback will be discarded.
+        """
+
     def finish():
         """Finishes this HTTP request on the open connection."""
         pass
+
+    def clear(self):
+        """Resets all headers and content for this response."""
+
+    def redirect( url, permanent=False, status=None ):
+        """Sends a redirect to the given (optionally relative) URL.
+
+        If the ``status`` argument is specified, that value is used as the
+        HTTP status code; otherwise either 301 (permanent) or 302
+        (temporary) is chosen based on the ``permanent`` argument.
+        The default is 302 (temporary).
+        """
+
+    def send_error( status_code=500, **kwargs ):
+        """Sends the given HTTP error code to the browser.
+
+        If `flush()` has already been called, it is not possible to send
+        an error, so this method will simply terminate the response.
+        If output has been written but not yet flushed, it will be discarded
+        and replaced with the error page.
+
+        Override `write_error()` to customize the error page that is returned.
+        Additional keyword arguments are passed through to `write_error`.
+        """
+
+    def write_error( status_code, **kwargs ):
+        """Override to implement custom error pages.
+
+        ``write_error`` may call `write`, `render`, `set_header`, etc
+        to produce output as usual.
+
+        If this error was caused by an uncaught exception, an ``exc_info``
+        triple will be available as ``kwargs["exc_info"]``.  Note that this
+        exception may not be the "current" exception for purposes of
+        methods like ``sys.exc_info()`` or ``traceback.format_exc``.
+
+        For historical reasons, if a method ``get_error_html`` exists,
+        it will be used instead of the default ``write_error`` implementation.
+        ``get_error_html`` returned a string instead of producing output
+        normally, and had different semantics for exception handling.
+        Users of ``get_error_html`` are encouraged to convert their code
+        to override ``write_error`` instead.
+        """
 
 
 class IRequestHandler( Interface ):
@@ -368,3 +520,8 @@ class IRequestHandler( Interface ):
         ``request``,
             Object instance implementing :class:`IRequest` interface.
         """
+
+    def onfinish():
+        """Called after the end of a request, after the response has been sent
+        to the client."""
+

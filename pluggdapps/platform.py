@@ -6,7 +6,7 @@
 
 
 import pkg_resources         as pkg
-import logging, os
+import logging, os, urlparse
 
 from   pluggdapps.plugin     import Plugin, query_plugin, query_plugins, \
                                     pluginname, plugin_init
@@ -127,13 +127,13 @@ class Platform( Plugin ):
             log.debug( "Shutting down application %r ...", appname )
             app.shutdown( appsettings[appname] )
 
-    def appfor( self, request ):
+    def appfor( self, startline, headers, body ):
         """Resolve applications for `request`."""
-        if ':' in request.host :
-            host, port = request.host.split(':', 1)
-            port = int(port)
-        else :
-            port = 80 if request.protocol == 'http' else 443
+        host = headers.get("Host") or "127.0.0.1"
+        _, _, path, _, _ = urlparse.urlsplit( h.native_str(uri) )
+
+        if ':' in host :
+            host, port = host.split(':', 1)
 
         try    : subdomain, site, tld = host.rsplit('.', 3)
         except : subdomain = None
@@ -142,7 +142,7 @@ class Platform( Plugin ):
             if subdom == subdomain : break
         else :
             for script, appnames in cls.map_scripts.items() :
-                if request.path.startswith( script ) : break
+                if path.startswith( script ) : break
             else :
                 appnames = [ cls.map_scripts['/'] ]
         return appnames[0]

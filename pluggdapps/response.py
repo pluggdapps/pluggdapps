@@ -8,6 +8,10 @@ from   pluggdapps.plugin     import Plugin, implements
 from   pluggdapps.interfaces import IResponse
 import pluggdapps.util       as h
 
+# TODO :
+#   1. user locale (server side).
+#   2. Browser locale.
+
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPResponse implementing IResponse interface."

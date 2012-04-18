@@ -306,10 +306,14 @@ class Plugin( PluginBase ):
     # Plugin constructor and instantiater methods.
     def __init__( self, appname, *args, **kwargs ):
         from  pluggdapps import appsettings
+        from  pluggdapps.interfaces import IApplication
         self.appname = appname
         sett = {} 
-        pluginnm = 'plugin:'+pluginname(self)
-        sett.update( appsettings[appname][pluginnm] )
+        pluginnm = pluginname(self)
+        if pluginnm in PluginMeta._implementers[IApplication] :
+            sett.update( appsettings[appname]['DEFAULT'] )
+        else :
+            sett.update( appsettings[appname]['plugin:'+pluginnm] )
         sett.update( kwargs.pop( 'settings', {} ))
         self._settngx = sett
 

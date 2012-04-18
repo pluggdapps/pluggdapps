@@ -17,8 +17,6 @@ from   pluggdapps.plugin              import Plugin, implements, pluginname, \
 from   pluggdapps.interfaces          import IServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
 from   pluggdapps.evserver            import stack_context
-from   pluggdapps.evserver.httputil   import utf8, native_str, parse_qs_bytes, \
-                                             parse_multipart_form_data
 import pluggdapps.util                as h 
 
 log = logging.getLogger( __name__ )
@@ -199,11 +197,18 @@ class HTTPConnection(object):
             address = ('0.0.0.0', 0)
         self.address = address
         self.platform = platform
-        self.request_factory = settings['request_factory']
+        self.settings = settings
         self.no_keep_alive = settings['no_keep_alive']
         self.xheaders = settings['xheaders']
+        self.request_factory = settings['request_factory']
+
+        # Per request attributes
+        self.startline = None
+        self.headers = None
+        self.body = None
         self._request = None
         self._request_finished = False
+
         # Save stack context here, outside of any request.  This keeps
         # contexts from one request from leaking into the next.
         self._header_callback = stack_context.wrap(self._on_headers)
@@ -222,10 +227,14 @@ class HTTPConnection(object):
         if not self.stream.writing():
             self._finish_request()
 
-    def dispatch( self, request ):
-        appname = self.platform.appfor( request )
-        request.app = query_plugin( appname, 'IApplication', appname )
-        request.app.start( request )
+    def dispatch( self ):
+        appname = self.platform.appfor(self.startline, self.headers, self.body)
+        app = query_plugin( appname, IApplication, appname )
+        request = query_plugin( 
+                    appname, IRequest, self.request_factory,
+                    app, self, self.address[0], 
+                    self.startline, self.headers, self.body )
+        app.start( request )
 
     def _on_write_complete(self):
         if self._write_callback is not None:
@@ -266,21 +275,10 @@ class HTTPConnection(object):
     def _on_headers(self, data):
         from pluggdapps import ROOTAPP
         try:
-            data = native_str(data.decode('latin1'))
+            data = h.native_str(data.decode('latin1'))
             eol = data.find("\r\n")
-            start_line = data[:eol]
-            try:
-                method, uri, version = start_line.split(" ")
-            except ValueError:
-                raise _BadRequestException("Malformed HTTP request line")
-            if not version.startswith("HTTP/"):
-                raise _BadRequestException("Malformed HTTP version in HTTP Request-Line")
-
-            headers = h.HTTPHeaders.parse( data[eol:] )
-            self._request = query_plugin( 
-                ROOTAPP, IRequest, self.request_factory,
-                self, method, uri, version, headers, self.address[0],
-                None, None, None )
+            self.startline = data[:eol]
+            self.headers = h.HTTPHeaders.parse( data[eol:] )
 
             content_length = headers.get( "Content-Length" )
             if content_length:
@@ -291,8 +289,7 @@ class HTTPConnection(object):
                     self.stream.write(b"HTTP/1.1 100 (Continue)\r\n\r\n")
                 self.stream.read_bytes(content_length, self._on_request_body)
                 return
-
-            self.dispatch( self._request )
+            self.dispatch()
 
         except _BadRequestException, e:
             logging.info( "Malformed HTTP request from %s: %s",
@@ -300,28 +297,6 @@ class HTTPConnection(object):
             self.stream.close()
             return
 
-    def _on_request_body(self, data):
-        self._request.body = data
-        content_type = self._request.headers.get("Content-Type", "")
-        if self._request.method in ("POST", "PUT"):
-            if content_type.startswith("application/x-www-form-urlencoded"):
-                arguments = parse_qs_bytes(native_str(self._request.body))
-                for name, values in arguments.iteritems():
-                    values = [v for v in values if v]
-                    if values:
-                        self._request.arguments.setdefault(name, []).extend(
-                            values)
-            elif content_type.startswith("multipart/form-data"):
-                fields = content_type.split(";")
-                for field in fields:
-                    k, sep, v = field.strip().partition("=")
-                    if k == "boundary" and v:
-                        httputil.parse_multipart_form_data(
-                            utf8(v), data,
-                            self._request.arguments,
-                            self._request.files)
-                        break
-                else:
-                    logging.warning("Invalid multipart/form-data")
-
-        self.dispatch( self._request )
+    def _on_request_body( self, data ):
+        self.body = data
+        self.dispatch()
