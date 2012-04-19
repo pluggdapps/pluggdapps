@@ -228,7 +228,8 @@ class IRequest( Interface ):
         "names to lists of :class:`HTTPFile`."
     )
     cookies = Attribute(
-        "A dictionary of Cookie.Morsel objects."
+        "A dictionary of Cookie.Morsel objects representing request cookies "
+        "from client"
     )
     settings = Attribute(
         "A copy of application settings dictionary. Settings are organised "
@@ -282,7 +283,7 @@ class IRequest( Interface ):
         """Returns the value of the argument with the given name.
 
         If default is not provided, the argument is considered to be
-        required, and we throw an HTTP 400 exception if it is missing.
+        required, and we throw an exception if it is missing.
 
         If the argument appears in the url more than once, we return the
         last value.
@@ -363,6 +364,11 @@ class IRequest( Interface ):
 class IResponse( Interface ):
     """Response object to send reponse status, headers and body."""
 
+    cookies = Attribute(
+        "A dictionary of Cookie.Morsel objects representing response cookies "
+        "to be sent from server."
+    )
+
     def __init__( request ):
         """
         ``request``,
@@ -435,9 +441,21 @@ class IResponse( Interface ):
     def render( template_name, **kwargs ):
         """Renders the template with the given arguments as the response."""
 
-    def write( chunk, callback=None ):
-        """Writes the given chunk to the response stream."""
-        pass
+    def write( chunk ):
+        """Writes the given chunk to the output buffer.
+
+        To write the output to the network, use the flush() method below.
+
+        If the given chunk is a dictionary, we write it as JSON and set
+        the Content-Type of the response to be application/json.
+        (if you want to send JSON as a different Content-Type, call
+        set_header *after* calling write()).
+
+        Note that lists are not converted to JSON because of a potential
+        cross-site security vulnerability.  All JSON output should be
+        wrapped in a dictionary.  More details at
+        http://haacked.com/archive/2008/11/20/anatomy-of-a-subtle-json-vulnerability.aspx
+        """
 
     def flush( include_footers=False, callback=None ):
         """Flushes the current output buffer to the network.
@@ -492,6 +510,22 @@ class IResponse( Interface ):
         Users of ``get_error_html`` are encouraged to convert their code
         to override ``write_error`` instead.
         """
+
+class IResponseTransformer( Interface ):
+    """Specification to transform response headers and body. A chain of
+    transforms can be configured with plugins implementing 
+    :class:`IResponse`."""
+
+    def start_transform( self, headers, chunk, finished=False ):
+        """Start transformation using complete list of response headers and
+        first ``chunk`` of response body, if ``finished`` is False. If
+        ``finished`` is True, then ``chunk`` becomes the first and last part
+        of response body."""
+
+    def transform( self, chunk, finished=False ):
+        """Continue with the current transformation with subsequent chunks
+        response body. If ``finished`` is True, then ``chunk is the last chunk
+        of response body."""
 
 
 class IRequestHandler( Interface ):

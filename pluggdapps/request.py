@@ -59,7 +59,7 @@ class HTTPRequest( Plugin ):
         self.files = {}
         self.full_url = self.protocol + "://" + self.host + self.uri
 
-        _, _, self.path, self.query, _ = urlparse.urlsplit( native_str(uri) )
+        _, _, self.path, self.query, _ = urlparse.urlsplit( h.native_str(uri) )
         self.arguments = self._parse_query( query )
         # Updates self.arguments and self.files based on request-body
         self._parse_body( method, headers, body ) 
@@ -76,6 +76,71 @@ class HTTPRequest( Plugin ):
             return self.connection.stream.socket.getpeercert()
         except ssl.SSLError:
             return None
+
+    _ARG_DEFAULT = []
+    def get_argument( self, name, default=None, strip=True ):
+        """Returns the value of the argument with the given name.
+
+        If default is not provided, the argument is considered to be
+        required, and we throw an exception if it is missing.
+
+        If the argument appears in the url more than once, we return the
+        last value.
+
+        The returned value is always unicode.
+        """
+        args = self.get_arguments( name, strip=strip )
+        if args :
+            return arg[-1]
+        elif default is not None : 
+            return default
+        else :
+            raise Exception( "Missing argument" )
+
+    def get_arguments( self, name, strip=True ):
+        """Returns a list of the arguments with the given name.
+
+        If the argument is not present, returns an empty list.
+
+        The returned values are always unicode.
+        """
+        values = []
+        for v in self.arguments.get( name, [] ) :
+            v = self.decode_argument( v, name=name )
+            if isinstance(v, unicode):
+                # Get rid of any weird control chars (unless decoding gave
+                # us bytes, in which case leave it alone)
+                v = re.sub(r"[\x00-\x08\x0e-\x1f]", " ", v)
+            v = v.strip() if strip else v
+            values.append(v)
+        return values
+
+    def decode_argument(self, value, name=None):
+        """Decodes an argument from the request.
+
+        The argument has been percent-decoded and is now a byte string.
+        By default, this method decodes the argument as utf-8 and returns
+        a unicode string, but this may be overridden in subclasses.
+
+        This method is used as a filter for both get_argument() and for
+        values extracted from the url and passed to get()/post()/etc.
+
+        The name of the argument is provided if known, but may be None
+        (e.g. for unnamed groups in the url regex).
+        """
+        return h.to_unicode( value )
+
+    def get_cookie( self, name, default=None ):
+        """Gets the value of the cookie with the given name, else default."""
+        return self.cookies[name].value if name in self.cookies else default
+
+    def get_secure_cookie(self, name, value=None, max_age_days=31):
+        """Returns the given signed cookie if it validates, or None."""
+        self.require_setting("cookie_secret", "secure cookies")
+        if value is None:
+            value = self.get_cookie(name)
+        return decode_signed_value(self.application.settings["cookie_secret"],
+                                   name, value, max_age_days=max_age_days)
 
     def __repr__(self):
         attrs = ("protocol", "host", "method", "uri", "version", "remote_ip",
@@ -127,7 +192,7 @@ class HTTPRequest( Plugin ):
 
     def _parse_cookies( self, headers ):
         cookies = Cookie.SimpleCookie()
-        try    : cookies.load( native_str( headers["Cookie"]  ))
+        try    : cookies.load( h.native_str( headers["Cookie"]  ))
         except : pass
         return cookies
 

@@ -28,6 +28,12 @@ _default_settings['response_factory']  = {
                 "response corresponding to request generated via "
                 "`request_factory` parameter."
 }
+_default_settings['cookie_secret']  = {
+    'default' : 'secure cookie signature',
+    'types'   : (str,),
+    'help'    : "Use this to sign the cookie value before sending it with the "
+                "response."
+}
 
 class RootApplication( Plugin ):
     implements( IApplication )

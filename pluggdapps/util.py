@@ -390,6 +390,21 @@ def to_basestring(value):
     assert isinstance(value, bytes)
     return value.decode("utf-8")
 
+def recursive_unicode( obj ):
+    """Walks a simple data structure, converting byte strings to unicode.
+    Supports lists, tuples, and dictionaries.
+    """
+    if isinstance(obj, dict):
+        return dict( (recursive_unicode(k), recursive_unicode(v))
+                     for (k, v) in obj.iteritems() )
+    elif isinstance(obj, list):
+        return list( recursive_unicode(i) for i in obj )
+    elif isinstance(obj, tuple):
+        return tuple( recursive_unicode(i) for i in obj )
+    elif isinstance( obj, bytes ):
+        return to_unicode(obj)
+    else:
+        return obj
 
 # When dealing with the standard library across python 2 and 3 it is
 # sometimes useful to have a direct conversion to the native string type
@@ -534,3 +549,20 @@ def _parse_header(line):
                 value = value.replace('\\\\', '\\').replace('\\"', '"')
             pdict[name] = value
     return key, pdict
+
+
+"""Convert objects from JSON format to python. And vice-versa."""
+import json
+def json_encode( value ):
+    """JSON-encodes the given Python object."""
+    # JSON permits but does not require forward slashes to be escaped.
+    # This is useful when json data is emitted in a <script> tag
+    # in HTML, as it prevents </script> tags from prematurely terminating
+    # the javscript.  Some json libraries do this escaping by default,
+    # although python's standard library does not, so we do it here.
+    # http://stackoverflow.com/questions/1580647/json-why-are-forward-slashes-escaped
+    return json.dumps( recursive_unicode(value) ).replace( "</", "<\\/" )
+
+def json_decode(value):
+    """Returns Python objects for the given JSON string."""
+    return json.loads( to_basestring(value) )
