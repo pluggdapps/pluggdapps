@@ -4,6 +4,7 @@
 
 # -*- coding: utf-8 -*-
 
+import logging
 import httplib, calendar, email, time, base64, hmac, hashlib, itertools
 import datetime as dt
 
@@ -11,16 +12,18 @@ from   pluggdapps.plugin     import Plugin, implements, query_plugin
 from   pluggdapps.interfaces import IResponse, IResponseTransformer
 import pluggdapps.util       as h
 
-from tornado import escape
-from tornado import locale
-from tornado import stack_context
-from tornado import template
-from tornado.escape import utf8, _unicode
-from tornado.util import b, bytes_type, import_object, ObjectDict
+#from tornado import escape
+#from tornado import locale
+#from tornado import stack_context
+#from tornado import template
+#from tornado.escape import utf8, _unicode
+#from tornado.util import b, bytes_type, import_object, ObjectDict
 
 # TODO :
 #   1. user locale (server side).
 #   2. Browser locale.
+
+log = logging.getLogger(__name__)
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
@@ -36,11 +39,9 @@ _default_settings['transforms']     = {
 class HTTPResponse( Plugin ):
     implements( IResponse )
 
-    def __init__( self, appname, request ):
-        Plugin.__init__( self, appname )
+    def __init__( self, request ):
         # Attributes from request
         self.app = request.app
-        self.appname = appname
         # Book keeping
         self._headers_written = False
         self._finished = False
@@ -156,7 +157,7 @@ class HTTPResponse( Plugin ):
         method for non-cookie uses.  To decode a value not stored
         as a cookie use the optional value argument to get_secure_cookie.
         """
-        return self._create_signed_value(self.app['cookie_secret'] name, value)
+        return self._create_signed_value(self.app['cookie_secret'], name, value)
 
     def write( self, chunk ):
         """Writes the given chunk to the output buffer.
@@ -180,6 +181,10 @@ class HTTPResponse( Plugin ):
             self.set_header( "Content-Type", "application/json; charset=UTF-8" )
         chunk = h.utf8(chunk)
         self._write_buffer.append(chunk)
+
+    def write( self, chunk, callback=None ): # From HTTPRequest of tornado
+        assert isinstance(chunk, bytes)
+        self.connection.write( chunk, callback=callback )
 
     def flush( self, finishing=False, callback=None ):
         """Flushes the current output buffer to the network.
@@ -213,48 +218,47 @@ class HTTPResponse( Plugin ):
         if headers or chunk:
             self.request.write( headers + chunk, callback=callback )
 
-    def finish(self, chunk=None):
+    def finish( self, chunk=None ):
         """Finishes this response, ending the HTTP request."""
         if self._finished:
-            raise RuntimeError("finish() called twice.  May be caused "
-                               "by using async operations without the "
-                               "@asynchronous decorator.")
+            raise Exception( "finish() called twice." )
 
-        if chunk is not None:
-            self.write(chunk)
+        self.write(chunk) if chunk is not None else None
 
         # Automatically support ETags and add the Content-Length header if
         # we have not flushed any content yet.
         if not self._headers_written:
-            if (self._status_code == 200 and
-                self.request.method in ("GET", "HEAD") and
-                "Etag" not in self._headers):
+            if ( self._status_code == 200 and
+                 self.request.method in ("GET", "HEAD") and
+                 "Etag" not in self._headers ):
                 etag = self.compute_etag()
-                if etag is not None:
+                if etag is not None :
                     self.set_header("Etag", etag)
-                    inm = self.request.headers.get("If-None-Match")
-                    if inm and inm.find(etag) != -1:
+                    inm = self.request.headers.get( "If-None-Match" )
+                    if inm and inm.find( etag ) != -1:
                         self._write_buffer = []
                         self.set_status(304)
-            if "Content-Length" not in self._headers:
-                content_length = sum(len(part) for part in self._write_buffer)
-                self.set_header("Content-Length", content_length)
+            if "Content-Length" not in self._headers :
+                self.set_header( "Content-Length", 
+                                 sum( map( len, self._write_buffer )) )
 
-        if hasattr(self.request, "connection"):
+        if hasattr( self.request, "connection" ):
             # Now that the request is finished, clear the callback we
             # set on the IOStream (which would otherwise prevent the
             # garbage collection of the RequestHandler when there
             # are keepalive connections)
             self.request.connection.stream.set_close_callback(None)
 
-        if not self.application._wsgi:
-            self.flush(include_footers=True)
-            self.request.finish()
-            self._log()
+        self.flush(include_footers=True)
+        self.request.finish()
         self._finished = True
         self.on_finish()
 
-    def send_error(self, status_code=500, **kwargs):
+    def _finish( self ):    # From HTTPRequest of tornado
+        self.connection.finish()
+        self._finish_time = time.time()
+    
+    def send_error( self, status_code=500, **kwargs ):
         """Sends the given HTTP error code to the browser.
 
         If `flush()` has already been called, it is not possible to send
@@ -263,21 +267,18 @@ class HTTPResponse( Plugin ):
         and replaced with the error page.
 
         Override `write_error()` to customize the error page that is returned.
-        Additional keyword arguments are passed through to `write_error`.
-        """
-        if self._headers_written:
-            logging.error("Cannot send error response after headers written")
-            if not self._finished:
-                self.finish()
+        Additional keyword arguments are passed through to `write_error`."""
+        if self._headers_written :
+            log.error("Cannot send error response after headers written")
+            self.finish() if not self._finished else None
             return
         self.clear()
-        self.set_status(status_code)
+        self.set_status( status_code )
         try:
-            self.write_error(status_code, **kwargs)
+            self.write_error( status_code, **kwargs )
         except Exception:
-            logging.error("Uncaught exception in write_error", exc_info=True)
-        if not self._finished:
-            self.finish()
+            log.error( "Uncaught exception in write_error", exc_info=True )
+        self.finish() if not self._finished else None
 
     def write_error(self, status_code, **kwargs):
         """Override to implement custom error pages.
@@ -322,14 +323,12 @@ class HTTPResponse( Plugin ):
                     "message": httplib.responses[status_code],
                     })
 
-    def write( self, chunk, callback=None ):
-        assert isinstance(chunk, bytes)
-        self.connection.write( chunk, callback=callback )
+    def compute_etag(self):
+        """Computes the etag header to be used for this request's response."""
+        hasher = hashlib.sha1()
+        map( hasher.update, self._write_buffer )
+        return '"%s"' % hasher.hexdigest()
 
-    def finish( self ):
-        self.connection.finish()
-        self._finish_time = time.time()
-    
     def redirect( self, url, permanent=False, status=None ):
         """Sends a redirect to the given (optionally relative) URL.
 
@@ -352,7 +351,7 @@ class HTTPResponse( Plugin ):
 
     def _initialize_headers( self ):
         self._headers = {
-            "Server": "PluggdappsServer/%s" % __version__
+            "Server": "PluggdappsServer/%s" % __version__,
             "Content-Type": "text/html; charset=UTF-8",
         }
         self._list_headers = []

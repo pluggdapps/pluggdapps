@@ -32,12 +32,10 @@ class HTTPRequest( Plugin ):
     do_methods = ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS')
 
     elapsedtime = property( lambda self : time.time() - self.receivedat )
-    servicetime = property( lambda self : (time.time() - self.receivedat )
+    servicetime = property( lambda self : time.time() - self.receivedat )
 
     # IRequest interface methods and attributes
-    def __init__( self, appname, app, conn, address, startline, headers, body ):
-        Plugin.__init__( self, appname )
-        self.appname = appname
+    def __init__( self, app, conn, address, startline, headers, body ):
         self.receivedat = time.time()
 
         if conn :

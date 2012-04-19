@@ -72,8 +72,7 @@ class HTTPIOStream( Plugin ):
         ioloop.start()
 
     """
-    def __init__( self, appname, socket, ioloop ):
-        Plugin.__init__( self, appname, socket, ioloop )
+    def __init__( self, socket, ioloop ):
         self.socket = socket
         self.socket.setblocking(False)
         self.ioloop = ioloop

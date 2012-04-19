@@ -150,8 +150,7 @@ class HTTPIOServer( TCPServer, Plugin ):
     """
     implements( IServer )
 
-    def __init__( self, appname, platform, **kwargs ):
-        Plugin.__init__( self, appname, platform, **kwargs )
+    def __init__( self, platform, **kwargs ):
         TCPServer.__init__( self )
         self.platform = platform
 

@@ -5,6 +5,7 @@
 # -*- coding: utf-8 -*-
 
 import sys, inspect, logging
+from   copy import deepcopy
 
 import pluggdapps.util       as h
 
@@ -227,34 +228,42 @@ def applications():
 
 class ISettings( Interface ):
     """ISettings is a mixin interface implemented by the base class 
-    :class:`Plugin`. Deriving plugin classes can override this interface
-    methods. Since every plugin is nothing but a bunch of configuration
-    settings, this interface is implemented by the base class :class:`Plugin`.
+    :class:`Plugin`. Since every plugin is nothing but a bunch of configuration
+    settings, a default implementation is provided by the base class 
+    :class:`Plugin`. Deriving plugin classes can override this interface 
+    methods.
+    
+    While instantiating plugins via `query_plugin()` or `query_plugins()`
+    method, passing a ``settings`` key-word argument will override plugin's
+    settings defined by ini files and web-admin.
     """
-
+    appname = Attribute(
+        "Application name under whose context the plugin was instantiated. "
+        "Every plugin is instantiated under an application's context. If no "
+        "application is involved (or resolved) then `ROOTAPP` is used as the "
+        "plugin's application context."
+    )
     settings = Attribute(
-        "Every plugin is invoked in an application's context. If no "
-        "application is involved (or resolved) then ROOTAPP is used as the "
-        "plugin's application context. This attribute is a copy of plugin's "
-        "application settings from ``pluggdapps.appsettings``."
+        "This attribute is a copy of application's settings from "
+        "``pluggdapps.appsettings``."
     )
 
     def normalize_settings( settings ):
         """Class method.
-        `settings` is a dictionary of configuration parameters. This method 
+        ``settings`` is a dictionary of configuration parameters. This method
         will be called after aggregating all configuration parameters for a
         plugin and before updating the plugin instance with its configuration
         parameters.
 
         Use this method to do any post processing on plugin's configuration
         parameter and return the final form of configuration parameters.
-        Processed parameters are updated in-pace"""
+        Processed parameters in ``settings`` are updated in-pace."""
 
     def default_settings():
         """Class method.
         Return instance of :class:`ConfigDict` providing meta data
-        associated with each configuration parameters supported by the plugin.
-        Like - default value, value type, help text, wether web configuration
+        associated with each configuration parameters supported by the plugin,
+        like, default value, value type, help text, whether web configuration
         is allowed, optional values, etc ...
         
         To be implemented by classed deriving :class:`Plugin`.
@@ -267,23 +276,27 @@ class ISettings( Interface ):
         following,
         
         * To update the in-memory configuration settings with new `settings`
-        * To persist new `settings` in a backend data-store."""
+        * To persist new `settings` in a backend data-store.
+       
+        Web-admin settings will override settings from ini-files.
+        """
 
 
 class Plugin( PluginBase ):
     """Every plugin must derive from this class.
 
-    A plugin is a dictionary of configuration parameters, that also implements
+    A plugin is a dictionary of configuration settings, that also implements
     one or more interface. Note that class:`Plugin` does not directly derive
     from built in type :type:`dict` because dictionary methods from dict
     type might clash with one or more interface methods implemented by the
     derving plugin class.
 
-    Every other plugin class ``must`` derive from this class and can override
+    Every other plugin class `must` derive from this class and can override
     the interface specification methods defined by :class:`ISettings`.
-    Deriving plugins can also assume that plugin's settings will be
-    consolidated from ini files and other sources and made available on the
-    plugin's instance object.
+    Deriving plugins can assume that plugin's settings will be
+    consolidated from web-backend, ini-files and default_settings() method, in
+    the order of decreasing priority, and made available as a dictionary of 
+    key,value pairs on plugin instance.
     """
 
     implements( ISettings )
@@ -310,13 +323,19 @@ class Plugin( PluginBase ):
     def __contains__( self, item ):
         return self._settngx.__contains__( item )
 
-    # Plugin constructor and instantiater methods.
-    def __init__( self, appname, *args, **kwargs ):
+    def __new__( cls, *args, **kwargs ):
+        """If ``settings`` key-word argument is passed, it will be used to
+        override plugin settings."""
         from  pluggdapps import appsettings
         from  pluggdapps.interfaces import IApplication
+        self = super( Plugin, cls ).__new__( cls )
+
+        # TODO : how to auto-magically pass appname ??
+        appname, sett = kwargs.pop('__xappname'), {}
+        # Initialize :class:`ISettings` attributes
         self.appname = appname
         self.settings = deepcopy( appsettings[appname] )
-        sett = {}
+        # Plugin settings
         pluginnm = pluginname(self)
         if pluginnm in PluginMeta._implementers[IApplication] :
             sett.update( self.settings['DEFAULT'] )
@@ -324,6 +343,7 @@ class Plugin( PluginBase ):
             sett.update( self.settings['plugin:'+pluginnm] )
         sett.update( kwargs.pop( 'settings', {} ))
         self._settngx = sett
+        return self
 
     # :class:`ISettings` interface methods
     @classmethod

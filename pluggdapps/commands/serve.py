@@ -14,8 +14,8 @@ class Serve( Plugin ):
     description = "Start http server."
     usage = "usage: pa [options] serve [serve_options]"
 
-    def __init__( self, appname, argv=[] ):
-        Plugin.__init__( self, appname, argv=argv )
+    def __init__( self, platform, argv=[] ):
+        self.platform = platform
 
     def argparse( self, argv ):
         pass

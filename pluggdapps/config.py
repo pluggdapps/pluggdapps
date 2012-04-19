@@ -16,7 +16,7 @@ from   pluggdapps.plugin    import default_settings, applications, plugin_info
 
 log = logging.getLogger( __name__ )
 
-def loadsettings( inifile={} ):
+def loadsettings( inifile=None ):
     """Load root settings, application settings, and section-wise settings for
     each application. Every plugin will have its own section."""
     from pluggdapps import ROOTAPP

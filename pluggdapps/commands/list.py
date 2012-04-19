@@ -18,10 +18,29 @@ class List( Plugin ):
     description = "list of plugins, interfaces."
     usage = "usage: pa [options] list [list_options] <module>"
 
-    def __init__( self, appname, argv=[] ):
-        Plugin.__init__( self, appname, argv=argv )
+    def __init__( self, platform, argv=[] ):
+        self.platform = platform
         parser = self._parse( List.usage )
         self.options, self.args = parser.parse_args( argv )
+
+    def argparse( self, argv ):
+        parser = self._parse( List.usage )
+        self.options, self.args = parser.parse_args( argv )
+        return self.options, self.args
+
+    def run( self, options=None, args=[] ):
+        options = options or self.options
+        args = args or self.args
+        if options.listinterfs :
+            self._listinterfs( options, args )
+        elif options.listplugins :
+            self._listplugins( options, args )
+        elif options.interface :
+            self._listinterf( options, args )
+        elif options.plugin :
+            self._listplugin( options, args )
+        else :
+            self._listinterfs( options, args )
 
     def _parse( self, usage ):
         return self._options( OptionParser( usage=usage ))
@@ -74,21 +93,3 @@ class List( Plugin ):
             print "\nConfiguration dictionary"
             pprint( info['config'] )
 
-    def argparse( self, argv ):
-        parser = self._parse( List.usage )
-        self.options, self.args = parser.parse_args( argv )
-        return self.options, self.args
-
-    def run( self, options=None, args=[] ):
-        options = options or self.options
-        args = args or self.args
-        if options.listinterfs :
-            self._listinterfs( options, args )
-        elif options.listplugins :
-            self._listplugins( options, args )
-        elif options.interface :
-            self._listinterf( options, args )
-        elif options.plugin :
-            self._listplugin( options, args )
-        else :
-            self._listinterfs( options, args )

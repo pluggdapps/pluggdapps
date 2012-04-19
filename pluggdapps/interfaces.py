@@ -16,29 +16,38 @@ __all__ = [
 class ICommand( Interface ):
     """Handle sub-commands issued from command line script. The general
     purpose is to parse the command line string arguments into `options` and
-    `arguments` and then perform the sub-command in the user desired 
-    fashion."""
+    `arguments` and handle sub-commands as pluggable functions."""
 
     description = Attribute(
         "Description about this command"
     )
 
-    def __init__( argv=[], settings={} ):
+    def __init__( platform, argv=[] ):
         """Parse command line arguments using argv list and return a tuple of
         (options, args).
+
+        ``platform``,
+            :class:`Platform` instance.
+        ``argv``,
+            A list of command line arguments that comes after the sub-command.
+            This can be overridden by calling :method:`ICommand.argparse` API.
         """
 
     def argparse( argv ):
         """Parse command line arguments using argv list and return a tuple of
         (options, args). Also overwrite self's `options` and `args` attributes
         initialized during instantiation.
+
+        ``argv``
+            A list of arguments to be interpreted as command line arguments
+            for this sub-command.
         """
 
     def run( options=None, args=[] ):
-        """Run the command using command line `options` and non-option 
-        parameters, `args`. If either or both `options` and `args` are None 
-        then previously parsed `options` and `args` using argparse() will be
-        used."""
+        """Run this sub-command using parsed ``options`` and ``args``, if
+        passed as arguments, otherwise use options and args already parsed via
+        __init__() or argparse().
+        """
 
 
 class IServer( Interface ):
@@ -368,6 +377,10 @@ class IResponse( Interface ):
         "A dictionary of Cookie.Morsel objects representing response cookies "
         "to be sent from server."
     )
+    request = Attribute(
+        "HTTP request object, an instance of plugin implementing "
+        ":class:`IRequest` interface."
+    )
 
     def __init__( request ):
         """
@@ -510,6 +523,10 @@ class IResponse( Interface ):
         Users of ``get_error_html`` are encouraged to convert their code
         to override ``write_error`` instead.
         """
+
+    def compute_etag():
+        """Computes the etag header to be used for this request's response."""
+
 
 class IResponseTransformer( Interface ):
     """Specification to transform response headers and body. A chain of

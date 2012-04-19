@@ -8,6 +8,7 @@ import logging
 
 from   pluggdapps.plugin     import Plugin, Interface, implements
 from   pluggdapps.interfaces import IApplication
+import pluggdapps.util       as h
 
 log = logging.getLogger(__name__)
 

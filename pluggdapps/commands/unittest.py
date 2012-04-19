@@ -16,16 +16,10 @@ class UnitTest( Plugin ):
     description = "Run one or more unittest."
     usage = "usage: pa [options] unittest [test_options] <module>"
 
-    def __init__( self, appname, argv=[] ):
-        Plugin.__init__( self, appname, argv=argv )
+    def __init__( self, platform, argv=[] ):
+        self.platform = platform
         parser = self._parse( UnitTest.usage )
         self.options, self.args = parser.parse_args( argv )
-
-    def _parse( self, usage ):
-        return self._options( OptionParser( usage=usage ))
-
-    def _options( self, parser ):
-        return parser
 
     def argparse( self, argv ):
         parser = self._parse( UnitTest.usage )
@@ -34,3 +28,10 @@ class UnitTest( Plugin ):
 
     def run( self, options=None, args=[] ):
         pass
+
+    def _parse( self, usage ):
+        return self._options( OptionParser( usage=usage ))
+
+    def _options( self, parser ):
+        return parser
+

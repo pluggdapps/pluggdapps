@@ -33,10 +33,26 @@ class Commands( Plugin ):
     description = "list of script commands and their short description."
     usage = "usage: pa [options] commands"
 
-    def __init__( self, appname, argv=[] ):
-        Plugin.__init__( self, appname, argv=argv )
+    def __init__( self, platform, argv=[] ):
+        self.platform = platform
         parser = self._parse( Commands.usage )
         self.options, self.args = parser.parse_args( argv )
+
+    def argparse( self, argv ):
+        parser = self._parse( List.usage )
+        self.options, self.args = parser.parse_args( argv )
+        return self.options, self.args
+
+    def run( self, options=None, args=[] ):
+        from pluggdapps import ROOTAPP
+        options = options or self.options
+        args = args or self.args
+        commands = query_plugins( ROOTAPP, ICommand )
+        commands = sorted( commands, key=lambda x : pluginname(x) )
+        for command in commands :
+            rows = self._formatdescr(pluginname(command), command.description)
+            for row in rows :
+                print row
 
     def _parse( self, usage ):
         return self._options( OptionParser( usage=usage ))
@@ -59,23 +75,6 @@ class Commands( Plugin ):
                 line = ' '.join(filter(None, [line, word]))
         rows.append( fmtstr % (name, line) ) if line else None
         return rows
-
-    def argparse( self, argv ):
-        parser = self._parse( List.usage )
-        self.options, self.args = parser.parse_args( argv )
-        return self.options, self.args
-
-    def run( self, options=None, args=[] ):
-        from pluggdapps import ROOTAPP
-
-        options = options or self.options
-        args = args or self.args
-        commands = sorted( 
-            query_plugins( ROOTAPP, ICommand ), key=lambda x : pluginname(x) )
-        for command in commands :
-            rows = self._formatdescr(pluginname(command), command.description)
-            for row in rows :
-                print row
 
     # ISettings interface methods
     @classmethod

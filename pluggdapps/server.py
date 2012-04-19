@@ -126,8 +126,6 @@ class HTTPServer( Plugin ):
     You must have the corresponding SSL driver library installed."""
 
     def __init__( self, gateway ):
-        Plugin.__init__( self )
-
         self.bind_addr = (self['host'], self['port'])
         self.procpool = multiprocessing.Pool( 
             self['minprocess'], None, [], self['maxtaskperchild'] )

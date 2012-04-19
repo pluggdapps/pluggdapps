@@ -6,7 +6,7 @@
 
 
 import pkg_resources         as pkg
-import logging, os, urlparse
+import logging, urlparse
 
 from   pluggdapps.plugin     import Plugin, query_plugin, query_plugins, \
                                     pluginname, plugin_init
@@ -17,14 +17,12 @@ import pluggdapps.util       as h
 
 log = logging.getLogger(__name__)
 
-DEFAULT_SERVER = 'httpioserver'
-DEFAULT_HOST = '127.0.0.1'
-DEFAULT_PORT = 5000
-
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
     "Platform configuration settings are equivalent to global configuration "
-    "settings." )
+    "settings. Nevertheless these configurations are to be modified only "
+    "under [plugin:platform] section, not the [DEFAULT] section. And "
+    "[plugin:platform] section is to be configured in the master ini file.")
 
 _default_settings['servername']  = {
     'default' : 'httpioserver',
@@ -87,10 +85,11 @@ class Platform( Plugin ):
             loglevel to use. This will override default 'logging.level'.
         """
         from  pluggdapps import appsettings, ROOTAPP
-        log.info( 'Booting platform ...' )
+        log.info( 'Booting platform from %r ...', inifile )
+        cls.inifile = inifile
+        # Load application settings
         appsettings.update( loadsettings( inifile ))
         cls.appsettings = appsettings
-
         # Setup logger 
         cls.setuplog( level=loglevel )
 
@@ -114,6 +113,8 @@ class Platform( Plugin ):
         http server."""
         from pluggdapps import ROOTAPP
         from pluggdapps.interfaces import IServer
+
+        print map( None, self )
 
         servername = getsettings(ROOTAPP, plugin='platform', key='servername')
         self.server = query_plugin( ROOTAPP, IServer, servername, self )

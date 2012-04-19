@@ -14,7 +14,6 @@ from   pluggdapps               import ROOTAPP
 from   pluggdapps.platform      import Platform
 from   pluggdapps.plugin        import plugin_init, pluginnames, \
                                        query_plugin, ISettings
-from   pluggdapps.platform      import Platform
 from   pluggdapps.interfaces    import ICommand
 
 usage = "pa [options] <command> [command_options]"
@@ -43,7 +42,7 @@ def options( parser ):
 
 def docommand( platform, command, argv ):
     """Handle sub-commands."""
-    comm = query_plugin( ROOTAPP, ICommand, command, argv=argv )
+    comm = query_plugin( ROOTAPP, ICommand, command, platform, argv=argv )
     comm.run()
 
 
