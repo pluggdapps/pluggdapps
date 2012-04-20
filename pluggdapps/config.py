@@ -20,40 +20,43 @@ def loadsettings( inifile=None ):
     """Load root settings, application settings, and section-wise settings for
     each application. Every plugin will have its own section."""
     from pluggdapps import ROOTAPP
+    rootapp = app2sec( ROOTAPP )
     appsettings = default_appsettings()
     # Override plugin defaults for each application with configuration from its
     # ini-file
     inisettings = load_inisettings( inifile ) if inifile else {}
-    for appname, sections in inisettings.items() :
-        if appname != ROOTAPP :
-            appcls = plugin_info(appname)['cls']
-            appcls.normalize_settings( appsettings[appname]['DEFAULT'] )
+    for appsec, sections in inisettings.items() :
+        appsettings[appsec]['DEFAULT'].update( sections['DEFAULT'] )
+        appcls = plugin_info( sec2app(appsec) )['cls']
+        appcls.normalize_settings( appsettings[appsec]['DEFAULT'] )
         for p, sett in sections.items() :
             sett = dict( sett.items() )
-            appsettings[appname].setdefault(p, {}).update( sett )
-            if p.startswith('plugin:') :
-                plugincls = plugin_info(p[7:])['cls']
-                plugincls.normalize_settings( appsettings[appname][p] )
+            appsettings[appsec].setdefault(p, {}).update( sett )
+            if is_plugin_section(p) :
+                plugincls = plugin_info( sec2plugin(p) )['cls']
+                plugincls.normalize_settings( appsettings[appsec][p] )
     return appsettings
 
 def default_appsettings():
     """Compose `appsettings` from plugin's default settings."""
     from pluggdapps import ROOTAPP
     # Default settings for applications and plugins.
-    appdefaults, plugindefaults = { ROOTAPP : {} }, {}
+    rootapp = app2sec(ROOTAPP)
+    appdefaults = { rootapp : {} }
+    plugindefaults = {}
     appnames = applications()
     for p, sett in default_settings().items() :
         sett = dict( sett.items() )
         if p in appnames :
-            appdefaults[p] = sett
+            appdefaults[ app2sec(p) ] = sett
         else :
-            plugindefaults['plugin:%s'%p] = sett
+            plugindefaults[ plugin2sec(p) ] = sett
     # Compose `appsettings`
-    appsettings = { ROOTAPP : { 'DEFAULT' : {} } }
-    appsettings[ROOTAPP].update( deepcopy( plugindefaults ))
+    appsettings = { rootapp : { 'DEFAULT' : {} } }
+    appsettings[rootapp].update( deepcopy( plugindefaults ))
     for appname in appnames :
         sett = { 'DEFAULT' : {} }
-        sett['DEFAULT'].update( deepcopy( appdefaults[appname] ))
+        sett['DEFAULT'].update( deepcopy( appdefaults[ app2sec(appname) ] ))
         sett.update( deepcopy( plugindefaults ))
         appsettings[appname] = sett
     return appsettings
@@ -68,12 +71,11 @@ def load_inisettings( inifile ):
     rootsett = { 'DEFAULT' : cp.defaults() }
     for secname in cp.sections() :
         secname = secname.strip()
-        if secname.startswith( 'app:' ) :
-            appname = secname[4:].lower() 
-            inisettings[appname] = loadapp( dict(cp.items( secname )))
+        if is_app_section( secname ) :
+            inisettings[secname] = loadapp( dict(cp.items( secname )))
         else :
             rootsett[secname] = deepload( secname, dict( cp.items( secname )))
-    inisettings[ROOTAPP] = rootsett
+    inisettings[ app2sec(ROOTAPP) ] = rootsett
     return inisettings
          
 
@@ -119,3 +121,22 @@ def getsettings( appname, sec=None, plugin=None, key=None ):
         return appsett.get( sec, {} )
     else :
         return appsett.get( sec, {} ).get( key, None )
+
+
+def app2sec( appname ):
+    return 'app:'+appname
+
+def plugin2sec( pluginname ):
+    return 'plugin:'+pluginname
+
+def sec2app( secname ):
+    return secname[4:]
+
+def sec2plugin( secname ):
+    return secname[7:]
+
+def is_plugin_section( secname ):
+    return secname.startswith('plugin:')
+
+def is_app_section( secname ):
+    return secname.startswith('app:')

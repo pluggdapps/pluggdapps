@@ -36,7 +36,7 @@ _default_settings['cookie_secret']  = {
                 "response."
 }
 
-class RootApplication( Plugin ):
+class RootApp( Plugin ):
     implements( IApplication )
 
     def boot( self, settings ):

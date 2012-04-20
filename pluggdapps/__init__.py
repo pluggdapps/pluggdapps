@@ -15,7 +15,7 @@ import pluggdapps.response
 import pluggdapps.application
 
 __version__ = '0.1dev'
-ROOTAPP = 'root'
+ROOTAPP = 'rootapp'
 
 appsettings = {}
 """Dictionary of plugin configurations. Note that,
