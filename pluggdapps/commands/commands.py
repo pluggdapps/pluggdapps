@@ -5,12 +5,14 @@
 # -*- coding: utf-8 -*-
 
 from   optparse                 import OptionParser
+import logging
 
 from   pluggdapps.plugin        import Plugin, implements, query_plugins, \
                                        pluginname
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.util          as h
 
+log = logging.getLogger(__name__)
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \

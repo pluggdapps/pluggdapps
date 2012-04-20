@@ -213,30 +213,54 @@ def plugin_init():
               len(PluginMeta._pluginmap.keys()),
               len(PluginMeta._interfmap.keys()) )
 
-def plugin_info( nm ):
-    """Return the information dictionary gathered by :class:`PluginMeta` for 
-    a plugin class."""
+def plugin_info( *args ):
+    """Return information dictionary gathered by :class:`PluginMeta` for 
+    a plugin class `nm`, where nm is the first argument in `args`. The second
+    argument is optional, and if provided is the default value to be returned
+    if a plugin by name `nm` is not found."""
+    nm = args[0]
     if isinstance( nm, basestring ) :
-        return PluginMeta._pluginmap.get( nm, {} )
-    elif issubclass(type(nm), PluginBase) :
+        return PluginMeta._pluginmap.get( *args )
+    elif issubclass( type(nm), PluginBase ) :
         nm = pluginname( type(nm) )
-        return PluginMeta._pluginmap.get( nm, {} )
+        return PluginMeta._pluginmap.get( *args )
     else :
         raise Exception( "Could not get plugin information for %r " % nm )
+
+
+def interface_info( *args ):
+    """Return information dictionary gathered by :class:`PluginMeta` for an
+    interface class `interf`, where `interf` is the first argument in `args`.
+    The second argument is optional, and if provided is the default value to
+    be returned if an interface by name `interf` is not found."""
+    interf = args[0]
+    if isinstance( interf, basestring ):
+        return PluginMeta._interfmap.get( *args )
+    else :
+        interf = interf.__name__
+        return PluginMeta._interfmap.get( *args )
 
 
 def pluginnames( interface ):
     """Return a list of plugin names implementing `interface`."""
     return PluginMeta._implementers[interface].keys()
 
+
 def pluginclass( interface, name ):
     """Return the plugin class by ``name`` implementing interface."""
     nm = pluginname( name )
     return PluginMeta._implementers.get( interface, {} ).get( nm, None )
 
+
 def pluginname( o ):
     """Plugin names are nothing but normalized form of plugin's class name,
-    where normalization is done by lower casing plugin's class name."""
+    where normalization is done by lower casing plugin's class name.
+    
+    `o` can be one of the following,
+      * basestring
+      * plugin class
+      * plugin class instance
+    """
     if isinstance(o, basestring) :
         return o.lower()
     elif inspect.isclass(o) :
@@ -245,18 +269,25 @@ def pluginname( o ):
         return o.__class__.__name__.lower()
     return name
 
+
 def default_settings():
     """Return dictionary default settings for every loaded plugin."""
     psetts = dict([ ( info['name'], info['cls'].default_settings() )
                     for info in PluginMeta._pluginmap.values() ])
     return psetts
 
+
 def applications():
     """Return a list of application names (which are actually plugins
     implementing :class:`IApplication` interface."""
     from  pluggdapps import ROOTAPP
     from  pluggdapps.interfaces import IApplication
-    return [ROOTAPP] + PluginMeta._implementers.get( IApplication, {} ).keys()
+    return [ROOTAPP] + PluginMeta._implementers.get(IApplication, {}).keys()
+
+
+def plugins():
+    """Returns a list of plugin names."""
+    return sorted( PluginMeta._pluginmap.keys() )
 
 
 # Plugin base class

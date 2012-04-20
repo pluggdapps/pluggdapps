@@ -4,7 +4,7 @@
 
 # -*- coding: utf-8 -*-
 
-import socket
+import socket, logging
 
 from   pluggdapps.plugin import Interface, Attribute
 
@@ -12,6 +12,8 @@ __all__ = [
     'ICommand', 'IServer', 'IRequest', 'IApplication', 'IRouter',
     'IResponse'
 ]
+
+log = logging.getLogger(__name__)
 
 class ICommand( Interface ):
     """Handle sub-commands issued from command line script. The general

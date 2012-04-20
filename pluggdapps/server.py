@@ -4,13 +4,15 @@
 
 # -*- coding: utf-8 -*-
 
-import time, socket, fcntl
+import time, socket, fcntl, logging
 
 from   pluggdapps            import __version__
 from   pluggdapps.plugin     import Plugin, implements
 from   pluggdapps.interfaces import IServer
 from   pluggdapps.util       import ConfigDict
                     
+log = logging.getLogger( __name__ )
+
 _default_settings = ConfigDict()
 _default_settings.__doc__ = "Pluggdapps native HTTP Server configuration"
 

@@ -61,7 +61,7 @@ _default_settings['logging.file_maxbackups'] = {
 _default_settings['logging.color'] = {
     'default' : True,
     'types'   : (bool,),
-    'help'    : "If logs have to be send to terminal, should you want it "
+    'help'    : "If logs have to be send to terminal should you want it "
                 "colored."
 }
 
@@ -201,4 +201,8 @@ class Platform( Plugin ):
         settings['logging.file_maxbackups'] = \
                 h.asint( settings['logging.file_maxbackups'] )
         settings['logging.color'] = h.asbool( settings['logging.color'] )
+        # Logging level
+        level = settings['logging.level']
+        level = getattr(logging, level.upper()) if level != 'none' else None
+        settings['logging.level'] = level
         return settings

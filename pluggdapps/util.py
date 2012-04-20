@@ -17,8 +17,8 @@ log = logging.getLogger( __name__ )
 
 def parsecsv( line ):
     """Parse a single line of comma separated values, into a list of strings"""
-    vals = line and line.split( ',' ) or []
-    vals = filter( None, [ v.strip(' \t') for v in vals ] )
+    vals = line.split(',') if line else []
+    vals = filter( None, [v.strip(' \t') for v in vals] )
     return vals
 
 

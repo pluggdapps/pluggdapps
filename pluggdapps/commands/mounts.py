@@ -6,11 +6,13 @@
 
 from   optparse   import OptionParser
 from   pprint     import pprint
+import logging
 
 from   pluggdapps.plugin        import Plugin, implements
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.util          as h
 
+log = logging.getLogger( __name__ )
 
 class Mounts( Plugin ):
     implements( ICommand )

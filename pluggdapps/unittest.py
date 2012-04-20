@@ -4,8 +4,12 @@
 
 # -*- coding: utf-8 -*-
 
-from pluggdapps.plugin      import Plugin, implements
-from pluggdapps.interfaces  import IUnitTest
+import logging
+
+from   pluggdapps.plugin      import Plugin, implements
+from   pluggdapps.interfaces  import IUnitTest
+
+log = logging.getLogger( __name__ )
 
 class UnitTestBase( Plugin ):
     implements( IUnitTest )

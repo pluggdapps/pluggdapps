@@ -4,9 +4,13 @@
 
 # -*- coding: utf-8 -*-
 
+import logging
+
 from   pluggdapps.plugin        import Plugin, implements, query_plugin, \
                                        ISettings
 from   pluggdapps.interfaces    import ICommand
+
+log = logging.getLogger( __name__ )
 
 class Serve( Plugin ):
     implements( ICommand )

@@ -95,7 +95,6 @@ def loadapp( options ):
         )
     return appsett
 
-
 def deepload( section, options ):
     """Check for nested configuration file under `use` option in `options`,
     if present parse their default section update this `options`."""
