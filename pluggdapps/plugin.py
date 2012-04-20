@@ -7,8 +7,6 @@
 import sys, inspect, logging
 from   copy import deepcopy
 
-import pluggdapps.util       as h
-
 # TODO :
 #   1. How to check for multiple plugins by name defined for same Interface.
 
@@ -22,6 +20,12 @@ __all__ = [
 ]
 
 log = logging.getLogger(__name__)
+
+def whichmodule( attr ):
+    """Try to fetch the module name in which `attr` is defined."""
+    modname = getattr( attr, '__module__' )
+    return sys.modules.get( modname, None ) if modname else None
+
 
 class PluginMeta( type ):
     """Plugin component manager."""
@@ -48,7 +52,7 @@ class PluginMeta( type ):
         if name in [ 'Interface', 'PluginBase' ] :
             return new_class
 
-        PluginMeta._sanitizecls( cls, name, bases, d )
+        PluginMeta._sanitizecls( name, bases, d )
 
         nm = pluginname(name)
         if Interface in bases :
@@ -61,14 +65,45 @@ class PluginMeta( type ):
                     PluginMeta._plugin( new_class, nm, bases, d )
             # Register deriving plugin for interfaces implemented by its base
             # classes
-            [ pmap.setdefault( nm, '-na-' )
-              for b in map( None, new_class.mro() )
-              for (i,pmap) in PluginMeta._implementers.items() 
-              if pluginname(b) in pmap ]
+            for b in new_class.mro() :
+                for (i,pmap) in PluginMeta._implementers.items() :
+                    if pluginname(b) in pmap :
+                        pmap.setdefault( nm, '-na-' )
+            # Hook masterinit() for __init__ call
+            init = d.get( '__init__', None )
+            if init == None :
+                # Because we're replacing the initializer, we need to make sure
+                # that any inherited initializers are also called.
+                for b in new_class.mro() :
+                    if issubclass(b, PluginBase) and '__init__' in b.__dict__ :
+                        init = b.__init__._original
+                        break
+            def masterinit( self, appname, *args, **kwargs ) :
+                """Component Init function hooked in by ComponentMeta."""
+                from  pluggdapps import appsettings
+                from  pluggdapps.interfaces import IApplication
+
+                self.appname, sett = appname, {}
+                # Initialize :class:`ISettings` attributes
+                self.settings = deepcopy( appsettings[self.appname] )
+                # Plugin settings
+                pluginnm = pluginname(self)
+                if pluginnm in PluginMeta._implementers[IApplication] :
+                    sett.update( self.settings['DEFAULT'] )
+                else :
+                    sett.update( self.settings['plugin:'+pluginnm] )
+                sett.update( kwargs.pop( 'settings', {} ))
+                self._settngx = sett
+                # Call the original plugin's __init__
+                if init :
+                    init( self, *args, **kwargs )
+
+            masterinit._original = init
+            new_class.__init__ = masterinit
         return new_class
 
-    @classmethod
-    def _sanitizecls( _cls, cls, name, bases, d ):
+    @staticmethod
+    def _sanitizecls( name, bases, d ):
         """Perform sanitory checks on :class:`Plugin` derived classes."""
         if Interface in bases :
             if PluginBase in bases :
@@ -77,13 +112,13 @@ class PluginMeta( type ):
             if interf :
                 raise Exception( PluginMeta.err2 % (name, interf['file']) )
 
-    @classmethod
-    def _interf( _cls, new_class, name, bases, d ):
-        """`new_class` is class deriving from Interface baseclass and provides 
+    @staticmethod
+    def _interf( cls, name, bases, d ):
+        """`cls` is class deriving from Interface baseclass and provides 
         specification for interface `name`."""
-        clsmod = h.whichmodule( new_class )
+        clsmod = whichmodule( cls )
         info = {
-            'cls' : new_class,
+            'cls' : cls,
             'name' : name,
             'file' : clsmod.__file__ if clsmod else '',
             'config' : {},      # Configuration dictionary for interface
@@ -92,28 +127,37 @@ class PluginMeta( type ):
         }
 
         """Collect attributes and methods specified by `interface` class."""
-        for k in dir(new_class) :
+        for k in dir(cls) :
             if k.startswith('__') : continue
-            v = getattr(new_class, k)
+            v = getattr(cls, k)
             if isinstance(v, Attribute) :
                 info['attributes'][k] = v
             elif inspect.ismethod(v) :
                 info['methods'][k] = v
         return info
 
-    @classmethod
-    def _plugin( _cls, new_class, nm, bases, d ):
-        """`new_class` is class deriving from Plugin baseclass and implements
+    @staticmethod
+    def _plugin( cls, nm, bases, d ):
+        """`cls` is class deriving from Plugin baseclass and implements
         interface specifications.
         """
-        clsmod = h.whichmodule( new_class )
+        clsmod = whichmodule( cls )
         info = {
-            'cls'    : new_class,
+            'cls'    : cls,
             'name'   : nm,
             'file'   : clsmod.__file__ if clsmod else '',
             'config' : {}       # Configuration dictionary for plugin
         }
         return info
+
+
+class PluginBase( object ):
+    """Base class for plugin classes. All plugin-classes are metaclassed by
+    PluginMeta."""
+    __metaclass__ = PluginMeta
+
+    def __new__( cls, *args, **kwargs ):
+        return super( PluginBase, cls ).__new__( cls )
 
 
 class Interface( object ):
@@ -128,15 +172,6 @@ class Interface( object ):
     def __new__( cls, *args, **kwargs ):
         return super( Interface, cls ).__new__( cls )
         
-
-class PluginBase( object ):
-    """Base class for plugin classes. All plugin-classes are metaclassed by
-    PluginMeta."""
-    __metaclass__ = PluginMeta
-
-    def __new__( cls, *args, **kwargs ):
-        return super( PluginBase, cls ).__new__( cls )
-
 
 class Attribute( object ):
     """Doc specifier for interface attributes."""
@@ -322,28 +357,6 @@ class Plugin( PluginBase ):
 
     def __contains__( self, item ):
         return self._settngx.__contains__( item )
-
-    def __new__( cls, *args, **kwargs ):
-        """If ``settings`` key-word argument is passed, it will be used to
-        override plugin settings."""
-        from  pluggdapps import appsettings
-        from  pluggdapps.interfaces import IApplication
-        self = super( Plugin, cls ).__new__( cls )
-
-        # TODO : how to auto-magically pass appname ??
-        appname, sett = kwargs.pop('__xappname'), {}
-        # Initialize :class:`ISettings` attributes
-        self.appname = appname
-        self.settings = deepcopy( appsettings[appname] )
-        # Plugin settings
-        pluginnm = pluginname(self)
-        if pluginnm in PluginMeta._implementers[IApplication] :
-            sett.update( self.settings['DEFAULT'] )
-        else :
-            sett.update( self.settings['plugin:'+pluginnm] )
-        sett.update( kwargs.pop( 'settings', {} ))
-        self._settngx = sett
-        return self
 
     # :class:`ISettings` interface methods
     @classmethod

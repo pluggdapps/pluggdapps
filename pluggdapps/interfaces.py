@@ -603,3 +603,15 @@ class IRequestHandler( Interface ):
         """Called after the end of a request, after the response has been sent
         to the client."""
 
+
+class IUnitTest( Interface ):
+    """Local interface to performing unit-testing on various modules."""
+
+    def setup( platform ):
+        """Setup fixtures before executing the test cases."""
+
+    def test():
+        """Start executing test bases."""
+
+    def teardown():
+        """Teardown fixtures after executing test cases."""

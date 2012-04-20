@@ -5,10 +5,14 @@
 # -*- coding: utf-8 -*-
 
 from   optparse              import OptionParser
+import logging
 
-from   pluggdapps.plugin     import Plugin, implements
-from   pluggdapps.interfaces import ICommand
+from   pluggdapps.plugin     import Plugin, implements, query_plugins, \
+                                    pluginname
+from   pluggdapps.interfaces import ICommand, IUnitTest
+from   pluggdapps.unittest   import UnitTestBase
 
+log = logging.getLogger(__name__)
 
 class UnitTest( Plugin ):
     implements( ICommand )
@@ -27,7 +31,12 @@ class UnitTest( Plugin ):
         return self.options, self.args
 
     def run( self, options=None, args=[] ):
-        pass
+        from pluggdapps import ROOTAPP
+        for case in query_plugins( ROOTAPP, IUnitTest ) :
+            log.info( "---- %s ----", pluginname(case) )
+            case.setup( self.platform )
+            case.test()
+            case.teardown()
 
     def _parse( self, usage ):
         return self._options( OptionParser( usage=usage ))

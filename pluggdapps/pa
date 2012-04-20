@@ -67,7 +67,7 @@ def doscript( paargs, cmd ):
         appsettings[ROOTAPP]['environment'] = options.environment
 
     if cmd :
-        level = 'info' if cmd != 'serve' else None
+        level = 'info' if cmd not in ['serve', 'unittest'] else None
         # -c (config file)
         Platform.boot( options.config, loglevel=level )
         platform = query_plugin( ROOTAPP, ISettings, 'platform' )

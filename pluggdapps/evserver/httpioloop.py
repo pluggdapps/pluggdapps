@@ -50,15 +50,18 @@ class Waker( object ):
         return self.reader.fileno()
 
     def wake(self):
-        try           : self.writer.write(b("x"))
+        try           : self.writer.write("x")
         except IOError: pass
 
     def consume(self):
         try :
-            while self.reader.read() :
-                pass
+            ss, s = b'', self.reader.read()
+            while s :
+                ss += s 
+                s = self.reader.read()
         except IOError:
             pass
+        return ss
 
     def close(self):
         self.reader.close()
@@ -110,7 +113,7 @@ class HTTPIOLoop( Plugin ):
 
     def __init__( self, impl=None ):
         self._impl = impl or _poll()
-        if hasattr(self._impl, 'fileno'):
+        if hasattr( self._impl, 'fileno' ):
             h.set_close_exec( self._impl.fileno() )
 
         # Book keeping
@@ -493,3 +496,23 @@ class PeriodicCallback( object ):
 
 # Python 2.6+ on Linux
 _poll = select.epoll
+
+
+# Unit test cases
+
+from  pluggdapps.unittest import UnitTestBase
+
+class HTTPIOLoopUnitTest( UnitTestBase ):
+
+    def test( self ):
+        #ioloop = HTTPIOLoop()
+        #_waker = Wake()
+        #print _waker.fileno()
+        #assert _waker
+        #assert bool( _waker.fileno() )
+        #def consume( fd, events ):
+        #    print fd, events
+        #    print _waker.consume()
+        #ioloop.add_handler( self._waker.fileno(), consume, self.READ )
+        #assert _waker.wake()
+        pass

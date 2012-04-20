@@ -11,13 +11,9 @@ from   __future__ import absolute_import, division, with_statement
 import os, sys, re, fcntl, urllib, logging
 from   urlparse import parse_qs  # Python 2.6+
 
+from   pluggdapps.plugin import whichmodule
+
 log = logging.getLogger( __name__ )
-
-def whichmodule( attr ):
-    """Try to fetch the module name in which `attr` is defined."""
-    modname = getattr( attr, '__module__' )
-    return sys.modules.get( modname, None ) if modname else None
-
 
 def parsecsv( line ):
     """Parse a single line of comma separated values, into a list of strings"""
@@ -566,3 +562,23 @@ def json_encode( value ):
 def json_decode(value):
     """Returns Python objects for the given JSON string."""
     return json.loads( to_basestring(value) )
+
+
+# Unit-test
+
+from pluggdapps.unittest import UnitTestBase
+
+class UnitTest_Util( UnitTestBase ):
+
+    def test( self ):
+        self.test_whichmodule()
+        self.test_parsecsv()
+
+    def test_whichmodule( self ):
+        log.info("Testing whichmodule() ...")
+        assert whichmodule(UnitTest_Util).__name__ == 'pluggdapps.util'
+        assert whichmodule(self).__name__ == 'pluggdapps.util'
+        assert whichmodule(whichmodule).__name__ == 'pluggdapps.plugin'
+
+    def test_parsecsv( self ):
+        log.info("Testing parsecsv() ...")

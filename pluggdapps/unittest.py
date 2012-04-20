@@ -1,0 +1,21 @@
+# This file is subject to the terms and conditions defined in
+# file 'LICENSE', which is part of this source code package.
+#       Copyright (c) 2011 SKR Farms (P) LTD.
+
+# -*- coding: utf-8 -*-
+
+from pluggdapps.plugin      import Plugin, implements
+from pluggdapps.interfaces  import IUnitTest
+
+class UnitTestBase( Plugin ):
+    implements( IUnitTest )
+
+    def setup( self, platform ):
+        self.platform = platform
+
+    def test( self ):
+        pass
+
+    def teardown( self ):
+        pass
+

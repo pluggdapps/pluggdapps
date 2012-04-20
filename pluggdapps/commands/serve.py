@@ -24,3 +24,4 @@ class Serve( Plugin ):
         from pluggdapps import ROOTAPP
         platform = query_plugin( ROOTAPP, ISettings, 'platform' )
         platform.serve()
+        platform.shutdown()

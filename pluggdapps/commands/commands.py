@@ -47,7 +47,7 @@ class Commands( Plugin ):
         from pluggdapps import ROOTAPP
         options = options or self.options
         args = args or self.args
-        commands = query_plugins( ROOTAPP, ICommand )
+        commands = query_plugins( ROOTAPP, ICommand, self.platform )
         commands = sorted( commands, key=lambda x : pluginname(x) )
         for command in commands :
             rows = self._formatdescr(pluginname(command), command.description)

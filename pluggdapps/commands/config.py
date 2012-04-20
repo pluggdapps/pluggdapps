@@ -4,7 +4,8 @@
 
 # -*- coding: utf-8 -*-
 
-from   optparse                 import OptionParser
+from   optparse   import OptionParser
+from   pprint     import pprint
 
 from   pluggdapps.plugin        import Plugin, implements
 from   pluggdapps.interfaces    import ICommand
@@ -18,9 +19,8 @@ class Config( Plugin ):
     usage = "usage: pa [options] commands"
 
     def __init__( self, platform, argv=[] ):
-        print self, platform, argv
         self.platform = platform
-        parser = self._parse( Commands.usage )
+        parser = self._parse( Config.usage )
         self.options, self.args = parser.parse_args( argv )
 
     def argparse( self, argv ):
@@ -31,7 +31,6 @@ class Config( Plugin ):
     def run( self, options=None, args=[] ):
         from pluggdapps.config import default_settings, load_inisettings
         from pluggdapps import ROOTAPP, appsettings
-        from pprint     import pprint
         options = options or self.options
         args = args or self.args
 
@@ -41,13 +40,14 @@ class Config( Plugin ):
         elif options.inisett :
             appsettings = load_inisettings( platform.inifile )
 
-        if appname in appsett :
+        if appname in appsettings :
             appsett = appsettings[appname]
         else :
             raise Exception("Application settings for %r not found" % appname)
 
-        if options.plugin in appsett :
-            pprint( appsett[options.plugin] )
+        plugin = options.plugin and ('plugin:' + options.plugin)
+        if plugin in appsett :
+            pprint( appsett[plugin] )
         else :
             pprint( appsett )
 

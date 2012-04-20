@@ -114,9 +114,7 @@ class Platform( Plugin ):
         from pluggdapps import ROOTAPP
         from pluggdapps.interfaces import IServer
 
-        print map( None, self )
-
-        servername = getsettings(ROOTAPP, plugin='platform', key='servername')
+        servername = self['servername']
         self.server = query_plugin( ROOTAPP, IServer, servername, self )
         self.server.start()  # Blocks !
 
@@ -130,6 +128,7 @@ class Platform( Plugin ):
 
     def appfor( self, startline, headers, body ):
         """Resolve applications for `request`."""
+        method, uri, version = h.parse_startline( startline )
         host = headers.get("Host") or "127.0.0.1"
         _, _, path, _, _ = urlparse.urlsplit( h.native_str(uri) )
 
@@ -139,14 +138,18 @@ class Platform( Plugin ):
         try    : subdomain, site, tld = host.rsplit('.', 3)
         except : subdomain = None
 
-        for subdom, appnames in cls.map_subdomains.items() :
-            if subdom == subdomain : break
+        if subdomain :
+            for subdom, appnames in cls.map_subdomains.items() :
+                if subdom == subdomain : break
         else :
             for script, appnames in cls.map_scripts.items() :
-                if path.startswith( script ) : break
+                if script != '/' and path.startswith( script ) : break
             else :
                 appnames = [ cls.map_scripts['/'] ]
         return appnames[0]
+
+    on_subdomains = property( lambda s : s.map_subdomains )
+    on_scripts = property( lambda s : s.map_scripts )  
 
     @classmethod
     def setuplog( cls, level=None, procid=None ):
@@ -180,9 +183,9 @@ class Platform( Plugin ):
             script = sett.get('DEFAULT', {}).get('mount_script', None)
             if script :
                 scripts.setdefault( script, [] ).append( appname )
-        log.debug( "%s applications mountable on subdomains", len(subdomains) )
-        log.debug( "%s applications mountable on script-path", len(scripts) )
         scripts.setdefault( '/', [] ).append( 'rootapp' )
+        log.debug( "%s applications mounted on subdomains", len(subdomains) )
+        log.debug( "%s applications mounted on script-path", len(scripts) )
         return subdomains, scripts
 
     # ISettings interface methods

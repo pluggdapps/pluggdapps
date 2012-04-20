@@ -1,0 +1,8 @@
+* Subscribe to signal handlers to instantiate a platform shutdown. Other than
+  signal handlers figure out ways to do platform shutdown when the platform
+  is hosted via external servers like Apache.
+
+* man sub-command for pa-script to show help text for interfaces and plugins.
+
+* config sub-command for pa-script should include options to display settings
+  help.
