@@ -8,6 +8,7 @@
 import pkg_resources         as pkg
 import logging, urlparse
 
+from   pluggdapps.config     import ConfigDict, settingsfor
 from   pluggdapps.plugin     import Plugin, query_plugin, query_plugins, \
                                     pluginname, plugin_init
 from   pluggdapps.config     import loadsettings, getsettings
@@ -17,7 +18,7 @@ import pluggdapps.util       as h
 
 log = logging.getLogger(__name__)
 
-_default_settings = h.ConfigDict()
+_default_settings = ConfigDict()
 _default_settings.__doc__ = (
     "Platform configuration settings are equivalent to global configuration "
     "settings. Nevertheless these configurations are to be modified only "
@@ -155,7 +156,7 @@ class Platform( Plugin ):
     def setuplog( cls, level=None, procid=None ):
         """Setup logging."""
         from pluggdapps import ROOTAPP
-        logsett = h.settingsfor( 'logging.', getsettings(ROOTAPP, plugin='platform' ))
+        logsett = settingsfor( 'logging.', getsettings(ROOTAPP, plugin='platform' ))
         logsett['level'] = level or logsett['level']
         logsett['filename'] = logm.logfileusing( procid, logsett['filename'] )
         logm.setup( logsett )

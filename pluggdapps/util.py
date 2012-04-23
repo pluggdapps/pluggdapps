@@ -8,12 +8,15 @@
 #   * Improve function asbool() implementation.
 
 from   __future__ import absolute_import, division, with_statement
-import os, sys, re, fcntl, urllib, logging
+import os, sys, re, fcntl, urllib, logging, calendar, email
+import datetime as dt
 from   urlparse import parse_qs  # Python 2.6+
 
 from   pluggdapps.plugin import whichmodule
 
 log = logging.getLogger( __name__ )
+
+#---- Generic helper functions.
 
 def parsecsv( line ):
     """Parse a single line of comma separated values, into a list of strings"""
@@ -35,67 +38,6 @@ def subclassof( cls, supers ):
         if issubclass( cls, sup ) : return sup
     return None
 
-
-class ConfigDict( dict ):
-    """A collection of configuration settings. When a fresh key, a.k.a 
-    configuration parameter is added to this dictionary, it can be provided
-    as `ConfigItem` object or as a dictionary containing key,value pairs
-    supported by ConfigItem.
-
-    Used as return type for default_settings() method specified in 
-    :class:`ISettings`
-    """
-    def __init__( self, *args, **kwargs ):
-        self._spec = {}
-        dict.__init__( self, *args, **kwargs )
-
-    def __setitem__( self, name, value ):
-        if not isinstance( value, (ConfigItem, dict) ) :
-            raise Exception( "Type received %r not `ConfigItem` or `dict`'" )
-
-        value = value if isinstance(value, ConfigItem) else ConfigItem(value)
-        self._spec[name] = value
-        val = value['default']
-        return dict.__setitem__( self, name, val )
-
-    def specifications( self ):
-        return self._spec
-
-
-class ConfigItem( dict ):
-    """Convenience class to encapsulate config parameter description, which
-    is a dictionary of following keys,
-
-    ``default``,
-        Default value for this settings a.k.a configuration parameter.
-        Compulsory field.
-    ``format``,
-        Comma separated value of valid format. Allowed formats are,
-            str, unicode, basestring, int, bool, csv.
-        Compulsory field.
-    ``help``,
-        Help string describing the purpose and scope of settings parameter.
-    ``webconfig``,
-        Boolean, specifying whether the settings parameter is configurable via
-        web. Default is True.
-    ``options``,
-        List of optional values that can be used for configuring this 
-        parameter.
-    """
-    fmt2str = {
-        str     : 'str', unicode : 'unicode',  bool : 'bool', int   : 'int',
-        'csv'   : 'csv'
-    }
-    def _options( self ):
-        opts = self.get( 'options', '' )
-        return opts() if callable(opts) else opts
-
-    # Compulsory fields
-    default = property( lambda s : s['default'] )
-    formats = property( lambda s : parsecsvlines( s['formats'] ) )
-    help = property( lambda s : s.get('help', '') )
-    webconfig = property( lambda s : s.get('webconfig', True) )
-    options = property( _options )
 
 def asbool( val, default=None ):
     """Convert a string representation of boolean value to boolean type."""
@@ -120,12 +62,6 @@ def asfloat( val, default=None ):
     except : v = default
     return v
 
-def settingsfor( prefix, sett ):
-    """Parse `settings` keys starting with `prefix` and return a dictionary of
-    corresponding options."""
-    l = len(prefix)
-    return dict([ (k[l:], sett[k]) for k in sett if k.startswith(prefix) ])
-
 def timedelta_to_seconds( td ) :
     """Equivalent to td.total_seconds() (introduced in python 2.7)."""
     return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
@@ -140,6 +76,26 @@ def set_nonblocking( *fds ):
         flags = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
+def call_entrypoint( distribution, group, name, *args, **kwargs ):
+    """If an entrypoint is callable, use this api to both identify the entry
+    point, evaluate them by loading and calling it. 
+    
+    Return the result from the called function. Note that the entrypoint must be
+    uniquely identified using
+        ``dist``, ``group`` and ``name``.
+    """
+    devmod = kwargs.pop( 'devmod', False )
+    try :
+        ep = distribution.get_entry_info( group, name )
+        return ep.load()( *args, **kwargs ) if ep else None
+    except :
+        if devmod : raise
+    return None
+
+def docstr( obj ):
+    """Return the doc-string for the object."""
+    return getattr( obj, '__doc__', '' ) or ''
+
 class ObjectDict(dict):
     """Makes a dictionary behave like an object."""
     def __getattr__(self, name):
@@ -151,7 +107,92 @@ class ObjectDict(dict):
     def __setattr__(self, name, value):
         self[name] = value
 
+
+"""String manipulation functions. To transform strings between bytes, str
+and unicode."""
+
+_UTF8_TYPES = (bytes, type(None))
+def utf8( value ):
+    """Converts a string argument to a byte string.
+
+    If the argument is already a byte string or None, it is returned unchanged.
+    Otherwise it must be a unicode string and is encoded as utf8.
+    """
+    if isinstance(value, _UTF8_TYPES):
+        return value
+    assert isinstance(value, unicode)
+    return value.encode("utf-8")
+
+_TO_UNICODE_TYPES = (unicode, type(None))
+def to_unicode( value ):
+    """Converts a string argument to a unicode string.
+
+    If the argument is already a unicode string or None, it is returned
+    unchanged.  Otherwise it must be a byte string and is decoded as utf8.
+    """
+    if isinstance( value, _TO_UNICODE_TYPES ):
+        return value
+    assert isinstance( value, bytes )
+    return value.decode("utf-8")
+
+_BASESTRING_TYPES = (basestring, type(None))
+def to_basestring(value):
+    """Converts a string argument to a subclass of basestring.
+
+    In python2, byte and unicode strings are mostly interchangeable,
+    so functions that deal with a user-supplied argument in combination
+    with ascii string constants can use either and should return the type
+    the user supplied.  In python3, the two types are not interchangeable,
+    so this method is needed to convert byte strings to unicode.
+    """
+    if isinstance(value, _BASESTRING_TYPES):
+        return value
+    assert isinstance(value, bytes)
+    return value.decode("utf-8")
+
+def recursive_unicode( obj ):
+    """Walks a simple data structure, converting byte strings to unicode.
+    Supports lists, tuples, and dictionaries.
+    """
+    if isinstance(obj, dict):
+        return dict( (recursive_unicode(k), recursive_unicode(v))
+                     for (k, v) in obj.iteritems() )
+    elif isinstance(obj, list):
+        return list( recursive_unicode(i) for i in obj )
+    elif isinstance(obj, tuple):
+        return tuple( recursive_unicode(i) for i in obj )
+    elif isinstance( obj, bytes ):
+        return to_unicode(obj)
+    else:
+        return obj
+
+# When dealing with the standard library across python 2 and 3 it is
+# sometimes useful to have a direct conversion to the native string type
+native_str = to_unicode if str is unicode else utf8
+
+
+"""Convert objects from JSON format to python. And vice-versa."""
+import json
+def json_encode( value ):
+    """JSON-encodes the given Python object."""
+    # JSON permits but does not require forward slashes to be escaped.
+    # This is useful when json data is emitted in a <script> tag
+    # in HTML, as it prevents </script> tags from prematurely terminating
+    # the javscript.  Some json libraries do this escaping by default,
+    # although python's standard library does not, so we do it here.
+    # http://stackoverflow.com/questions/1580647/json-why-are-forward-slashes-escaped
+    return json.dumps( recursive_unicode(value) ).replace( "</", "<\\/" )
+
+def json_decode(value):
+    """Returns Python objects for the given JSON string."""
+    return json.loads( to_basestring(value) )
+
+
+"""HTTP utility functions."""
+
 def parse_startline( startline ):
+    """Every HTTP request starts with a start line specifying method, uri and
+    version. Parse them and return a tuple of (method, uri, version)."""
     try :
         method, uri, version = startline.split(" ")
     except :
@@ -159,6 +200,32 @@ def parse_startline( startline ):
     if not version.startswith("HTTP/") :
         method = version = None
     return method, uri, version
+
+def convert_header_value( value ):
+    """Transform `value` to marshal them as HTTP header value.
+
+    If a datetime is given, we automatically format it according to the
+    HTTP specification. If the value is not a string, we convert it to
+    a string. All header values are then encoded as UTF-8."""
+    if isinstance( value, bytes ):
+        pass
+    elif isinstance( value, unicode ):
+        value = value.encode('utf-8')
+    elif isinstance( value, (int, long) ):
+        # return immediately since we know the converted value will be safe
+        return str(value)
+    elif isinstance( value, dt.datetime ):
+        t = calendar.timegm( value.utctimetuple() )
+        return email.utils.formatdate( t, localtime=False, usegmt=True )
+    else:
+        raise TypeError( "Unsupported header value %r" % value )
+    # If \n is allowed into the header, it is possible to inject
+    # additional headers or split the request. Also cap length to
+    # prevent obviously erroneous values.
+    if len(value) > 4000 or re.match( b"[\x00-\x1f]", value ):
+        raise ValueError( "Unsafe header value %r", value )
+    return value
+
 
 class HTTPFile( ObjectDict ):
     """Represents an HTTP file, whose instance variables are also accessible
@@ -326,86 +393,6 @@ class HTTPHeaders( dict ):
             return normalized
 
 
-def call_entrypoint( distribution, group, name, *args, **kwargs ):
-    """If an entrypoint is callable, use this api to both identify the entry
-    point, evaluate them by loading and calling it. 
-    
-    Return the result from the called function. Note that the entrypoint must be
-    uniquely identified using
-        ``dist``, ``group`` and ``name``.
-    """
-    devmod = kwargs.pop( 'devmod', False )
-    try :
-        ep = distribution.get_entry_info( group, name )
-        return ep.load()( *args, **kwargs ) if ep else None
-    except :
-        if devmod : raise
-    return None
-
-def docstr( obj ):
-    """Return the doc-string for the object."""
-    return getattr( obj, '__doc__', '' ) or ''
-
-
-_UTF8_TYPES = (bytes, type(None))
-def utf8( value ):
-    """Converts a string argument to a byte string.
-
-    If the argument is already a byte string or None, it is returned unchanged.
-    Otherwise it must be a unicode string and is encoded as utf8.
-    """
-    if isinstance(value, _UTF8_TYPES):
-        return value
-    assert isinstance(value, unicode)
-    return value.encode("utf-8")
-
-_TO_UNICODE_TYPES = (unicode, type(None))
-def to_unicode( value ):
-    """Converts a string argument to a unicode string.
-
-    If the argument is already a unicode string or None, it is returned
-    unchanged.  Otherwise it must be a byte string and is decoded as utf8.
-    """
-    if isinstance( value, _TO_UNICODE_TYPES ):
-        return value
-    assert isinstance( value, bytes )
-    return value.decode("utf-8")
-
-_BASESTRING_TYPES = (basestring, type(None))
-def to_basestring(value):
-    """Converts a string argument to a subclass of basestring.
-
-    In python2, byte and unicode strings are mostly interchangeable,
-    so functions that deal with a user-supplied argument in combination
-    with ascii string constants can use either and should return the type
-    the user supplied.  In python3, the two types are not interchangeable,
-    so this method is needed to convert byte strings to unicode.
-    """
-    if isinstance(value, _BASESTRING_TYPES):
-        return value
-    assert isinstance(value, bytes)
-    return value.decode("utf-8")
-
-def recursive_unicode( obj ):
-    """Walks a simple data structure, converting byte strings to unicode.
-    Supports lists, tuples, and dictionaries.
-    """
-    if isinstance(obj, dict):
-        return dict( (recursive_unicode(k), recursive_unicode(v))
-                     for (k, v) in obj.iteritems() )
-    elif isinstance(obj, list):
-        return list( recursive_unicode(i) for i in obj )
-    elif isinstance(obj, tuple):
-        return tuple( recursive_unicode(i) for i in obj )
-    elif isinstance( obj, bytes ):
-        return to_unicode(obj)
-    else:
-        return obj
-
-# When dealing with the standard library across python 2 and 3 it is
-# sometimes useful to have a direct conversion to the native string type
-native_str = to_unicode if str is unicode else utf8
-
 # python 3 changed things around enough that we need two separate
 # implementations of url_unescape.  We also need our own implementation
 # of parse_qs since python 3's version insists on decoding everything.
@@ -547,25 +534,7 @@ def _parse_header(line):
     return key, pdict
 
 
-"""Convert objects from JSON format to python. And vice-versa."""
-import json
-def json_encode( value ):
-    """JSON-encodes the given Python object."""
-    # JSON permits but does not require forward slashes to be escaped.
-    # This is useful when json data is emitted in a <script> tag
-    # in HTML, as it prevents </script> tags from prematurely terminating
-    # the javscript.  Some json libraries do this escaping by default,
-    # although python's standard library does not, so we do it here.
-    # http://stackoverflow.com/questions/1580647/json-why-are-forward-slashes-escaped
-    return json.dumps( recursive_unicode(value) ).replace( "</", "<\\/" )
-
-def json_decode(value):
-    """Returns Python objects for the given JSON string."""
-    return json.loads( to_basestring(value) )
-
-
 # Unit-test
-
 from pluggdapps.unittest import UnitTestBase
 
 class UnitTest_Util( UnitTestBase ):
@@ -582,3 +551,4 @@ class UnitTest_Util( UnitTestBase ):
 
     def test_parsecsv( self ):
         log.info("Testing parsecsv() ...")
+

@@ -140,3 +140,73 @@ def is_plugin_section( secname ):
 
 def is_app_section( secname ):
     return secname.startswith('app:')
+
+
+class ConfigDict( dict ):
+    """A collection of configuration settings. When a fresh key, a.k.a 
+    configuration parameter is added to this dictionary, it can be provided
+    as `ConfigItem` object or as a dictionary containing key,value pairs
+    supported by ConfigItem.
+
+    Used as return type for default_settings() method specified in 
+    :class:`ISettings`
+    """
+    def __init__( self, *args, **kwargs ):
+        self._spec = {}
+        dict.__init__( self, *args, **kwargs )
+
+    def __setitem__( self, name, value ):
+        if not isinstance( value, (ConfigItem, dict) ) :
+            raise Exception( "Type received %r not `ConfigItem` or `dict`'" )
+
+        value = value if isinstance(value, ConfigItem) else ConfigItem(value)
+        self._spec[name] = value
+        val = value['default']
+        return dict.__setitem__( self, name, val )
+
+    def specifications( self ):
+        return self._spec
+
+
+class ConfigItem( dict ):
+    """Convenience class to encapsulate config parameter description, which
+    is a dictionary of following keys,
+
+    ``default``,
+        Default value for this settings a.k.a configuration parameter.
+        Compulsory field.
+    ``format``,
+        Comma separated value of valid format. Allowed formats are,
+            str, unicode, basestring, int, bool, csv.
+        Compulsory field.
+    ``help``,
+        Help string describing the purpose and scope of settings parameter.
+    ``webconfig``,
+        Boolean, specifying whether the settings parameter is configurable via
+        web. Default is True.
+    ``options``,
+        List of optional values that can be used for configuring this 
+        parameter.
+    """
+    fmt2str = {
+        str     : 'str', unicode : 'unicode',  bool : 'bool', int   : 'int',
+        'csv'   : 'csv'
+    }
+    def _options( self ):
+        opts = self.get( 'options', '' )
+        return opts() if callable(opts) else opts
+
+    # Compulsory fields
+    default = property( lambda s : s['default'] )
+    formats = property( lambda s : parsecsvlines( s['formats'] ) )
+    help = property( lambda s : s.get('help', '') )
+    webconfig = property( lambda s : s.get('webconfig', True) )
+    options = property( _options )
+
+
+def settingsfor( prefix, sett ):
+    """Parse `settings` keys starting with `prefix` and return a dictionary of
+    corresponding options."""
+    l = len(prefix)
+    return dict([ (k[l:], sett[k]) for k in sett if k.startswith(prefix) ])
+

@@ -8,6 +8,7 @@ import logging
 import httplib, calendar, email, time, base64, hmac, hashlib, itertools
 import datetime as dt
 
+from   pluggdapps.config     import ConfigDict
 from   pluggdapps.plugin     import Plugin, implements, query_plugin
 from   pluggdapps.interfaces import IResponse, IResponseTransformer
 import pluggdapps.util       as h
@@ -22,10 +23,12 @@ import pluggdapps.util       as h
 # TODO :
 #   1. user locale (server side).
 #   2. Browser locale.
+#   3. clear_cookie() method doesn't seem to use expires field to remove the
+#      cookie from browser. Should we try that implementation instead ?
 
 log = logging.getLogger(__name__)
 
-_default_settings = h.ConfigDict()
+_default_settings = ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPResponse implementing IResponse interface."
 
@@ -43,6 +46,10 @@ class HTTPResponse( Plugin ):
         # Attributes from request
         self.app = request.app
         # Book keeping
+        self._headers = {}
+        self._list_headers = []
+        self._write_buffer = []
+        self._status_code = 200
         self._headers_written = False
         self._finished = False
         self._auto_finish = True
@@ -60,9 +67,14 @@ class HTTPResponse( Plugin ):
         # and its case-normalization is not generally necessary for
         # headers we generate on the server side, so use a plain dict
         # and list instead.
-        self._initialize_headers()
+        self._list_headers = []
         self._write_buffer = []
         self._status_code = 200
+        self._headers = {
+            "Server": "PluggdappsServer/%s" % __version__,
+            "Content-Type": "text/html; charset=UTF-8",
+        }
+        self._keep_alive( request )
 
     def set_status( self, status_code ):
         """Sets the status code for our response."""
@@ -80,7 +92,7 @@ class HTTPResponse( Plugin ):
         HTTP specification. If the value is not a string, we convert it to
         a string. All header values are then encoded as UTF-8.
         """
-        self._headers[name] = self._convert_header_value(value)
+        self._headers[name] = h.convert_header_value( value )
 
     def add_header( self, name, value ):
         """Adds the given response header and value.
@@ -88,56 +100,25 @@ class HTTPResponse( Plugin ):
         Unlike `set_header`, `add_header` may be called multiple times
         to return multiple values for the same header.
         """
-        self._list_headers.append((name, self._convert_header_value(value)))
+        self._list_headers.append((name, h.convert_header_value(value)))
 
-    def set_cookie( self, name, value, domain=None, expires=None, path="/",
-                    expires_days=None, **kwargs ):
-        """Sets the given cookie name/value with the given options.
+    def set_cookie( self, name, value, **kwargs ):
+        """Sets the given cookie name/value with the given options. Key-word
+        arguments typically contains,
+          domain, expires_days, expires, path
+        Additional keyword arguments are set on the Cookie.Morsel directly.
 
-        Additional keyword arguments are set on the Cookie.Morsel
-        directly.
+        By calling this method cookies attribute will be updated inplace.
+
         See http://docs.python.org/library/cookie.html#morsel-objects
         for available attributes.
         """
-        # The cookie library only accepts type str, in both python 2 and 3
-        name = h.native_str(name)
-        value = h.native_str(value)
-        if re.search( r"[\x00-\x20]", name + value ):
-            # Don't let us accidentally inject bad stuff
-            raise ValueError("Invalid cookie %r: %r" % (name, value))
-        if name in self.cookies :
-            del self.cookies[name]
-        self.cookies[name] = value
-        morsel = self.cookies[name]
-        if domain :
-            morsel["domain"] = domain
-        if expires_days is not None and not expires:
-            expires = dt.datetime.utcnow() + dt.timedelta( days=expires_days )
-        if expires:
-            timestamp = calendar.timegm( expires.utctimetuple() )
-            morsel["expires"] = email.utils.formatdate(
-                timestamp, localtime=False, usegmt=True )
-        if path:
-            morsel["path"] = path
-        for k, v in kwargs.iteritems() :
-            if k == 'max_age' :
-                k = 'max-age'
-            morsel[k] = v
+        return self.docookie.set_cookie( self.cookies, name, value, **kwargs )
 
-    def clear_cookie( self, name, path="/", domain=None ):
-        """Deletes the cookie with the given name."""
-        expires = dt.datetime.utcnow() - dt.timedelta(days=365)
-        self.set_cookie( name, value="", path=path, expires=expires,
-                         domain=domain )
-
-    def clear_all_cookies(self):
-        """Deletes all the cookies the user sent with this request."""
-        [ self.clear_cookie(name) for name in self.cookies.iterkeys() ]
-
-    def set_secure_cookie(self, name, value, expires_days=30, **kwargs):
+    def set_secure_cookie( self, name, value, expires_days=30, **kwargs ):
         """Signs and timestamps a cookie so it cannot be forged.
 
-        You must specify the ``cookie_secret`` setting in your Application
+        You must specify the ``secret`` setting in your Application
         to use this method. It should be a long, random sequence of bytes
         to be used as the HMAC secret for the signature.
 
@@ -147,17 +128,21 @@ class HTTPResponse( Plugin ):
         cookie in the browser, but is independent of the ``max_age_days``
         parameter to `get_secure_cookie`.
         """
-        self.set_cookie( name, self.create_signed_value(name, value),
-                         expires_days=expires_days, **kwargs )
+        return self.docookie.set_cookie( 
+                    self.cookies, name, self.create_signed_value(name, value),
+                    expires_days=expires_days, **kwargs )
 
-    def create_signed_value( self, name, value ):
-        """Signs and timestamps a string so it cannot be forged.
+    def clear_cookie( self, name, path="/", domain=None ):
+        """Deletes the cookie with the given name."""
+        expires = dt.datetime.utcnow() - dt.timedelta(days=365)
+        self.docookie.set_cookie( 
+            self.cookies, name, "", path=path, expires=expires, domain=domain )
 
-        Normally used via set_secure_cookie, but provided as a separate
-        method for non-cookie uses.  To decode a value not stored
-        as a cookie use the optional value argument to get_secure_cookie.
-        """
-        return self._create_signed_value(self.app['cookie_secret'], name, value)
+    def clear_all_cookies(self):
+        """Deletes all the cookies the user sent with this request."""
+        [ self.clear_cookie(name) for name in self.cookies.iterkeys() ]
+
+    # TODO : Continue from here ...
 
     def write( self, chunk ):
         """Writes the given chunk to the output buffer.
@@ -349,43 +334,12 @@ class HTTPResponse( Plugin ):
         self.set_header( "Location", urlparse.urljoin( h.utf8(self.request.uri), url) )
         self.finish()
 
-    def _initialize_headers( self ):
-        self._headers = {
-            "Server": "PluggdappsServer/%s" % __version__,
-            "Content-Type": "text/html; charset=UTF-8",
-        }
-        self._list_headers = []
-        self.set_default_headers()
-        if not self.request.supports_http_1_1():
-            if self.request.headers.get("Connection") == "Keep-Alive":
-                self.set_header("Connection", "Keep-Alive")
-
-    def _convert_header_value( self, value ):
-        if isinstance( value, bytes ):
-            pass
-        elif isinstance( value, unicode ):
-            value = value.encode('utf-8')
-        elif isinstance( value, (int, long) ):
-            # return immediately since we know the converted value will be safe
-            return str(value)
-        elif isinstance( value, dt.datetime ):
-            t = calendar.timegm( value.utctimetuple() )
-            return email.utils.formatdate( t, localtime=False, usegmt=True )
-        else:
-            raise TypeError( "Unsupported header value %r" % value )
-        # If \n is allowed into the header, it is possible to inject
-        # additional headers or split the request. Also cap length to
-        # prevent obviously erroneous values.
-        if len(value) > 4000 or re.match( b"[\x00-\x1f]", value ):
-            raise ValueError( "Unsafe header value %r", value )
-        return value
-
-    def _create_signed_value( self, secret, name, value ):
-        timestamp = h.utf8( str(int(time.time())) )
-        value = base64.b64encode( h.utf8(value) )
-        signature = self._create_signature( secret, name, value, timestamp )
-        value = b"|".join([ value, timestamp, signature ])
-        return value
+    def _keep_alive( self, request ):
+        """For HTTP/1.1 connection can be kept alive across multiple request
+        and response."""
+        if not request.supports_http_1_1() :
+            if request.headers.get( "Connection", None ) == "Keep-Alive" :
+                self.set_header( "Connection", "Keep-Alive" )
 
     def _create_signature( self, secret, *parts ):
         hash_ = hmac.new( h.utf8(secret), digestmod=hashlib.sha1 )

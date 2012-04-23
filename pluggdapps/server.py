@@ -9,7 +9,7 @@ import time, socket, fcntl, logging
 from   pluggdapps            import __version__
 from   pluggdapps.plugin     import Plugin, implements
 from   pluggdapps.interfaces import IServer
-from   pluggdapps.util       import ConfigDict
+from   pluggdapps.config     import ConfigDict
                     
 log = logging.getLogger( __name__ )
 

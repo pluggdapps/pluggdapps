@@ -12,6 +12,7 @@ from __future__ import absolute_import, division, with_statement
 import logging, socket
 import ssl  # Python 2.6+
 
+from   pluggdapps.config              import ConfigDict
 from   pluggdapps.plugin              import Plugin, implements, pluginname, \
                                              query_plugin
 from   pluggdapps.interfaces          import IServer, IRequest
@@ -21,7 +22,7 @@ import pluggdapps.util                as h
 
 log = logging.getLogger( __name__ )
 
-_default_settings = h.ConfigDict()
+_default_settings = ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for event poll based HTTP server."
 
@@ -210,9 +211,15 @@ class HTTPConnection(object):
         # on-connection
         self.stream.set_close_callback( self._on_connection_close )
 
+    def get_ssl_certificate(self):
+        try:
+            return self.stream.socket.get_ssl_certificate()
+        except ssl.SSLError:
+            return None
+
     def write( self, chunk, callback=None ):
         assert self._request, "Request closed"
-        if not self.stream.closed():
+        if not self.stream.closed() :
             self._write_callback = stack_context.wrap(callback)
             self.stream.write(chunk, self._on_write_complete)
 
@@ -223,22 +230,22 @@ class HTTPConnection(object):
             self._finish_request()
 
     def dispatch( self ):
+        # Resolve application
         appname = self.platform.appfor(self.startline, self.headers, self.body)
         app = query_plugin( appname, IApplication, appname )
+        # IRequest plugin
         self._request = query_plugin( 
                             appname, IRequest, app['request_factory'],
                             app, self, self.address[0], 
                             self.startline, self.headers, self.body )
         app.start( self._request )
-
         # Flush and finish the response
-
         # Reset request attributes
         self.startline = None
         self.headers = None
         self.body = None
 
-    def _on_write_complete(self):
+    def _on_write_complete( self ):
         if self._write_callback is not None:
             callback = self._write_callback
             self._write_callback = None
@@ -253,7 +260,7 @@ class HTTPConnection(object):
         if self._request_finished and not self.stream.writing():
             self._finish_request()
 
-    def _finish_request(self):
+    def _finish_request( self ):
         if self.no_keep_alive:
             disconnect = True
         else:
@@ -274,7 +281,7 @@ class HTTPConnection(object):
             return
         self.stream.read_until(b"\r\n\r\n", self._header_callback)
 
-    def _on_headers(self, data):
+    def _on_headers( self, data ):
         from pluggdapps import ROOTAPP
         try:
             data = h.native_str(data.decode('latin1'))
@@ -304,4 +311,5 @@ class HTTPConnection(object):
         self.dispatch()
 
     def _on_connection_close( self ):
-        self._request.on_connection_close() if self._request else None
+        response = getattr( self._request, 'response', None ), 
+        reponse.on_connection_close() if response else None

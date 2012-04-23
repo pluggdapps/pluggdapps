@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, with_statement
 import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
+from   pluggdapps.config                import settingsfor
 import pluggdapps.util                  as h
 from   pluggdapps.plugin                import ISettings, query_plugin
 from   pluggdapps.evserver              import process
@@ -144,7 +145,7 @@ class TCPServer( object ):
     def _handle_connection( self, conn, address ):
         from pluggdapps import ROOTAPP
 
-        ssloptions = h.settingsfor( 'ssloptions.', self )
+        ssloptions = settingsfor( 'ssloptions.', self )
         is_ssl = ssloptions['keyfile'] and ssloptions['certfile']
         if is_ssl :
             assert ssl, "Python 2.6+ and OpenSSL required for SSL"

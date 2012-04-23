@@ -15,13 +15,14 @@ from __future__ import absolute_import, division, with_statement
 import datetime, errno, heapq, logging, time
 import os, select, thread, threading, traceback, signal
 
+from   pluggdapps.config     import ConfigDict
 from   pluggdapps.plugin     import Plugin
 import pluggdapps.util       as h
 from   pluggdapps.evserver   import stack_context
 
 log = logging.getLogger( __name__ )
 
-_default_settings = h.ConfigDict()
+_default_settings = ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for poll based event handling for HTTP sockets"
 

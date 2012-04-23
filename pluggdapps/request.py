@@ -4,18 +4,19 @@
 
 # -*- coding: utf-8 -*-
 
-import Cookie, socket, time, urlparse, logging
+import socket, time, urlparse, logging, re
 from   copy import deepcopy
 
+from   pluggdapps.config     import ConfigDict
 from   pluggdapps.plugin     import Plugin, implements, pluginname, \
                                     query_plugin
-from   pluggdapps.interfaces import IRequest, IResponse
+from   pluggdapps.interfaces import IRequest, IResponse, ICookie
 from   pluggdapps.evserver   import httpiostream
 import pluggdapps.util       as h
 
 log = logging.getLogger( __name__ )
 
-_default_settings = h.ConfigDict()
+_default_settings = ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPRequest implementing IRequest interface."
 
@@ -25,6 +26,14 @@ _default_settings['default_host']  = {
     'help'    : "Default host name to use in the absence of host name not "
                 "available from request headers."
 }
+_default_settings['cookie_factory']  = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Plugin class implementing ICookie interface specification. "
+                "methods from this plugin will be used to process request "
+                "cookies. Overrides cookie_factory if defined in application "
+                "plugin."
+}
 
 class HTTPRequest( Plugin ):
     implements( IRequest )
@@ -32,7 +41,6 @@ class HTTPRequest( Plugin ):
     do_methods = ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS')
 
     elapsedtime = property( lambda self : time.time() - self.receivedat )
-    servicetime = property( lambda self : time.time() - self.receivedat )
 
     # IRequest interface methods and attributes
     def __init__( self, app, conn, address, startline, headers, body ):
@@ -45,37 +53,37 @@ class HTTPRequest( Plugin ):
         self.app = app
         self.connection = conn
         self.platform = conn.platform
+        self.docookie = self.query_plugin( 
+                ICookie, self['cookie_factory'] or app['cookie_factory'] )
         
-        self.method, self.uri, self.version = self._parse_startline(startline)
+        self.method, self.uri, self.version = self._parse_startline( startline )
         self.headers = headers or h.HTTPHeaders()
-        self.body = body or ""
+        self.body = body or b""
 
-        self.protocol = self._parse_protocol( stream, headers, xheaders )
-        self.remote_ip = self._parse_remoteip( address, headers, xheaders )
-        self.cookies = self._parse_cookies( self.headers )
         self.host = self.headers.get("Host") or self['default_host']
-        self.files = {}
+        _, _, self.path, self.query, _ = urlparse.urlsplit( h.native_str(uri) )
+        self.protocol = self._parse_protocol( stream, headers, xheaders )
         self.full_url = self.protocol + "://" + self.host + self.uri
 
-        _, _, self.path, self.query, _ = urlparse.urlsplit( h.native_str(uri) )
+        self.remote_ip = self._parse_remoteip( address, headers, xheaders )
+        self.cookies = self.docookie.parse_cookies( self.headers )
+        self.files = {}
         self.arguments = self._parse_query( query )
         # Updates self.arguments and self.files based on request-body
         self._parse_body( method, headers, body ) 
-
         # Reponse object
-        self.response = query_plugin( 
-                appname, IResponse, app['response_factory'], self )
+        self.response = self.query_plugin( 
+                IResponse, app['response_factory'], self )
 
     def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
 
     def get_ssl_certificate(self):
-        try:
-            return self.connection.stream.socket.getpeercert()
-        except ssl.SSLError:
+        try    :
+            return self.connection.get_ssl_certificate()
+        except :
             return None
 
-    _ARG_DEFAULT = []
     def get_argument( self, name, default=None, strip=True ):
         """Returns the value of the argument with the given name.
 
@@ -108,9 +116,8 @@ class HTTPRequest( Plugin ):
             if isinstance(v, unicode):
                 # Get rid of any weird control chars (unless decoding gave
                 # us bytes, in which case leave it alone)
-                v = re.sub(r"[\x00-\x08\x0e-\x1f]", " ", v)
-            v = v.strip() if strip else v
-            values.append(v)
+                v = re.sub( r"[\x00-\x08\x0e-\x1f]", " ", v )
+            values.append( v.strip() if strip else v )
         return values
 
     def decode_argument(self, value, name=None):
@@ -132,26 +139,30 @@ class HTTPRequest( Plugin ):
         """Gets the value of the cookie with the given name, else default."""
         return self.cookies[name].value if name in self.cookies else default
 
-    def get_secure_cookie(self, name, value=None, max_age_days=31):
+    def get_secure_cookie( self, name, value=None ):
         """Returns the given signed cookie if it validates, or None."""
-        self.require_setting("cookie_secret", "secure cookies")
-        if value is None:
+        if value is None :
             value = self.get_cookie(name)
-        return decode_signed_value(self.application.settings["cookie_secret"],
-                                   name, value, max_age_days=max_age_days)
+        return self.docookie.decode_signed_value( name, value ) 
 
-    def __repr__(self):
-        attrs = ("protocol", "host", "method", "uri", "version", "remote_ip",
-                 "body")
+    def query_plugin( self, *args, **kwargs ):
+        query_plugin( self.appname, *args, **kwargs ):
+
+    def query_plugins( self, *args, **kwargs ):
+        query_plugin( self.appname, *args, **kwargs ):
+
+    def __repr__( self ):
+        attrs = ( "protocol", "host", "method", "uri", "version", "remote_ip",
+                  "body" )
         args = ", ".join(["%s=%r" % (n, getattr(self, n)) for n in attrs])
         return "%s(%s, headers=%s)" % (
             self.__class__.__name__, args, dict(self.headers))
 
-    def _valid_ip(self, ip):
+    def _valid_ip( self, ip ):
         try:
-            res = socket.getaddrinfo(ip, 0, socket.AF_UNSPEC,
-                                     socket.SOCK_STREAM,
-                                     0, socket.AI_NUMERICHOST)
+            res = socket.getaddrinfo( ip, 0, socket.AF_UNSPEC,
+                                      socket.SOCK_STREAM,
+                                      0, socket.AI_NUMERICHOST )
             return bool(res)
         except socket.gaierror, e:
             if e.args[0] == socket.EAI_NONAME:
@@ -187,12 +198,6 @@ class HTTPRequest( Plugin ):
         else :
             remote_ip = address
         return remote_ip
-
-    def _parse_cookies( self, headers ):
-        cookies = Cookie.SimpleCookie()
-        try    : cookies.load( h.native_str( headers["Cookie"]  ))
-        except : pass
-        return cookies
 
     def _parse_query( self, query ):
         arguments = {}

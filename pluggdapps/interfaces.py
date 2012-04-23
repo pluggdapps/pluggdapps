@@ -197,8 +197,8 @@ class IRequest( Interface ):
         "HTTP protocol version specified in request, e.g. 'HTTP/1.1'"
     )
     headers = Attribute(
-       "Dictionary-like object for HTTP headers. Acts like a "
-       "case-insensitive dictionary."
+        "Dictionary-like object for HTTP headers. Acts like a "
+        "case-insensitive dictionary."
     )
     body = Attribute(
        "Request body, if present, as a byte string."
@@ -226,6 +226,10 @@ class IRequest( Interface ):
        "or a proxy, the real IP address provided by a load balancer will be "
        "passed in the ``X-Real-Ip`` header."
     )
+    files = Attribute(
+        "File uploads are available in the files property, which maps file "
+        "names to lists of :class:`HTTPFile`."
+    )
     arguments = Attribute(
         "GET/POST arguments are available in the arguments property, which "
         "maps arguments names to lists of values (to support multiple values "
@@ -233,10 +237,6 @@ class IRequest( Interface ):
         "are byte strings. Note that this is different from "
         ":method:`IRequest.get_argument`, which returns argument values as "
         "unicode strings."
-    )
-    files = Attribute(
-        "File uploads are available in the files property, which maps file "
-        "names to lists of :class:`HTTPFile`."
     )
     cookies = Attribute(
         "A dictionary of Cookie.Morsel objects representing request cookies "
@@ -252,12 +252,6 @@ class IRequest( Interface ):
         "Timestamp when request was recieved"
     )
     elapsedtime = Attribute(
-        "Amount of time, in floating seconds, elapsed since the request was "
-        "received. Call this method while servicing the request. To know the "
-        "final elapsed time, that is after servicing the request, use "
-        "``servicetime`` attribute."
-    )
-    servicetime = Attribute(
         "Amount of time, in floating seconds, elapsed since the request was "
         "received."
     )
@@ -290,6 +284,19 @@ class IRequest( Interface ):
             None.
         """
 
+    def supports_http_1_1():
+        """Returns True if this request supports HTTP/1.1 semantics"""
+
+    def get_ssl_certificate():
+        """Returns the client's SSL certificate, if any.
+
+        To use client certificates, `cert_reqs` configuration value must be
+        set to ssl.CERT_REQUIRED,
+
+        The return value is a dictionary, see SSLSocket.getpeercert() in
+        the standard library for more details.
+        http://docs.python.org/library/ssl.html#sslsocket-objects."""
+
     def get_argument( name, default=None, strip=True ):
         """Returns the value of the argument with the given name.
 
@@ -315,7 +322,7 @@ class IRequest( Interface ):
 
         The argument has been percent-decoded and is now a byte string.
         By default, this method decodes the argument as utf-8 and returns
-        a unicode string, but this may be overridden in subclasses.
+        a unicode string.
 
         This method is used as a filter for both get_argument() and for
         values extracted from the url and passed to get()/post()/etc.
@@ -327,31 +334,8 @@ class IRequest( Interface ):
     def get_cookie( name, default=None ):
         """Gets the value of the cookie with the given name, else default."""
 
-    def get_secure_cookie( name, value=None, max_age_days=31 ):
+    def get_secure_cookie( name, value=None ):
         """Returns the given signed cookie if it validates, or None."""
-
-    def supports_http_1_1():
-        """Returns True if this request supports HTTP/1.1 semantics"""
-
-    def get_ssl_certificate():
-        """Returns the client's SSL certificate, if any.
-
-        To use client certificates, `cert_reqs` configuration value must be
-        set to ssl.CERT_REQUIRED,
-
-        The return value is a dictionary, see SSLSocket.getpeercert() in
-        the standard library for more details.
-        http://docs.python.org/library/ssl.html#sslsocket-objects."""
-
-    def query_plugins( interface, name, *args, **kwargs ):
-        """Query plugins in the request's context. Since every request is
-        under the context of an application, appname will be used to make the
-        actual query. Will be using `IRequest.app` attribute"""
-
-    def query_plugin( interface, name, *args, **kwargs ):
-        """Query plugin in the request's context. Since every request is
-        under the context of an application, appname will be used to make the
-        actual query. Will be using `IRequest.app` attribute"""
 
     def url( *args, **kwargs ) :
         """Generate url for same application handling the current request."""
@@ -367,9 +351,15 @@ class IRequest( Interface ):
     def path( appname, *args, **kwargs ) :
         """Generate url-path for the same application handling this request."""
 
-    def on_connection_close():
-        """Called back when remote client close the connection on this request
-        currently processed."""
+    def query_plugins( interface, *args, **kwargs ):
+        """Query plugins in the request's context. Since every request is
+        under the context of an application, appname will be used to make the
+        actual query. Will be using `IRequest.appname` attribute"""
+
+    def query_plugin( interface, name, *args, **kwargs ):
+        """Query plugin in the request's context. Since every request is
+        under the context of an application, appname will be used to make the
+        actual query. Will be using `IRequest.appname` attribute"""
 
 
 class IResponse( Interface ):
@@ -380,8 +370,7 @@ class IResponse( Interface ):
         "to be sent from server."
     )
     request = Attribute(
-        "HTTP request object, an instance of plugin implementing "
-        ":class:`IRequest` interface."
+        "Plugin instance implementing :class:`IRequest` interface."
     )
 
     def __init__( request ):
@@ -396,7 +385,6 @@ class IResponse( Interface ):
 
     def set_status( status_code ):
         """Sets the status code for our response."""
-        pass
 
     def get_status():
         """Returns the status code for our response."""
@@ -415,21 +403,17 @@ class IResponse( Interface ):
         to return multiple values for the same header.
         """
 
-    def set_cookie( name, value, domain=None, expires=None, path="/",
-                    expires_days=None, **kwargs ):
-        """Sets the given cookie name/value with the given options.
+    def set_cookie( name, value, **kwargs ) :
+        """Sets the given cookie name/value with the given options. Key-word
+        arguments typically contains,
+          domain, expires_days, expires, path
+        Additional keyword arguments are set on the Cookie.Morsel directly.
 
-        Additional keyword arguments are set on the Cookie.Morsel
-        directly.
+        By calling this method cookies attribute will be updated inplace.
+
         See http://docs.python.org/library/cookie.html#morsel-objects
         for available attributes.
         """
-
-    def clear_cookie( name, path="/", domain=None ):
-        """Deletes the cookie with the given name."""
-
-    def clear_all_cookies():
-        """Deletes all the cookies the user sent with this request."""
 
     def set_secure_cookie( name, value, expires_days=30, **kwargs ):
         """Signs and timestamps a cookie so it cannot be forged.
@@ -445,13 +429,11 @@ class IResponse( Interface ):
         parameter to `get_secure_cookie`.
         """
 
-    def create_signed_value( name, value ):
-        """Signs and timestamps a string so it cannot be forged.
+    def clear_cookie( name, path="/", domain=None ):
+        """Deletes the cookie with the given name."""
 
-        Normally used via set_secure_cookie, but provided as a separate
-        method for non-cookie uses.  To decode a value not stored
-        as a cookie use the optional value argument to get_secure_cookie.
-        """
+    def clear_all_cookies():
+        """Deletes all the cookies the user sent with this request."""
 
     def render( template_name, **kwargs ):
         """Renders the template with the given arguments as the response."""
@@ -529,6 +511,16 @@ class IResponse( Interface ):
     def compute_etag():
         """Computes the etag header to be used for this request's response."""
 
+    def set_close_callback():
+        """Set a call back function to be called when remote client close 
+        the connection on this request/response or when no-keep-alive is 
+        true, hence closing the connection after the response."""
+
+    def on_connection_close():
+        """Call back from http-server. Typically, plugin implementing this
+        method should in-turn call the callback function registered via
+        :method:`set_close_callback`."""
+
 
 class IResponseTransformer( Interface ):
     """Specification to transform response headers and body. A chain of
@@ -552,9 +544,6 @@ class IRequestHandler( Interface ):
     methods = Attribute(
         "Request handler can override this attribute to provide a sequence of "
         "HTTP Methods supported by the plugin. "
-    )
-    default_headers = Attribute(
-        "Default HTTP headers to be set automatically for every reponse."
     )
 
     def __call__( request ):
@@ -603,7 +592,42 @@ class IRequestHandler( Interface ):
 
     def onfinish():
         """Called after the end of a request, after the response has been sent
-        to the client."""
+        to the client. Note that this is not the same as close callback, which
+        is called when the connection get closed. In this case the connection
+        may or may not remain open. Refer to HTTP/1.1 spec."""
+
+
+class ICookie( Interface ):
+    """Necessary methods and plugins to be used to handle HTTP cookies. This
+    specification is compativle with IRequest and python's Cookie standard 
+    library."""
+
+    def parse_cookies( headers ):
+        """Use `headers`, to parse cookie name/value pairs, along with
+        its meta-information, into Cookie Morsels."""
+
+    def set_cookie( cookies, name, value, **kwargs ) :
+        """Sets the given cookie name/value with the given options. Key-word
+        arguments typically contains,
+          domain, expires_days, expires, path
+        Additional keyword arguments are set on the Cookie.Morsel directly.
+
+        ``cookies`` is from Cookie module and updated inplace.
+
+        See http://docs.python.org/library/cookie.html#morsel-objects
+        for available attributes.
+        """
+
+    def create_signed_value( name, value ):
+        """To avoid cookie-forgery `value` is digitally signed binary of 
+        typically a cookie_secret, name, timestamp of current time and 
+        value."""
+
+    def decode_signed_value( name, value ):
+        """`value` is digitally signed binary of typically a cookie_secret, 
+        name, timestamp and value. Validate the cookie and decode them if need
+        be and return an interpreted value. Reverse of `create_signed_value()`
+        method."""
 
 
 class IUnitTest( Interface ):
@@ -617,3 +641,4 @@ class IUnitTest( Interface ):
 
     def teardown():
         """Teardown fixtures after executing test cases."""
+
