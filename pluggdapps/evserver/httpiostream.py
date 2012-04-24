@@ -7,10 +7,10 @@ from __future__ import absolute_import, division, with_statement
 import sys, re, collections, errno, logging, socket
 import ssl  # Python 2.6+
 
-from   pluggdapps.config     import ConfigDict
-from   pluggdapps.plugin     import Plugin
-from   pluggdapps.evserver   import stack_context
-import pluggdapps.util       as h
+from   pluggdapps.config        import ConfigDict
+from   pluggdapps.plugin        import Plugin
+import pluggdapps.util          as h
+import pluggdapps.stack_context as sc
 
 log = logging.getLogger( __name__ )
 
@@ -126,7 +126,7 @@ class HTTPIOStream( Plugin ):
                         "Connect error on fd %d: %s", self.socket.fileno(), e )
                 self.close()
                 return
-        self._connect_callback = stack_context.wrap(callback)
+        self._connect_callback = sc.wrap(callback)
         self._add_io_state(self.ioloop.WRITE)
 
     def read_until_regex(self, regex, callback):
@@ -151,7 +151,7 @@ class HTTPIOStream( Plugin ):
         self._set_read_callback(callback)
         assert isinstance(num_bytes, (int, long))
         self._read_bytes = num_bytes
-        self._streaming_callback = stack_context.wrap(streaming_callback)
+        self._streaming_callback = sc.wrap(streaming_callback)
         self._try_inline_read()
 
     def read_until_close(self, callback, streaming_callback=None):
@@ -170,7 +170,7 @@ class HTTPIOStream( Plugin ):
             self._read_callback = None
             return
         self._read_until_close = True
-        self._streaming_callback = stack_context.wrap(streaming_callback)
+        self._streaming_callback = sc.wrap(streaming_callback)
         self._add_io_state(self.ioloop.READ)
 
     def write(self, data, callback=None):
@@ -187,7 +187,7 @@ class HTTPIOStream( Plugin ):
             # We use bool(_write_buffer) as a proxy for write_buffer_size>0,
             # so never put empty strings in the buffer.
             self._write_buffer.append(data)
-        self._write_callback = stack_context.wrap(callback)
+        self._write_callback = sc.wrap(callback)
         self._handle_write()
         if self._write_buffer:
             self._add_io_state(self.ioloop.WRITE)
@@ -195,7 +195,7 @@ class HTTPIOStream( Plugin ):
 
     def set_close_callback(self, callback):
         """Call the given callback when the stream is closed."""
-        self._close_callback = stack_context.wrap(callback)
+        self._close_callback = sc.wrap(callback)
 
     def close(self):
         """Close this stream."""
@@ -299,7 +299,7 @@ class HTTPIOStream( Plugin ):
         #   non-reentrant mutexes
         # * Ensures that the try/except in wrapper() is run outside
         #   of the application's StackContexts
-        with stack_context.NullContext():
+        with sc.NullContext():
             # stack_context was already captured in callback, we don't need to
             # capture it again for HTTPIOStream's wrapper.  This is especially
             # important if the callback was pre-wrapped before entry to
@@ -568,7 +568,7 @@ class HTTPIOStream( Plugin ):
             return
         if self._state is None:
             self._state = self.ioloop.ERROR | state
-            with stack_context.NullContext():
+            with sc.NullContext():
                 self.ioloop.add_handler(
                     self.socket.fileno(), self._handle_events, self._state)
         elif not self._state & state:

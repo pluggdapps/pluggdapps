@@ -51,8 +51,8 @@ class RootApp( Plugin ):
     def router( self, request ):
         pass
 
-    def finish( self, request ):
-        pass
+    def onfinish( self, request ):
+        request.onfinish()
 
     def shutdown( self, settings ):
         pass

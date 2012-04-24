@@ -8,7 +8,7 @@
 #   * Improve function asbool() implementation.
 
 from   __future__ import absolute_import, division, with_statement
-import os, sys, re, fcntl, urllib, logging, calendar, email
+import os, sys, re, fcntl, urllib, logging, calendar, email, hashlib
 import datetime as dt
 from   urlparse import parse_qs  # Python 2.6+
 
@@ -226,6 +226,12 @@ def convert_header_value( value ):
         raise ValueError( "Unsafe header value %r", value )
     return value
 
+
+def compute_etag( write_buffer ) :
+    """Computes the etag header to be used for this request's response."""
+    hasher = hashlib.sha1()
+    map( hasher.update, write_buffer )
+    return '"%s"' % hasher.hexdigest()
 
 class HTTPFile( ObjectDict ):
     """Represents an HTTP file, whose instance variables are also accessible

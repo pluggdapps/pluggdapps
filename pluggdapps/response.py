@@ -8,17 +8,11 @@ import logging
 import httplib, calendar, email, time, base64, hmac, hashlib, itertools
 import datetime as dt
 
-from   pluggdapps.config     import ConfigDict
-from   pluggdapps.plugin     import Plugin, implements, query_plugin
-from   pluggdapps.interfaces import IResponse, IResponseTransformer
-import pluggdapps.util       as h
-
-#from tornado import escape
-#from tornado import locale
-#from tornado import stack_context
-#from tornado import template
-#from tornado.escape import utf8, _unicode
-#from tornado.util import b, bytes_type, import_object, ObjectDict
+from   pluggdapps.config        import ConfigDict
+from   pluggdapps.plugin        import Plugin, implements, query_plugin
+from   pluggdapps.interfaces    import IResponse, IResponseTransformer
+import pluggdapps.util          as h
+import pluggdapps.stack_context as sc
 
 # TODO :
 #   1. user locale (server side).
@@ -38,6 +32,11 @@ _default_settings['transforms']     = {
     'help'    : "Comma separated transformation plugins to be applied on "
                 "response headers and body.",
 }
+_default_settings['IErrorPage']     = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "",
+}
 
 class HTTPResponse( Plugin ):
     implements( IResponse )
@@ -46,14 +45,15 @@ class HTTPResponse( Plugin ):
         # Attributes from request
         self.app = request.app
         # Book keeping
+        self._status_code = 200
         self._headers = {}
         self._list_headers = []
-        self._write_buffer = []
-        self._status_code = 200
         self._headers_written = False
+        self._write_buffer = []
+        self._transforms = h.parsecsvlines( self['transforms'] )
+        self._close_callback = None
         self._finished = False
         self._auto_finish = True
-        self._transforms = h.parsecsvlines( self['transforms'] )
         # Cookies
         self.cookies = Cookie.SimpleCookie()
         # Start from a clean slate
@@ -128,9 +128,9 @@ class HTTPResponse( Plugin ):
         cookie in the browser, but is independent of the ``max_age_days``
         parameter to `get_secure_cookie`.
         """
+        value = self.docookie.create_signed_value(name, value)
         return self.docookie.set_cookie( 
-                    self.cookies, name, self.create_signed_value(name, value),
-                    expires_days=expires_days, **kwargs )
+                self.cookies, name, value, expires_days=expires_days, **kwargs )
 
     def clear_cookie( self, name, path="/", domain=None ):
         """Deletes the cookie with the given name."""
@@ -142,7 +142,16 @@ class HTTPResponse( Plugin ):
         """Deletes all the cookies the user sent with this request."""
         [ self.clear_cookie(name) for name in self.cookies.iterkeys() ]
 
-    # TODO : Continue from here ...
+    def set_close_callback( self, callback ):
+        """Set a call back to be called when either the server or client
+        closes this connection."""
+        self._close_callback = sc.wrap( callback )
+
+    def on_connection_close( self ):
+        """Callback with this response object."""
+        if self._close_callback :
+            self._close_callback( self )
+            self._close_callback = None
 
     def write( self, chunk ):
         """Writes the given chunk to the output buffer.
@@ -164,12 +173,7 @@ class HTTPResponse( Plugin ):
         if isinstance( chunk, dict ):
             chunk = h.json_encode(chunk)
             self.set_header( "Content-Type", "application/json; charset=UTF-8" )
-        chunk = h.utf8(chunk)
-        self._write_buffer.append(chunk)
-
-    def write( self, chunk, callback=None ): # From HTTPRequest of tornado
-        assert isinstance(chunk, bytes)
-        self.connection.write( chunk, callback=callback )
+        self._write_buffer.append( h.utf8(chunk) )
 
     def flush( self, finishing=False, callback=None ):
         """Flushes the current output buffer to the network.
@@ -185,7 +189,7 @@ class HTTPResponse( Plugin ):
         if not self._headers_written :
             self._headers_written = True
             for name in self._transforms :
-                t = query_plugin( self.appname, IResponseTransformer, name )
+                t = self.request.query_plugin( IResponseTransformer, name )
                 self._headers, chunk = \
                         t.start_transform( self._headers, chunk, finishing )
             headers = self._generate_headers()
@@ -197,11 +201,11 @@ class HTTPResponse( Plugin ):
         # Ignore the chunk and only write the headers for HEAD requests
         if self.request.method == "HEAD" :
             if headers :
-                self.request.write(headers, callback=callback)
+                self._dowrite( headers, callback=callback )
             return
 
         if headers or chunk:
-            self.request.write( headers + chunk, callback=callback )
+            self._dowrite( headers + chunk, callback=callback )
 
     def finish( self, chunk=None ):
         """Finishes this response, ending the HTTP request."""
@@ -216,7 +220,7 @@ class HTTPResponse( Plugin ):
             if ( self._status_code == 200 and
                  self.request.method in ("GET", "HEAD") and
                  "Etag" not in self._headers ):
-                etag = self.compute_etag()
+                etag = h.compute_etag()
                 if etag is not None :
                     self.set_header("Etag", etag)
                     inm = self.request.headers.get( "If-None-Match" )
@@ -228,20 +232,18 @@ class HTTPResponse( Plugin ):
                                  sum( map( len, self._write_buffer )) )
 
         if hasattr( self.request, "connection" ):
+            # TODO : Understand and fix this.
             # Now that the request is finished, clear the callback we
             # set on the IOStream (which would otherwise prevent the
             # garbage collection of the RequestHandler when there
             # are keepalive connections)
             self.request.connection.stream.set_close_callback(None)
 
-        self.flush(include_footers=True)
-        self.request.finish()
-        self._finished = True
-        self.on_finish()
+        self.flush( finishing=True, callback=self.onfinish )
 
-    def _finish( self ):    # From HTTPRequest of tornado
-        self.connection.finish()
-        self._finish_time = time.time()
+    def onfinish( self ):
+        self._finished = True
+        self.app.onfinish( self.request )
     
     def send_error( self, status_code=500, **kwargs ):
         """Sends the given HTTP error code to the browser.
@@ -308,12 +310,6 @@ class HTTPResponse( Plugin ):
                     "message": httplib.responses[status_code],
                     })
 
-    def compute_etag(self):
-        """Computes the etag header to be used for this request's response."""
-        hasher = hashlib.sha1()
-        map( hasher.update, self._write_buffer )
-        return '"%s"' % hasher.hexdigest()
-
     def redirect( self, url, permanent=False, status=None ):
         """Sends a redirect to the given (optionally relative) URL.
 
@@ -353,7 +349,11 @@ class HTTPResponse( Plugin ):
                         )]
         headers = itertools.chain(self._headers.iteritems(), self._list_headers)
         lines.extend([ h.utf8(n) + b": " + h.utf8(v) for n, v in headers ])
-        for cookie in self.cookies.values():
-            lines.append( h.utf8("Set-Cookie: " + cookie.OutputString(None)) )
+        [ lines.append( h.utf8("Set-Cookie: " + cookie.OutputString(None)) )
+          for cookie in self.cookies.values() ]
         return b"\r\n".join(lines) + b"\r\n\r\n"
+
+    def _dowrite( self, chunk, callback=None ):
+        assert isinstance(chunk, bytes)
+        self.connection.write( chunk, callback=callback )
 

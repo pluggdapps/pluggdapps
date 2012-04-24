@@ -130,8 +130,11 @@ class IApplication( Interface ):
         """Return the router plugin implementing :class:`IRouter` 
         interface."""
 
-    def finish( request ):
-        """Finish this request. Reverse of start."""
+    def onfinish( request ):
+        """A finish is called on the response. And this call back is issued to 
+        Start a finish sequence for this ``request`` in the application's 
+        context. Plugin's implementing this method must call
+        request.onfinish()."""
 
     def shutdown( settings ):
         """Shutdown this application. Reverse of boot.
@@ -251,6 +254,9 @@ class IRequest( Interface ):
     receivedat = Attribute(
         "Timestamp when request was recieved"
     )
+    finishedat = Attribute(
+        "Timestamp when the request was finished."
+    )
     elapsedtime = Attribute(
         "Amount of time, in floating seconds, elapsed since the request was "
         "received."
@@ -336,6 +342,9 @@ class IRequest( Interface ):
 
     def get_secure_cookie( name, value=None ):
         """Returns the given signed cookie if it validates, or None."""
+
+    def onfinish():
+        """Callback for asyncrhonous finish()."""
 
     def url( *args, **kwargs ) :
         """Generate url for same application handling the current request."""
@@ -454,8 +463,11 @@ class IResponse( Interface ):
         http://haacked.com/archive/2008/11/20/anatomy-of-a-subtle-json-vulnerability.aspx
         """
 
-    def flush( include_footers=False, callback=None ):
-        """Flushes the current output buffer to the network.
+    def flush( finishing=False, callback=None ):
+        """Flushes the current output buffer to the network. If ``finishing``
+        is True, it signifies that the flush is the last chunk to be
+        transferred for this chunk. Will be used by output transformers
+        implementing :class:`IResponseTransformer` interface.
 
         The ``callback`` argument, if given, can be used for flow control:
         it will be run when all flushed data has been written to the socket.
@@ -465,8 +477,11 @@ class IResponse( Interface ):
         """
 
     def finish():
-        """Finishes this HTTP request on the open connection."""
-        pass
+        """Finishes this HTTP response on the open connection and initiates a
+        finish sequence starting from app's onfinish() interface"""
+
+    def onfinish():
+        """Callback for asynchronous writes and flushes."""
 
     def redirect( url, permanent=False, status=None ):
         """Sends a redirect to the given (optionally relative) URL.
@@ -508,10 +523,7 @@ class IResponse( Interface ):
         to override ``write_error`` instead.
         """
 
-    def compute_etag():
-        """Computes the etag header to be used for this request's response."""
-
-    def set_close_callback():
+    def set_close_callback( callback ):
         """Set a call back function to be called when remote client close 
         the connection on this request/response or when no-keep-alive is 
         true, hence closing the connection after the response."""
@@ -527,19 +539,24 @@ class IResponseTransformer( Interface ):
     transforms can be configured with plugins implementing 
     :class:`IResponse`."""
 
-    def start_transform( self, headers, chunk, finished=False ):
+    def start_transform( headers, chunk, finished=False ):
         """Start transformation using complete list of response headers and
         first ``chunk`` of response body, if ``finished`` is False. If
         ``finished`` is True, then ``chunk`` becomes the first and last part
         of response body."""
 
     def transform( self, chunk, finished=False ):
-        """Continue with the current transformation with subsequent chunks
+        """Continue with the current transformation with subsequent chunks in
         response body. If ``finished`` is True, then ``chunk is the last chunk
         of response body."""
 
 
-class IRequestHandler( Interface ):
+class IErrorPage( Interface ):
+
+    def render( request, status_code, **kwargs ):
+
+
+class IController( Interface ):
 
     methods = Attribute(
         "Request handler can override this attribute to provide a sequence of "

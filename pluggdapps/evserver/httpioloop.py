@@ -15,10 +15,10 @@ from __future__ import absolute_import, division, with_statement
 import datetime, errno, heapq, logging, time
 import os, select, thread, threading, traceback, signal
 
-from   pluggdapps.config     import ConfigDict
-from   pluggdapps.plugin     import Plugin
-import pluggdapps.util       as h
-from   pluggdapps.evserver   import stack_context
+from   pluggdapps.config        import ConfigDict
+from   pluggdapps.plugin        import Plugin
+import pluggdapps.util          as h
+import pluggdapps.stack_context as sc
 
 log = logging.getLogger( __name__ )
 
@@ -168,7 +168,7 @@ class HTTPIOLoop( Plugin ):
 
     def add_handler(self, fd, handler, events):
         """Registers the given handler to receive the given events for fd."""
-        self._handlers[fd] = stack_context.wrap(handler)
+        self._handlers[fd] = sc.wrap(handler)
         self._impl.register(fd, events | self.ERROR)
         poll_threshold = self['poll_threshold']
         if len(self._handlers) > poll_threshold :
@@ -355,7 +355,7 @@ class HTTPIOLoop( Plugin ):
         Instead, you must use `add_callback` to transfer control to the
         HTTPIOLoop's thread, and then call `add_timeout` from there.
         """
-        timeout = _Timeout(deadline, stack_context.wrap(callback))
+        timeout = _Timeout(deadline, sc.wrap(callback))
         heapq.heappush(self._timeouts, timeout)
         return timeout
 
@@ -382,7 +382,7 @@ class HTTPIOLoop( Plugin ):
         """
         with self._callback_lock:
             list_empty = not self._callbacks
-            self._callbacks.append(stack_context.wrap(callback))
+            self._callbacks.append(sc.wrap(callback))
         if list_empty and thread.get_ident() != self._thread_ident:
             # If we're in the HTTPIOLoop's thread, we know it's not currently
             # polling.  If we're not, and we added the first callback to an

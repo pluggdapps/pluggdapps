@@ -17,8 +17,8 @@ from   pluggdapps.plugin              import Plugin, implements, pluginname, \
                                              query_plugin
 from   pluggdapps.interfaces          import IServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
-from   pluggdapps.evserver            import stack_context
 import pluggdapps.util                as h 
+import pluggdapps.stack_context       as sc
 
 log = logging.getLogger( __name__ )
 
@@ -204,7 +204,7 @@ class HTTPConnection(object):
 
         # Save stack context here, outside of any request.  This keeps
         # contexts from one request from leaking into the next.
-        self._header_callback = stack_context.wrap(self._on_headers)
+        self._header_callback = sc.wrap(self._on_headers)
         self.stream.read_until( b"\r\n\r\n", self._header_callback )
         self._write_callback = None
 
@@ -220,7 +220,7 @@ class HTTPConnection(object):
     def write( self, chunk, callback=None ):
         assert self._request, "Request closed"
         if not self.stream.closed() :
-            self._write_callback = stack_context.wrap(callback)
+            self._write_callback = sc.wrap(callback)
             self.stream.write(chunk, self._on_write_complete)
 
     def finish( self ):

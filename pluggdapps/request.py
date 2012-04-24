@@ -45,6 +45,7 @@ class HTTPRequest( Plugin ):
     # IRequest interface methods and attributes
     def __init__( self, app, conn, address, startline, headers, body ):
         self.receivedat = time.time()
+        self.finishedat = None
 
         if conn :
             stream, xheaders = conn.stream, conn.xheaders
@@ -144,6 +145,10 @@ class HTTPRequest( Plugin ):
         if value is None :
             value = self.get_cookie(name)
         return self.docookie.decode_signed_value( name, value ) 
+
+    def onfinish( self ):
+        self.connection.finish()
+        self.finishedat = time.time()
 
     def query_plugin( self, *args, **kwargs ):
         query_plugin( self.appname, *args, **kwargs ):
