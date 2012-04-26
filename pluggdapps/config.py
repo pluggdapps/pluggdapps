@@ -41,8 +41,8 @@ def default_appsettings():
     """Compose `appsettings` from plugin's default settings."""
     from pluggdapps import ROOTAPP
     # Default settings for applications and plugins.
-    rootapp = app2sec(ROOTAPP)
-    appdefaults = { rootapp : {} }
+    rootsec = app2sec(ROOTAPP)
+    appdefaults = { rootsec : {} }
     plugindefaults = {}
     appnames = applications()
     for p, sett in default_settings().items() :
@@ -52,13 +52,13 @@ def default_appsettings():
         else :
             plugindefaults[ plugin2sec(p) ] = sett
     # Compose `appsettings`
-    appsettings = { rootapp : { 'DEFAULT' : {} } }
-    appsettings[rootapp].update( deepcopy( plugindefaults ))
+    appsettings = { rootsec : { 'DEFAULT' : {} } }
+    appsettings[rootsec].update( deepcopy( plugindefaults ))
     for appname in appnames :
         sett = { 'DEFAULT' : {} }
         sett['DEFAULT'].update( deepcopy( appdefaults[ app2sec(appname) ] ))
         sett.update( deepcopy( plugindefaults ))
-        appsettings[appname] = sett
+        appsettings[ app2sec(appname) ] = sett
     return appsettings
 
 def load_inisettings( inifile ):
@@ -112,7 +112,7 @@ def deepload( section, options ):
 def getsettings( appname, sec=None, plugin=None, key=None ):
     from pluggdapps import appsettings
     sec = sec or ('plugin:'+plugin if plugin else None)
-    appsett = appsettings[appname]
+    appsett = appsettings[ app2sec(appname) ]
     if sec == None :
         if key != None :
             return appsett.get( 'DEFAULT', {} ).get( key, None )

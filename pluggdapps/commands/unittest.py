@@ -33,14 +33,23 @@ class UnitTest( Plugin ):
     def run( self, options=None, args=[] ):
         from pluggdapps import ROOTAPP
         for case in query_plugins( ROOTAPP, IUnitTest ) :
-            log.info( "---- %s ----", pluginname(case) )
-            case.setup( self.platform )
-            case.test()
-            case.teardown()
+            if case.__class__ == UnitTestBase :
+                continue
+            if self.args :
+                if self.args[0] == pluginname(case) :
+                    self._run_testcase( case )
+                    break;
+            else :
+                self._run_testcase( case )
+
+    def _run_testcase( self, case ):
+        log.info( "---- %s ----", pluginname(case) )
+        case.setup( self.platform )
+        case.test()
+        case.teardown()
 
     def _parse( self, usage ):
         return self._options( OptionParser( usage=usage ))
 
     def _options( self, parser ):
         return parser
-

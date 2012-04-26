@@ -11,7 +11,7 @@ import logging, urlparse
 from   pluggdapps.config     import ConfigDict, settingsfor
 from   pluggdapps.plugin     import Plugin, query_plugin, query_plugins, \
                                     pluginname, plugin_init
-from   pluggdapps.config     import loadsettings, getsettings
+from   pluggdapps.config     import loadsettings, getsettings, app2sec
 from   pluggdapps.interfaces import IApplication
 import pluggdapps.helper     as h
 
@@ -84,10 +84,11 @@ class Platform( Plugin ):
         ``loglevel``,
             loglevel to use. This will override default 'logging.level'.
         """
-        from  pluggdapps import appsettings, ROOTAPP
+        from  pluggdapps import get_appsettings, ROOTAPP
         log.info( 'Booting platform from %r ...', inifile )
         cls.inifile = inifile
         # Load application settings
+        appsettings = get_appsettings()
         appsettings.update( loadsettings( inifile ))
         cls.appsettings = appsettings
         # Setup logger 
@@ -104,7 +105,7 @@ class Platform( Plugin ):
         for app in apps :
             appname = pluginname(app)
             log.debug( "Booting application %r ...", appname )
-            app.boot( appsettings[appname] ) 
+            app.boot( appsettings[ app2sec(appname) ] ) 
 
         return appsettings
 
@@ -124,7 +125,7 @@ class Platform( Plugin ):
         for app in query_plugin( ROOTAPP, IApplication ) :
             appname = pluginname(app)
             log.debug( "Shutting down application %r ...", appname )
-            app.shutdown( appsettings[appname] )
+            app.shutdown( appsettings[ app2sec(appname) ] )
 
     def appfor( self, startline, headers, body ):
         """Resolve applications for `request`."""

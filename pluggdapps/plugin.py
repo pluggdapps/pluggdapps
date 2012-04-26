@@ -78,14 +78,16 @@ class PluginMeta( type ):
                     if issubclass(b, PluginBase) and '__init__' in b.__dict__ :
                         init = b.__init__._original
                         break
+
             def masterinit( self, appname, *args, **kwargs ) :
                 """Component Init function hooked in by ComponentMeta."""
-                from  pluggdapps import appsettings
+                from  pluggdapps import get_appsettings
                 from  pluggdapps.interfaces import IApplication
+                from  pluggdapps.config import app2sec
 
-                self.appname, sett = appname, {}
+                appsettings, self.appname, sett = get_appsettings(), appname, {}
                 # Initialize :class:`ISettings` attributes
-                settings = deepcopy( appsettings[self.appname] )
+                self.settings = deepcopy( appsettings[ app2sec(self.appname) ] )
                 # Plugin settings
                 pluginnm = pluginname(self)
                 if pluginnm in PluginMeta._implementers[IApplication] :

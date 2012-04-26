@@ -26,6 +26,7 @@ def parse_assetspec( spec, pname ):
         pname, filename = None, spec
     return pname, filename
 
+
 def asset_spec_from_abspath( abspath, package ):
     """ Try to convert an absolute path to a resource in a package to
     a resource specification if possible; otherwise return the
@@ -39,6 +40,7 @@ def asset_spec_from_abspath( abspath, package ):
                           relpath.replace(os.path.sep, '/'))
     return abspath
 
+
 # bw compat only; use pyramid.path.AssetDescriptor.abspath() instead
 def abspath_for_spec( spec, pname=None ):
     if pname is None :
@@ -47,4 +49,8 @@ def abspath_for_spec( spec, pname=None ):
     if pname is None:
         return filename
     return pkg_resources.resource_filename(pname, filename)
+
+
+# Unit-test
+from pluggdapps.unittest import UnitTestBase
 

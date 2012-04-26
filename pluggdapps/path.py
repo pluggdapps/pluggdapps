@@ -1,71 +1,72 @@
 # -*- coding: utf-8 -*-
 
+import sys, pkg_resources, logging, imp
 from   os.path  import isabs, join, split, abspath, isdir, exists
 from   os       import listdir
-import sys
 
-def package_path(package):
-    """Compute directory path to package."""
-    # computing the abspath is actually kinda expensive so we memoize
-    # the result
-    prefix = getattr(package, '__abspath__', None)
-    if prefix is None:
-        prefix = pkg_resources.resource_filename(package.__name__, '')
-        # pkg_resources doesn't care whether we feed it a package
-        # name or a module name within the package, the result
-        # will be the same: a directory name to the package itself
-        try:
-            package.__abspath__ = prefix
-        except:
-            # this is only an optimization, ignore any error
-            pass
-    return prefix
+log = logging.getLogger( __name__ )
 
-#def caller_path( path, level=2 ):
-#    if not os.path.isabs( path ):
-#        module = caller_module(level+1)
-#        prefix = package_path(module)
-#        path = os.path.join( prefix, path )
-#    return path
-#
-#def caller_module( level=2, sys=sys ):
-#    module_globals = sys._getframe(level).f_globals
-#    module_name = module_globals.get('__name__') or '__main__'
-#    module = sys.modules[module_name]
-#    return module
-#
-#def package_name(pkg_or_module):
-#    """ If this function is passed a module, return the dotted Python
-#    package name of the package in which the module lives.  If this
-#    function is passed a package, return the dotted Python package
-#    name of the package itself."""
-#    if pkg_or_module is None or pkg_or_module.__name__ == '__main__':
-#        return '__main__'
-#    pkg_filename = pkg_or_module.__file__
-#    pkg_name = pkg_or_module.__name__
-#    splitted = os.path.split(pkg_filename)
-#    if splitted[-1] in init_names:
-#        # it's a package
-#        return pkg_name
-#    return pkg_name.rsplit('.', 1)[0]
-#
-#def package_of(pkg_or_module):
-#    """ Return the package of a module or return the package itself """
-#    pkg_name = package_name(pkg_or_module)
-#    __import__(pkg_name)
-#    return sys.modules[pkg_name]
-#
-#def caller_package(level=2, caller_module=caller_module):
-#    # caller_module in arglist for tests
-#    module = caller_module(level+1)
-#    f = getattr(module, '__file__', '')
-#    if (('__init__.py' in f) or ('__init__$py' in f)): # empty at >>>
-#        # Module is a package
-#        return module
-#    # Go up one level to get package
-#    package_name = module.__name__.rsplit('.', 1)[0]
-#    return sys.modules[package_name]
-#
+ignore_types = [ imp.C_EXTENSION, imp.C_BUILTIN ]
+init_names = [ '__init__%s' % x[0] for x in imp.get_suffixes() 
+                                   if x[0] and x[2] not in ignore_types ]
+
+def package_path( package ):
+    """Compute directory path to package. To avoid repeating the same
+    computing, the abspath is cached on the package object."""
+    cachedpath = getattr(package, '__abspath__', None)
+    if cachedpath : return cachedpath
+    abspath = pkg_resources.resource_filename( package.__name__, '' )
+    # pkg_resources doesn't care whether we feed it a package
+    # name or a module name within the package, the result
+    # will be the same: a directory name to the package
+    package.__abspath__ = abspath
+    return abspath
+
+def caller_module( level=2, sys=sys ):
+    module_globals = sys._getframe(level).f_globals
+    module_name = module_globals.get('__name__') or '__main__'
+    module = sys.modules[module_name]
+    return module
+
+def caller_path( path, level=2 ):
+    if isabs( path ) : return path
+    module = caller_module( level+1 )
+    prefix = package_path(module)
+    path = join( prefix, path )
+    return path
+
+def package_name( pkg_or_module ):
+    """If this function is passed a module, return the dotted Python
+    package name of the package in which the module lives. If this
+    function is passed a package, return the dotted Python package
+    name of the package itself."""
+    if pkg_or_module is None or pkg_or_module.__name__ == '__main__':
+        return '__main__'
+    pkg_filename = pkg_or_module.__file__
+    pkg_name = pkg_or_module.__name__
+    splitted = split(pkg_filename)
+    if splitted[-1] in init_names:
+        # it's a package
+        return pkg_name
+    return pkg_name.rsplit('.', 1)[0]
+
+def package_of( pkg_or_module ):
+    """Return the package of a module or return the package itself """
+    pkg_name = package_name(pkg_or_module)
+    __import__(pkg_name)
+    return sys.modules[pkg_name]
+
+def caller_package( level=2 ):
+    # caller_module in arglist for tests
+    module = caller_module(level+1)
+    f = getattr( module, '__file__', '' )
+    if (('__init__.py' in f) or ('__init__$py' in f)): # empty at >>>
+        # Module is a package
+        return module
+    # Go up one level to get package
+    package_name = module.__name__.rsplit('.', 1)[0]
+    return sys.modules[package_name]
+
 #class _CALLER_PACKAGE(object):
 #    def __repr__(self): # pragma: no cover (for docs)
 #        return 'pyramid.path.CALLER_PACKAGE'
@@ -181,7 +182,7 @@ def package_path(package):
 #        ``None``, and a relative asset specification is passed to
 #        ``resolve``, an :exc:`ValueError` exception is raised.
 #        """
-#        if os.path.isabs(spec):
+#        if isabs(spec):
 #            return FSAssetDescriptor(spec)
 #        path = spec
 #        if ':' in path:
@@ -398,7 +399,7 @@ def package_path(package):
 #class FSAssetDescriptor(object):
 #
 #    def __init__(self, path):
-#        self.path = os.path.abspath(path)
+#        self.path = abspath(path)
 #
 #    def absspec(self):
 #        raise NotImplementedError
@@ -410,11 +411,76 @@ def package_path(package):
 #        return open(self.path, 'rb')
 #
 #    def isdir(self):
-#        return os.path.isdir(self.path)
+#        return isdir(self.path)
 #
 #    def listdir(self):
-#        return os.listdir(self.path)
+#        return listdir(self.path)
 #
 #    def exists(self):
-#        return os.path.exists(self.path)
-#
+#        return exists(self.path)
+
+
+# Unit-test
+from pluggdapps.unittest import UnitTestBase
+from os.path import dirname, join
+
+class UnitTest_Path( UnitTestBase ):
+
+    def test( self ):
+        self.test_package_path()
+        self.test_caller_module()
+        self.test_caller_path()
+        self.test_package_name()
+        self.test_package_of()
+
+    def test_package_path( self ):
+        import pluggdapps.commands.unittest
+        log.info("Testing package_path() ...")
+        assert package_path(sys.modules[self.__module__]) == dirname(__file__)
+        refpath = join( dirname(__file__), 'commands', )
+        assert package_path( pluggdapps.commands.unittest ) == refpath
+
+    def test_caller_module( self ):
+        log.info("Testing caller_module() ...")
+        assert caller_module(1) == sys.modules['pluggdapps.path']
+        assert caller_module(2) == sys.modules['pluggdapps.path']
+        assert caller_module(3) == sys.modules['pluggdapps.commands.unittest']
+        assert caller_module(4) == sys.modules['pluggdapps.commands.unittest']
+
+    def test_caller_path( self ):
+        log.info("Testing caller_path() ...")
+        unittestpath = join( dirname(__file__), 'commands', 'unittest.py' )
+        assert caller_path('path.py', 1) == __file__
+        assert caller_path('path.py', 2) == __file__
+        assert caller_path('unittest.py', 3) == unittestpath
+        assert caller_path('unittest.py', 4) == unittestpath
+
+    def test_package_name( self ):
+        import pluggdapps.commands
+        import pluggdapps.commands.unittest
+        import os, os.path
+        log.info("Testing package_name() ...")
+        assert package_name(pluggdapps.commands) == 'pluggdapps.commands'
+        assert package_name(pluggdapps.commands.unittest) == 'pluggdapps.commands'
+        assert package_name(os.path) == 'posixpath'
+        assert package_name(os) == 'os'
+
+    def test_package_name( self ):
+        import pluggdapps.commands
+        import pluggdapps.commands.unittest
+        import os, os.path
+        log.info("Testing package_name() ...")
+        assert package_name(pluggdapps.commands) == 'pluggdapps.commands'
+        assert package_name(pluggdapps.commands.unittest) == 'pluggdapps.commands'
+        assert package_name(os.path) == 'posixpath'
+        assert package_name(os) == 'os'
+
+    def test_package_of( self ):
+        import pluggdapps.commands
+        import pluggdapps.commands.unittest
+        import os, os.path, posixpath
+        log.info("Testing package_of() ...")
+        assert package_of(pluggdapps.commands) == pluggdapps.commands
+        assert package_of(pluggdapps.commands.unittest) == pluggdapps.commands
+        assert package_of(os.path) == posixpath
+        assert package_of(os) == os

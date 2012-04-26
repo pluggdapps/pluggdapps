@@ -50,6 +50,8 @@ appsettings = {}
   * `appsettings` will be populated during platform boot-up time.
 """
 
+def get_appsettings() :
+    return appsettings
 
 def package( appsettings ) :
     """Entry point that returns a dictionary of key,value details about the

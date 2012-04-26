@@ -23,3 +23,7 @@ class UnitTestBase( Plugin ):
     def teardown( self ):
         pass
 
+
+# modules with unittest cases
+
+import pluggdapps.path
