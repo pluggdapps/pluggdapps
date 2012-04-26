@@ -12,7 +12,7 @@ from   pluggdapps.plugin     import Plugin, implements, pluginname, \
                                     query_plugin
 from   pluggdapps.interfaces import IRequest, IResponse, ICookie
 from   pluggdapps.evserver   import httpiostream
-import pluggdapps.util       as h
+import pluggdapps.helper     as h
 
 log = logging.getLogger( __name__ )
 
@@ -26,13 +26,13 @@ _default_settings['default_host']  = {
     'help'    : "Default host name to use in the absence of host name not "
                 "available from request headers."
 }
-_default_settings['cookie_factory']  = {
-    'default' : '',
+_default_settings['ICookie']  = {
+    'default' : 'httpcookie',
     'types'   : (str,),
     'help'    : "Plugin class implementing ICookie interface specification. "
                 "methods from this plugin will be used to process request "
-                "cookies. Overrides cookie_factory if defined in application "
-                "plugin."
+                "cookies. Overrides :class:`ICookie` if defined in "
+                "application plugin."
 }
 
 class HTTPRequest( Plugin ):
@@ -55,7 +55,7 @@ class HTTPRequest( Plugin ):
         self.connection = conn
         self.platform = conn.platform
         self.docookie = self.query_plugin( 
-                ICookie, self['cookie_factory'] or app['cookie_factory'] )
+                ICookie, self['ICookie'] or app['ICookie'] )
         
         self.method, self.uri, self.version = self._parse_startline( startline )
         self.headers = headers or h.HTTPHeaders()
@@ -71,10 +71,9 @@ class HTTPRequest( Plugin ):
         self.files = {}
         self.arguments = self._parse_query( query )
         # Updates self.arguments and self.files based on request-body
-        self._parse_body( method, headers, body ) 
+        self._parse_body( method, headers, body )
         # Reponse object
-        self.response = self.query_plugin( 
-                IResponse, app['response_factory'], self )
+        self.response = self.query_plugin( IResponse, app['IResponse'], self )
 
     def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
@@ -151,10 +150,10 @@ class HTTPRequest( Plugin ):
         self.finishedat = time.time()
 
     def query_plugin( self, *args, **kwargs ):
-        query_plugin( self.appname, *args, **kwargs ):
+        query_plugin( self.appname, *args, **kwargs )
 
     def query_plugins( self, *args, **kwargs ):
-        query_plugin( self.appname, *args, **kwargs ):
+        query_plugin( self.appname, *args, **kwargs )
 
     def __repr__( self ):
         attrs = ( "protocol", "host", "method", "uri", "version", "remote_ip",
@@ -206,7 +205,7 @@ class HTTPRequest( Plugin ):
 
     def _parse_query( self, query ):
         arguments = {}
-        for name, values in parse_qs_bytes(query).iteritems():
+        for name, values in h.parse_qs_bytes(query).iteritems():
             values = filter( None, values )
             if values:
                 arguments[name] = values

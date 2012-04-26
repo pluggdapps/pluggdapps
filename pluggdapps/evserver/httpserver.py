@@ -17,7 +17,7 @@ from   pluggdapps.plugin              import Plugin, implements, pluginname, \
                                              query_plugin
 from   pluggdapps.interfaces          import IServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
-import pluggdapps.util                as h 
+import pluggdapps.helper              as h 
 import pluggdapps.stack_context       as sc
 
 log = logging.getLogger( __name__ )
@@ -235,7 +235,7 @@ class HTTPConnection(object):
         app = query_plugin( appname, IApplication, appname )
         # IRequest plugin
         self._request = query_plugin( 
-                            appname, IRequest, app['request_factory'],
+                            appname, IRequest, app['IRequest'],
                             app, self, self.address[0], 
                             self.startline, self.headers, self.body )
         app.start( self._request )

@@ -173,6 +173,39 @@ class IRouter( Interface ):
         resolving the `request` url based on mapping urls."""
 
 
+class ICookie( Interface ):
+    """Necessary methods and plugins to be used to handle HTTP cookies. This
+    specification is compativle with IRequest and python's Cookie standard 
+    library."""
+
+    def parse_cookies( headers ):
+        """Use `headers`, to parse cookie name/value pairs, along with
+        its meta-information, into Cookie Morsels."""
+
+    def set_cookie( cookies, name, value, **kwargs ) :
+        """Sets the given cookie name/value with the given options. Key-word
+        arguments typically contains,
+          domain, expires_days, expires, path
+        Additional keyword arguments are set on the Cookie.Morsel directly.
+
+        ``cookies`` is from Cookie module and updated inplace.
+
+        See http://docs.python.org/library/cookie.html#morsel-objects
+        for available attributes.
+        """
+
+    def create_signed_value( name, value ):
+        """To avoid cookie-forgery `value` is digitally signed binary of 
+        typically a cookie_secret, name, timestamp of current time and 
+        value."""
+
+    def decode_signed_value( name, value ):
+        """`value` is digitally signed binary of typically a cookie_secret, 
+        name, timestamp and value. Validate the cookie and decode them if need
+        be and return an interpreted value. Reverse of `create_signed_value()`
+        method."""
+
+
 class IRequest( Interface ):
     """Request object, the only parameter that will be passed to
     :class:`IRquestHandler`."""
@@ -444,9 +477,6 @@ class IResponse( Interface ):
     def clear_all_cookies():
         """Deletes all the cookies the user sent with this request."""
 
-    def render( template_name, **kwargs ):
-        """Renders the template with the given arguments as the response."""
-
     def write( chunk ):
         """Writes the given chunk to the output buffer.
 
@@ -483,16 +513,7 @@ class IResponse( Interface ):
     def onfinish():
         """Callback for asynchronous writes and flushes."""
 
-    def redirect( url, permanent=False, status=None ):
-        """Sends a redirect to the given (optionally relative) URL.
-
-        If the ``status`` argument is specified, that value is used as the
-        HTTP status code; otherwise either 301 (permanent) or 302
-        (temporary) is chosen based on the ``permanent`` argument.
-        The default is 302 (temporary).
-        """
-
-    def send_error( status_code=500, **kwargs ):
+    def httperror( status_code=500, **kwargs ):
         """Sends the given HTTP error code to the browser.
 
         If `flush()` has already been called, it is not possible to send
@@ -500,27 +521,40 @@ class IResponse( Interface ):
         If output has been written but not yet flushed, it will be discarded
         and replaced with the error page.
 
-        Override `write_error()` to customize the error page that is returned.
-        Additional keyword arguments are passed through to `write_error`.
+        It is the caller's responsibility to finish the request, by calling
+        finish()."""
+
+    def redirect( url, permanent=False, status=None ):
+        """Sends a redirect to the given (optionally relative) URL.
+
+        If the ``status`` argument is specified, that value is used as the
+        HTTP status code; otherwise either 301 (permanent) or 302
+        (temporary) is chosen based on the ``permanent`` argument.
+        The default is 302 (temporary).
+
+        It is the responsibility of the caller to finish the request by
+        calling :method:`IResponse.finish`.
         """
 
-    def write_error( status_code, **kwargs ):
-        """Override to implement custom error pages.
+    def render( templatefile, request, c ):
+        """Render ``templatefile`` under ``context`` to generate response body
+        for http ``request``. Picks a plugin implementing :class:`IRenderer`
+        to generate the html. 
 
-        ``write_error`` may call `write`, `render`, `set_header`, etc
-        to produce output as usual.
+        It is the responsibility of the caller to finish the request by
+        calling :method:`IResponse.finish`.
 
-        If this error was caused by an uncaught exception, an ``exc_info``
-        triple will be available as ``kwargs["exc_info"]``.  Note that this
-        exception may not be the "current" exception for purposes of
-        methods like ``sys.exc_info()`` or ``traceback.format_exc``.
+        The render call writes the response body using :method:`IResponse.write`
 
-        For historical reasons, if a method ``get_error_html`` exists,
-        it will be used instead of the default ``write_error`` implementation.
-        ``get_error_html`` returned a string instead of producing output
-        normally, and had different semantics for exception handling.
-        Users of ``get_error_html`` are encouraged to convert their code
-        to override ``write_error`` instead.
+        ``templatefile``,
+            File path for html template in asset-specification format.
+        ``request``,
+            Plugin instance implementing :class:`IRequest` interface. Same as
+            the one passed to :class:`IController` methods.
+        ``c``,
+            Dictionary like context object. Typically populated by
+            :class:`IController` methods and made availabe inside HTML
+            templates.
         """
 
     def set_close_callback( callback ):
@@ -553,7 +587,20 @@ class IResponseTransformer( Interface ):
 
 class IErrorPage( Interface ):
 
-    def render( request, status_code, **kwargs ):
+    def render( request, status_code, c ):
+        """Use ``status_code``, typically an error code, and a collection of
+        arguments ``c`` to generate error page for ``request``. This is
+        called as a result of :method:`IResponse.httperror` method.
+
+        If this error was caused by an uncaught exception, an ``exc_info``
+        triple can be passed as ``c["exc_info"]``. Note that this
+        exception may not be the "current" exception for purposes of
+        methods like ``sys.exc_info()`` or ``traceback.format_exc``. Note that
+        exception rendering happens only when application's `debug` settings is
+        `True`.
+
+        The render call writes the response body using :method:`IResponse.write`
+        """
 
 
 class IController( Interface ):
@@ -572,39 +619,54 @@ class IController( Interface ):
             Object instance implementing :class:`IRequest` interface.
         """
 
-    def head( request ):
+    def head( request, c ):
         """Callback method for HEAD request. 
         
         ``request``,
             Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
         """
 
-    def get( request ):
+    def get( request, c ):
         """Callback method for GET request. 
         
         ``request``,
             Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
         """
 
-    def post( request ):
+    def post( request, c ):
         """Callback method for POST request. 
         
         ``request``,
             Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
         """
 
-    def delete( request ):
+    def delete( request, c ):
         """Callback method for DELETE request. 
         
         ``request``,
             Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
         """
 
-    def put( request ):
+    def put( request, c ):
         """Callback method for PUT request. 
         
         ``request``,
             Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
         """
 
     def onfinish():
@@ -614,37 +676,25 @@ class IController( Interface ):
         may or may not remain open. Refer to HTTP/1.1 spec."""
 
 
-class ICookie( Interface ):
-    """Necessary methods and plugins to be used to handle HTTP cookies. This
-    specification is compativle with IRequest and python's Cookie standard 
-    library."""
+class IRenderer( Interface ):
+    """Attributes and methods to render a page using a supplied context."""
 
-    def parse_cookies( headers ):
-        """Use `headers`, to parse cookie name/value pairs, along with
-        its meta-information, into Cookie Morsels."""
+    def render( templatefile, request, c ):
+        """Render ``templatefile`` under ``context`` to generate response body
+        for http ``request``.
 
-    def set_cookie( cookies, name, value, **kwargs ) :
-        """Sets the given cookie name/value with the given options. Key-word
-        arguments typically contains,
-          domain, expires_days, expires, path
-        Additional keyword arguments are set on the Cookie.Morsel directly.
+        The render call writes the response body using :method:`IResponse.write`
 
-        ``cookies`` is from Cookie module and updated inplace.
-
-        See http://docs.python.org/library/cookie.html#morsel-objects
-        for available attributes.
+        ``templatefile``,
+            File path for html template in asset-specification format.
+        ``request``,
+            Plugin instance implementing :class:`IRequest` interface. Same as
+            the one passed to :class:`IController` methods.
+        ``c``,
+            Dictionary like context object. Typically populated by
+            :class:`IController` methods and made availabe inside HTML
+            templates.
         """
-
-    def create_signed_value( name, value ):
-        """To avoid cookie-forgery `value` is digitally signed binary of 
-        typically a cookie_secret, name, timestamp of current time and 
-        value."""
-
-    def decode_signed_value( name, value ):
-        """`value` is digitally signed binary of typically a cookie_secret, 
-        name, timestamp and value. Validate the cookie and decode them if need
-        be and return an interpreted value. Reverse of `create_signed_value()`
-        method."""
 
 
 class IUnitTest( Interface ):

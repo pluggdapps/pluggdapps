@@ -9,7 +9,7 @@ import logging, hmac, hashlib, Cookie, base64
 from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import Plugin, implements
 from   pluggdapps.interfaces    import ICookie
-import pluggdapps.util          as h
+import pluggdapps.helper        as h
 
 log = logging.getLogger( __name__ )
 

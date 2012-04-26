@@ -11,7 +11,7 @@ from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import Plugin, implements, query_plugins, \
                                        pluginname
 from   pluggdapps.interfaces    import ICommand
-import pluggdapps.util          as h
+import pluggdapps.helper        as h
 
 log = logging.getLogger(__name__)
 

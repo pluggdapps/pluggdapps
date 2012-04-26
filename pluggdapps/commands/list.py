@@ -8,7 +8,7 @@ from   pprint                   import pprint
 from   optparse                 import OptionParser
 
 from   pluggdapps.plugin        import PluginMeta, Plugin, implements
-from   pluggdapps.util          import docstr
+from   pluggdapps.helper        import docstr
 from   pluggdapps.interfaces    import ICommand
 
 

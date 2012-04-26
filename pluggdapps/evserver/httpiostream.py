@@ -9,7 +9,7 @@ import ssl  # Python 2.6+
 
 from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import Plugin
-import pluggdapps.util          as h
+import pluggdapps.helper        as h
 import pluggdapps.stack_context as sc
 
 log = logging.getLogger( __name__ )

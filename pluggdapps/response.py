@@ -10,8 +10,9 @@ import datetime as dt
 
 from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import Plugin, implements, query_plugin
-from   pluggdapps.interfaces    import IResponse, IResponseTransformer
-import pluggdapps.util          as h
+from   pluggdapps.interfaces    import IResponse, IResponseTransformer, \
+                                       ICookie, IErrorPage
+import pluggdapps.helper        as h
 import pluggdapps.stack_context as sc
 
 # TODO :
@@ -32,8 +33,16 @@ _default_settings['transforms']     = {
     'help'    : "Comma separated transformation plugins to be applied on "
                 "response headers and body.",
 }
+_default_settings['ICookie']  = {
+    'default' : 'httpcookie',
+    'types'   : (str,),
+    'help'    : "Plugin class implementing ICookie interface specification. "
+                "methods from this plugin will be used to process request "
+                "cookies. Overrides :class:`ICookie` if defined in "
+                "application plugin."
+}
 _default_settings['IErrorPage']     = {
-    'default' : '',
+    'default' : 'HTTPErrorPage',
     'types'   : (str,),
     'help'    : "",
 }
@@ -56,6 +65,8 @@ class HTTPResponse( Plugin ):
         self._auto_finish = True
         # Cookies
         self.cookies = Cookie.SimpleCookie()
+        self.docookie = request.query_plugin(
+                ICookie, self['ICookie'] or self.app['ICookie'] )
         # Start from a clean slate
         self.clear()
 
@@ -245,7 +256,7 @@ class HTTPResponse( Plugin ):
         self._finished = True
         self.app.onfinish( self.request )
     
-    def send_error( self, status_code=500, **kwargs ):
+    def httperror( self, status_code=500, **kwargs ):
         """Sends the given HTTP error code to the browser.
 
         If `flush()` has already been called, it is not possible to send
@@ -253,62 +264,19 @@ class HTTPResponse( Plugin ):
         If output has been written but not yet flushed, it will be discarded
         and replaced with the error page.
 
-        Override `write_error()` to customize the error page that is returned.
-        Additional keyword arguments are passed through to `write_error`."""
+        It is the responsibility of the caller to finish the request by
+        calling :method:`IResponse.finish`."""
         if self._headers_written :
-            log.error("Cannot send error response after headers written")
-            self.finish() if not self._finished else None
+            log.error( "Cannot send error response after headers written" )
             return
         self.clear()
         self.set_status( status_code )
+        errorpage = self.request.query_plugin( IErrorPage, 'httperrorpage' )
         try:
-            self.write_error( status_code, **kwargs )
+            return errorpage.render( self.request, status_code, **kwargs )
         except Exception:
             log.error( "Uncaught exception in write_error", exc_info=True )
-        self.finish() if not self._finished else None
-
-    def write_error(self, status_code, **kwargs):
-        """Override to implement custom error pages.
-
-        ``write_error`` may call `write`, `render`, `set_header`, etc
-        to produce output as usual.
-
-        If this error was caused by an uncaught exception, an ``exc_info``
-        triple will be available as ``kwargs["exc_info"]``.  Note that this
-        exception may not be the "current" exception for purposes of
-        methods like ``sys.exc_info()`` or ``traceback.format_exc``.
-
-        For historical reasons, if a method ``get_error_html`` exists,
-        it will be used instead of the default ``write_error`` implementation.
-        ``get_error_html`` returned a string instead of producing output
-        normally, and had different semantics for exception handling.
-        Users of ``get_error_html`` are encouraged to convert their code
-        to override ``write_error`` instead.
-        """
-        if hasattr(self, 'get_error_html'):
-            if 'exc_info' in kwargs:
-                exc_info = kwargs.pop('exc_info')
-                kwargs['exception'] = exc_info[1]
-                try:
-                    # Put the traceback into sys.exc_info()
-                    raise exc_info[0], exc_info[1], exc_info[2]
-                except Exception:
-                    self.finish(self.get_error_html(status_code, **kwargs))
-            else:
-                self.finish(self.get_error_html(status_code, **kwargs))
-            return
-        if self.settings.get("debug") and "exc_info" in kwargs:
-            # in debug mode, try to send a traceback
-            self.set_header('Content-Type', 'text/plain')
-            for line in traceback.format_exception(*kwargs["exc_info"]):
-                self.write(line)
-            self.finish()
-        else:
-            self.finish("<html><title>%(code)d: %(message)s</title>"
-                        "<body>%(code)d: %(message)s</body></html>" % {
-                    "code": status_code,
-                    "message": httplib.responses[status_code],
-                    })
+        return
 
     def redirect( self, url, permanent=False, status=None ):
         """Sends a redirect to the given (optionally relative) URL.
@@ -317,6 +285,9 @@ class HTTPResponse( Plugin ):
         HTTP status code; otherwise either 301 (permanent) or 302
         (temporary) is chosen based on the ``permanent`` argument.
         The default is 302 (temporary).
+
+        It is the responsibility of the caller to finish the request by
+        calling :method:`IResponse.finish`.
         """
         if self._headers_written :
             raise Exception("Cannot redirect after headers have been written")
@@ -328,7 +299,13 @@ class HTTPResponse( Plugin ):
         # Remove whitespace
         url = re.sub(b(r"[\x00-\x20]+"), "", h.utf8(url))
         self.set_header( "Location", urlparse.urljoin( h.utf8(self.request.uri), url) )
-        self.finish()
+
+    def render( self, templatefile, c ):
+        """Generate HTML content for request and write them using
+        :method:`IResponse.write`.
+        It is the responsibility of the caller to finish the request by
+        calling :method:`IResponse.finish`."""
+        pass
 
     def _keep_alive( self, request ):
         """For HTTP/1.1 connection can be kept alive across multiple request
@@ -336,11 +313,6 @@ class HTTPResponse( Plugin ):
         if not request.supports_http_1_1() :
             if request.headers.get( "Connection", None ) == "Keep-Alive" :
                 self.set_header( "Connection", "Keep-Alive" )
-
-    def _create_signature( self, secret, *parts ):
-        hash_ = hmac.new( h.utf8(secret), digestmod=hashlib.sha1 )
-        [ hash_.update(utf8(part)) for part in parts ]
-        return h.utf8( hash_.hexdigest() )
 
     def _generate_headers( self ):
         lines = [ h.utf8( ' '.join([ self.request.version, 
@@ -356,4 +328,3 @@ class HTTPResponse( Plugin ):
     def _dowrite( self, chunk, callback=None ):
         assert isinstance(chunk, bytes)
         self.connection.write( chunk, callback=callback )
-

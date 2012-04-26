@@ -10,7 +10,7 @@ import logging
 
 from   pluggdapps.plugin        import Plugin, implements
 from   pluggdapps.interfaces    import ICommand
-import pluggdapps.util          as h
+import pluggdapps.helper        as h
 
 log = logging.getLogger(__name__)
 

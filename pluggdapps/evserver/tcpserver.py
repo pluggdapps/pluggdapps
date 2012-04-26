@@ -8,7 +8,7 @@ import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
 from   pluggdapps.config                import settingsfor
-import pluggdapps.util                  as h
+import pluggdapps.helper                as h
 from   pluggdapps.plugin                import ISettings, query_plugin
 from   pluggdapps.evserver              import process
 from   pluggdapps.evserver.httpioloop   import HTTPIOLoop

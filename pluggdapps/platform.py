@@ -12,9 +12,8 @@ from   pluggdapps.config     import ConfigDict, settingsfor
 from   pluggdapps.plugin     import Plugin, query_plugin, query_plugins, \
                                     pluginname, plugin_init
 from   pluggdapps.config     import loadsettings, getsettings
-import pluggdapps.log        as logm
 from   pluggdapps.interfaces import IApplication
-import pluggdapps.util       as h
+import pluggdapps.helper     as h
 
 log = logging.getLogger(__name__)
 
@@ -155,7 +154,8 @@ class Platform( Plugin ):
     @classmethod
     def setuplog( cls, level=None, procid=None ):
         """Setup logging."""
-        from pluggdapps import ROOTAPP
+        from   pluggdapps     import ROOTAPP
+        import pluggdapps.log as logm
         logsett = settingsfor( 'logging.', getsettings(ROOTAPP, plugin='platform' ))
         logsett['level'] = level or logsett['level']
         logsett['filename'] = logm.logfileusing( procid, logsett['filename'] )

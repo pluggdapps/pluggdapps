@@ -85,7 +85,7 @@ class PluginMeta( type ):
 
                 self.appname, sett = appname, {}
                 # Initialize :class:`ISettings` attributes
-                self.settings = deepcopy( appsettings[self.appname] )
+                settings = deepcopy( appsettings[self.appname] )
                 # Plugin settings
                 pluginnm = pluginname(self)
                 if pluginnm in PluginMeta._implementers[IApplication] :
@@ -434,3 +434,18 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
     nm = pluginname( name )
     cls = PluginMeta._implementers.get( interface, {} ).get( nm, None )
     return cls( appname, *args, **kwargs ) if cls else None
+
+
+# Unit-test
+from pluggdapps.unittest import UnitTestBase
+
+class UnitTest_Plugin( UnitTestBase ):
+
+    def test( self ):
+        self.test_whichmodule()
+
+    def test_whichmodule( self ):
+        log.info("Testing whichmodule() ...")
+        assert whichmodule(UnitTest_Plugin).__name__ == 'pluggdapps.plugin'
+        assert whichmodule(self).__name__ == 'pluggdapps.plugin'
+        assert whichmodule(whichmodule).__name__ == 'pluggdapps.plugin'
