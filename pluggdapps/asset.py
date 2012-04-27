@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from   os.path              import sep, isabs
-import pkg_resources
+import pkg_resources, logging
+from   os.path  import isabs, sep
 
 from   pluggdapps.compat    import string_types
-from   pluggdapps.path      import (package_path, package_name,)
+from   pluggdapps.path      import package_name, package_path
+
+log = logging.getLogger( __name__ )
 
 def parse_assetspec( spec, pname ):
     """Parse the asset specification ``spec`` in the context of package name
@@ -26,31 +28,24 @@ def parse_assetspec( spec, pname ):
         pname, filename = None, spec
     return pname, filename
 
-
 def asset_spec_from_abspath( abspath, package ):
     """ Try to convert an absolute path to a resource in a package to
     a resource specification if possible; otherwise return the
     absolute path.  """
     if getattr(package, '__name__', None) == '__main__':
         return abspath
-    pp = package_path(package) + os.path.sep
+    pp = package_path(package) + sep
     if abspath.startswith(pp):
         relpath = abspath[len(pp):]
         return '%s:%s' % (package_name(package),
-                          relpath.replace(os.path.sep, '/'))
+                          relpath.replace(sep, '/'))
     return abspath
 
-
-# bw compat only; use pyramid.path.AssetDescriptor.abspath() instead
-def abspath_for_spec( spec, pname=None ):
+# bw compat only; use AssetDescriptor.abspath() instead
+def abspath_from_asset_spec( spec, pname=None ):
     if pname is None :
         return spec
     pname, filename = resolve_asset_spec( spec, pname )
     if pname is None:
         return filename
     return pkg_resources.resource_filename(pname, filename)
-
-
-# Unit-test
-from pluggdapps.unittest import UnitTestBase
-

@@ -24,7 +24,8 @@ except ImportError: # pragma: no cover
         from django.utils import simplejson as json # GAE
 
 # True if we are running on Python 3.
-PY3 = sys.version_info[0] == 3
+PY3  = sys.version_info[0] == 3
+ver_int = int( str(sys.version_info[0]) + str(sys.version_info[1]) )
 
 if PY3: # pragma: no cover
     string_types = str,

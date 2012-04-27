@@ -36,7 +36,7 @@ class UnitTest( Plugin ):
             if case.__class__ == UnitTestBase :
                 continue
             if self.args :
-                if self.args[0] == pluginname(case) :
+                if self.args[0].lower() == pluginname(case) :
                     self._run_testcase( case )
                     break;
             else :

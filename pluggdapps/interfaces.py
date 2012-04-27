@@ -696,7 +696,6 @@ class IRenderer( Interface ):
             templates.
         """
 
-
 class IUnitTest( Interface ):
     """Local interface to performing unit-testing on various modules."""
 
