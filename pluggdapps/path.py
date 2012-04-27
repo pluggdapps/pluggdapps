@@ -390,7 +390,7 @@ class FSAssetDescriptor(object):
 from pluggdapps.unittest import UnitTestBase
 from os.path import dirname, join
 
-class UnitTest_Asset( UnitTestBase ):
+class UnitTest_Path( UnitTestBase ):
 
     def test( self ):
         self.test_package_path()
@@ -408,17 +408,18 @@ class UnitTest_Asset( UnitTestBase ):
         assert package_path( pluggdapps.commands.unittest ) == refpath
 
     def test_caller_module( self ):
+        import pluggdapps.path
         log.info("Testing caller_module() ...")
-        assert caller_module(1) == sys.modules['pluggdapps.asset']
-        assert caller_module(2) == sys.modules['pluggdapps.asset']
+        assert caller_module(1) == sys.modules['pluggdapps.path']
+        assert caller_module(2) == sys.modules['pluggdapps.path']
         assert caller_module(3) == sys.modules['pluggdapps.commands.unittest']
         assert caller_module(4) == sys.modules['pluggdapps.commands.unittest']
 
     def test_caller_path( self ):
         log.info("Testing caller_path() ...")
         unittestpath = join( dirname(__file__), 'commands', 'unittest.py' )
-        assert caller_path('asset.py', 1) == __file__
-        assert caller_path('asset.py', 2) == __file__
+        assert caller_path('path.py', 1) == join(dirname(__file__), 'path.py')
+        assert caller_path('path.py', 2) == join(dirname(__file__), 'path.py')
         assert caller_path('unittest.py', 3) == unittestpath
         assert caller_path('unittest.py', 4) == unittestpath
 

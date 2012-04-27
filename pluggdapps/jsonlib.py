@@ -12,6 +12,8 @@
 
 import json
 
+from   pluggdapps.bsu   import recursive_unicode, to_unicode
+
 __all__ = [ 'json_encode', 'json_decode' ]
 
 def json_encode( value ):
@@ -24,8 +26,7 @@ def json_encode( value ):
     # http://stackoverflow.com/questions/1580647/json-why-are-forward-slashes-escaped
     return json.dumps( recursive_unicode(value) ).replace( "</", "<\\/" )
 
-def json_decode(value):
+def json_decode( value ):
     """Returns Python objects for the given JSON string."""
-    return json.loads( to_basestring(value) )
-
+    return json.loads( to_unicode(value) )
 

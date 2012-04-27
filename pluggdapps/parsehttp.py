@@ -258,7 +258,7 @@ else:
         if encoding is None:
             return urllib.parse.unquote_to_bytes(value)
         else:
-            return urllib.unquote_plus(to_basestring(value), encoding=encoding)
+            return urllib.unquote_plus(to_unicode(value), encoding=encoding)
 
     def parse_qs_bytes(qs, keep_blank_values=False, strict_parsing=False):
         """Parses a query string like urlparse.parse_qs, but returns the

@@ -27,3 +27,5 @@ class UnitTestBase( Plugin ):
 # modules with unittest cases
 
 import pluggdapps.asset
+import pluggdapps.path
+import pluggdapps.util

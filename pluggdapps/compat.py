@@ -42,33 +42,22 @@ else:
     binary_type = str
     long = long
 
-def text_(s, encoding='latin-1', errors='strict'):
-    if isinstance(s, binary_type):
-        return s.decode(encoding, errors)
-    return s # pragma: no cover
-
-def bytes_(s, encoding='latin-1', errors='strict'):
-    if isinstance(s, text_type):
-        return s.encode(encoding, errors)
-    return s
-
+# When dealing with the standard library across python 2 and 3 it is
+# sometimes useful to have a direct conversion to the native string type
 if PY3: # pragma: no cover
     def ascii_native_(s):
         if isinstance(s, text_type):
             s = s.encode('ascii')
         return str(s, 'ascii', 'strict')
-else:
-    def ascii_native_(s):
-        if isinstance(s, text_type):
-            s = s.encode('ascii')
-        return str(s)
-
-if PY3: # pragma: no cover
     def native_(s, encoding='latin-1', errors='strict'):
         if isinstance(s, text_type):
             return s
         return str(s, encoding, errors)
 else:
+    def ascii_native_(s):
+        if isinstance(s, text_type):
+            s = s.encode('ascii')
+        return str(s)
     def native_(s, encoding='latin-1', errors='strict'):
         if isinstance(s, text_type):
             return s.encode(encoding, errors)
