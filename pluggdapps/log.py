@@ -34,7 +34,7 @@ def setup( logsett ):
 
     log = None
     if logsett['filename'] :
-        filename = logfileusing( None, logsett['filename'] )
+        filename = logsett['filename']
         channel = logging.handlers.RotatingFileHandler(
                         filename=filename,
                         maxBytes=logsett['file_maxsize'],

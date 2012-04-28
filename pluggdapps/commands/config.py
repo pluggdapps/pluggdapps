@@ -8,7 +8,8 @@ from   optparse   import OptionParser
 from   pprint     import pprint
 import logging
 
-from   pluggdapps.plugin        import Plugin, implements
+from   pluggdapps.plugin        import Plugin, implements, query_plugin,\
+                                       IApplication
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.helper        as h
 
@@ -31,21 +32,19 @@ class Config( Plugin ):
         return self.options, self.args
 
     def run( self, options=None, args=[] ):
-        from pluggdapps.config import default_settings, load_inisettings
-        from pluggdapps import ROOTAPP, apps
+        from pluggdapps.config import default_appsettings, load_inisettings
+        from pluggdapps import ROOTAPP
         options = options or self.options
         args = args or self.args
 
         appname = options.appname or ROOTAPP
         if options.defsett :
-            appsett = default_settings
+            appsett = default_appsettings
         elif options.inisett :
             appsett = load_inisettings( platform.inifile )
 
-        if appname in apps :
-            appsett = apps[appname].settings
-        else :
-            raise Exception("Application settings for %r not found" % appname)
+        app = query_plugin( appname, IApplication, appname )
+        appsett = app.settings
 
         plugin = options.plugin and ('plugin:' + options.plugin)
         if plugin in appsett :

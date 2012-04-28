@@ -84,11 +84,11 @@ class Platform( Plugin ):
         ``loglevel``,
             loglevel to use. This will override default 'logging.level'.
         """
-        from  pluggdapps import apps, ROOTAPP
+        from  pluggdapps import ROOTAPP
         log.info( 'Booting platform from %r ...', inifile )
         cls.inifile = inifile
         # Setup logger 
-        cls.setuplog( inifile )
+        cls.setuplog( inifile, loglevel=loglevel )
         # Load packages specific to pluggdapps
         cls._loadpackages()
         # Load application settings
@@ -98,12 +98,11 @@ class Platform( Plugin ):
         # Initialize plugin data structures
         plugin_init()
         # Load applictions
-        for app in query_plugins( ROOTAPP, IApplication ) :
+        for app in query_plugins( '', IApplication, appsettings ) :
             appname = pluginname( app )
             app.settings = cls.appsettings[ appname ]
             log.debug( "Booting application %r ...", appname )
-            app.boot( app.settings ) 
-            apps[ appname ] = app
+            app.onboot( app.settings ) 
 
     def serve( self ):
         """Use :class:`IServer` interface and `servername` settings to start a
@@ -116,15 +115,14 @@ class Platform( Plugin ):
         self.server.start()  # Blocks !
 
     def shutdown( self ):
-        from pluggdapps import get_apps
+        from pluggdapps import ROOTAPP
         log.info( "Shutting down platform ..." )
-        for appname, app in get_apps().items() :
-            log.debug( "Shutting down application %r ...", appname )
+        for app in query_plugins( '', IApplication ) :
+            log.debug( "Shutting down application %r ...", pluginname(app) )
             app.shutdown( app.settings )
 
     def appfor( self, startline, headers, body ):
         """Resolve applications for `request`."""
-        from  pluggdapps import get_apps
         method, uri, version = h.parse_startline( startline )
         host = headers.get("Host") or "127.0.0.1"
         _, _, path, _, _ = urlparse.urlsplit( h.native_str(uri) )
@@ -145,13 +143,13 @@ class Platform( Plugin ):
             else :
                 appnames = [ cls.map_scripts['/'] ]
                 script = ''
-        return get_apps()[appname]
+        return appnames[0]
 
     on_subdomains = property( lambda s : s.map_subdomains )
     on_scripts = property( lambda s : s.map_scripts )  
 
     @classmethod
-    def setuplog( cls, inifile=None, procid=None ):
+    def setuplog( cls, inifile=None, loglevel=None, procid=None ):
         """Setup logging."""
         from   pluggdapps        import ROOTAPP
         import pluggdapps.log    as logm
@@ -167,7 +165,7 @@ class Platform( Plugin ):
         logsett = dict([ (k[8:], v) for k,v in _default_settings.items()
                                     if k.startswith('logging.') ])
 
-        logsett['level'] = level or logsett['level']
+        logsett['level'] = loglevel or level or logsett['level']
         logsett['filename'] = logm.logfileusing( procid, logsett['filename'] )
         logm.setup( logsett )
 

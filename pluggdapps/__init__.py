@@ -63,18 +63,6 @@ gives a hierarchy of configuration sources and its priority.
     dictionary for every valid application.
 """
 
-apps = {}
-"""Dictionary of application plugins, indexed by application names.
-
-  * Every mountable application is a plugin object implementing
-    :class:`IApplication` interface specification.
-
-  * Application's `settings` will be populated during platform boot-up time.
-"""
-
-def get_apps() :
-    return apps
-
 def package() :
     """Entry point that returns a dictionary of key,value details about the
     package.

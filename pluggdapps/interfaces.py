@@ -6,11 +6,11 @@
 
 import socket, logging
 
-from   pluggdapps.plugin import Interface, Attribute
+from   pluggdapps.plugin import Interface, Attribute, ISettings, IApplication
 
 __all__ = [ 
     'ICommand', 'IServer', 'IRequest', 'IApplication', 'IRouter',
-    'IResponse'
+    'IResponse',
 ]
 
 log = logging.getLogger(__name__)
@@ -102,61 +102,6 @@ class IServer( Interface ):
         """To handle a new connection stream."""
 
 
-class IApplication( Interface ):
-    """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
-    of configuration parameters implementing one or more interface
-    specification."""
-
-    appscript = Attribute(
-        "The script name on which the application was mounted. If the "
-        "application is mounted on a sub-domain this will be ``None``"
-    )
-    appdomain = Attibute(
-        "The subdomain name on which the application was mounted. If the "
-        "application is mounted on a script name this will be ``None``"
-    )
-
-    def boot( settings ):
-        """Do necessary activities to boot this applications. Called at
-        platform boot-time.
-
-        ``settings``,
-            configuration dictionary for this application. Dictionary is a
-            collection of sections and its settings. Plugin section names will
-            follow the following format, 'plugin:<pluginname>'. There is a
-            special section by name 'DEFAULT', whose settings are global to
-            all other section settings.
-        """
-
-    def start( request ):
-        """Once a `request` is resolved for an application, this method is the
-        entry point for the request into the resolved application. Typically 
-        this method will be implemented by :class:`Application` base class 
-        which automatically does url route-mapping and invokes the configured 
-        request handler."""
-
-    def router( request ):
-        """Return the router plugin implementing :class:`IRouter` 
-        interface."""
-
-    def onfinish( request ):
-        """A finish is called on the response. And this call back is issued to 
-        Start a finish sequence for this ``request`` in the application's 
-        context. Plugin's implementing this method must call
-        request.onfinish()."""
-
-    def shutdown( settings ):
-        """Shutdown this application. Reverse of boot.
-        
-        ``settings``,
-            configuration dictionary for this application. Dictionary is a
-            collection of sections and its settings. Plugin section names will
-            follow the following format, 'plugin:<pluginname>'. There is a
-            special section by name 'DEFAULT', whose settings are global to
-            all other section settings.
-        """
-
-
 class IRouter( Interface ):
     """Every `IRouter` plugin must either treat a request's url as a chain
     of resource and resolve them based on the next path component or 
@@ -184,8 +129,6 @@ class IRouter( Interface ):
     def match( request ):
         """If route() method should return None, then match must succeed in 
         resolving the `request` url based on mapping urls."""
-
-    def generate( request, *elements, **kwargs ):
 
 
 class ICookie( Interface ):
@@ -309,16 +252,13 @@ class IRequest( Interface ):
         "instance of plugin implementing :class:`IResponse` interface."
     )
 
-    def __init__( app, connection, address, startline, headers, body ):
+    def __init__( connection, address, startline, headers, body ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
         :method:`IRequest.handle` is called complete request is available
         and partially parsed.
 
-        ``app``,
-            application plugin implementing :class:`IApplication` interface
-            in whose context the current request is processed.
         ``connection``,
             HTTP socket returned as a result of accepting the connection.
         ``address``

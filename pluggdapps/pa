@@ -46,7 +46,6 @@ def docommand( platform, command, argv ):
 
 def doscript( paargs, cmd ):
     """Default handling for master script."""
-    from  pluggdapps import apps
     parser = parse( usage )
     options, args = parser.parse_args( paargs )
 

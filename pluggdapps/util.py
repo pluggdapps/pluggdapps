@@ -224,7 +224,7 @@ class UnitTest_Util( UnitTestBase ):
         import pkg_resources as pkg
         log.info("Testing call_entrypoint() ...")
         dist = pkg.WorkingSet().by_key['pluggdapps']
-        info = call_entrypoint( dist, 'pluggdapps', 'package', {} )
+        info = call_entrypoint( dist, 'pluggdapps', 'package' )
         assert info == {}
 
     def test_docstr( self ):

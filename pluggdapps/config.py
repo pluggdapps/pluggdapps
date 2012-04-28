@@ -11,7 +11,7 @@
 import logging
 from   copy                 import deepcopy
 
-from   pluggdapps.plugin    import plugin_info
+from   pluggdapps.plugin    import plugin_info, query_plugin, IApplication
 from   pluggdapps.compat    import configparser, string_types
 
 log = logging.getLogger( __name__ )
@@ -112,9 +112,7 @@ def nestedload( options ):
 def getsettings( app, sec=None, plugin=None, key=None ):
     from  pluggdapps import get_apps
     if isinstance( app, string_types ):
-        app = get_apps().get( app, None )
-        if not app :
-            raise Exception("IApplication plugin %r not found, app")
+        app = query_plugin( app, IApplication, app )
     sec = sec or ('plugin:'+plugin if plugin else None)
     appsett = app.settings
     if sec == None :

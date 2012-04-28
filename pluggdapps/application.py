@@ -7,7 +7,7 @@
 import logging
 
 from   pluggdapps.config     import ConfigDict
-from   pluggdapps.plugin     import Plugin, Interface, implements
+from   pluggdapps.plugin     import Plugin, Singleton, Interface, implements
 from   pluggdapps.interfaces import IApplication
 import pluggdapps.helper     as h
 
@@ -49,10 +49,10 @@ _default_settings['IRouter']  = {
     'help'    : ""
 }
 
-class RootApp( Plugin ):
+class RootApp( Plugin, Singleton ):
     implements( IApplication )
 
-    def boot( self, settings ):
+    def onboot( self, settings ):
         pass
 
     def start( self, request ):

@@ -38,16 +38,15 @@ class HTTPRequest( Plugin ):
     elapsedtime = property( lambda self : time.time() - self.receivedat )
 
     # IRequest interface methods and attributes
-    def __init__( self, app, conn, address, startline, headers, body ):
+    def __init__( self, conn, address, startline, headers, body ):
         self.receivedat = time.time()
         self.finishedat = None
 
         xheaders = getattr(conn, 'xheaders', None) if conn else None
-        self.app = app
         self.connection = conn
         self.platform = conn.platform
         self.docookie = self.query_plugin( 
-                ICookie, self['ICookie'] or app['ICookie'] )
+                ICookie, self['ICookie'] or self.app['ICookie'] )
         
         self.method, self.uri, self.version = parse_startline( startline )
         self.headers = headers or h.HTTPHeaders()
@@ -65,7 +64,7 @@ class HTTPRequest( Plugin ):
         args, self.files = self.parse_body( method, self.headers, body )
         self.arguments.update( args )
         # Reponse object
-        self.response = self.query_plugin( IResponse, app['IResponse'], self )
+        self.response = self.query_plugin(IResponse, self.app['IResponse'], self)
 
     def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
@@ -138,7 +137,7 @@ class HTTPRequest( Plugin ):
         return self.docookie.decode_signed_value( name, value ) 
 
     def onfinish( self ):
-        """Callback when :meth:`IResponse.finis()` is called."""
+        """Callback when :meth:`IResponse.finish()` is called."""
         self.connection.finish()
         self.finishedat = time.time()
 
@@ -157,10 +156,10 @@ class HTTPRequest( Plugin ):
         return url + url_quote( bscript_name, PATH_SAFE )
 
     def query_plugin( self, *args, **kwargs ):
-        query_plugin( self.appname, *args, **kwargs )
+        query_plugin( self.app, *args, **kwargs )
 
     def query_plugins( self, *args, **kwargs ):
-        query_plugin( self.appname, *args, **kwargs )
+        query_plugin( self.app, *args, **kwargs )
 
     def __repr__( self ):
         attrs = ( "scheme", "host", "method", "uri", "version", "remote_ip",
