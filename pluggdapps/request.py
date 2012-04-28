@@ -148,12 +148,12 @@ class HTTPRequest( Plugin ):
         variants."""
         host = host or self.host
         port = port or self.port
-        url = scheme or self.scheme + '://'
+        url = (scheme or self.scheme) + '://'
         if host :
             url += host
         if port :
             url += ':'+str(port)
-        bscript_name = h.utf8( self.appscript )
+        bscript_name = h.utf8( self.app.appscript )
         return url + url_quote( bscript_name, PATH_SAFE )
 
     def query_plugin( self, *args, **kwargs ):

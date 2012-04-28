@@ -17,43 +17,65 @@ import pluggdapps.application
 __version__ = '0.1dev'
 ROOTAPP = 'rootapp'
 
-appsettings = {}
-"""Dictionary of plugin configurations. Note that,
+settings = {}    # This is a dummy object, use the corresponding app's 
+                 # plugin to access its settings
+"""Dictionary of plugin configurations for each aplication. The following
+gives a hierarchy of configuration sources and its priority.
+
+  * A dictionary of settings will be parsed and populated for every loaded
+    application, defined by its plugin. Typical structure of settings
+    dictionary will be,
+
+      { 'DEFAULT'    : { <option> : <value>, ... },
+        <pluginname> : { <option> : <value>, ... },
+        ...
+      }
+
+  * Since every application is also a plugin, their default settings, defined
+    by :meth:`ISettings.default_settings` will be populated under ``DEFAULT``
+    section of the settings dictionary.
+
+  * Similarly, every loaded plugin's default settings will be popluated
+    under the corresponding plugin-section of the settings dictionary.
+
+  * Settings in ``DEFAULT`` section can be overridden in the master ini 
+    file by,
+
+      [app:<appname>]
+        key = value
+        ....
+
+  * Master configuration file, also called platform configuration file, can 
+    specify separate configuration files for each loaded application like,
+
+     [app:<appname>]
+        use = config:<app-ini-file>
+    
+    and all sections and its configuration inside <app-ini-file> will override
+    the default settings.
+
+  * Similar to ini files, settings can also be read from web-admin's backend
+    storage. If one is available, then the sections and configuration for a 
+    valid application found in the backend storage will override the
+    applications settings parsed so far.
+
+  * structure stored in web-admin's backend will be similar to this settings
+    dictionary for every valid application.
+"""
+
+apps = {}
+"""Dictionary of application plugins, indexed by application names.
 
   * Every mountable application is a plugin object implementing
     :class:`IApplication` interface specification.
 
-  * Platform configuration file (master ini file) can specify separate 
-    configuration files for each loaded application like,
-     [app:<appname>]
-        use = config:<ini-file>
-
-  * `appsettings` dictionary will have the following structure,
-      { <appname> : { 'DEFAULT'    : { <option> : <value>, ... },
-                      <pluginname> : { <option> : <value>, ... },
-                      ...
-                    },
-        ...
-      }
-    where, <appname> is plugin-name implementing :class:`IApplication`
-    interface.
-
-  * `appsettings` structure will be populated based on default settings, by
-    parsing configuration files (ini files) and web-admin's storage backend.
-
-  * settings in configuration file will override default settings and
-    web-admin's settings will override settings from configuration file.
-
-  * structure stored in web-admin's backend will be similar to the
-    `appsettings` structure described above.
-
-  * `appsettings` will be populated during platform boot-up time.
+  * Application's `settings` will be populated during platform boot-up time.
 """
 
-def get_appsettings() :
-    return appsettings
+def get_apps() :
+    return apps
 
-def package( appsettings ) :
+def package() :
     """Entry point that returns a dictionary of key,value details about the
     package.
     """

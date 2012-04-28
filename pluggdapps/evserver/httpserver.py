@@ -231,15 +231,12 @@ class HTTPConnection(object):
 
     def dispatch( self ):
         # Resolve application
-        appname, appscript = self.platform.appfor(
-                                self.startline, self.headers, self.body )
-        app = query_plugin( appname, IApplication, appname )
+        app = self.platform.appfor( self.startline, self.headers, self.body )
         # IRequest plugin
         self._request = query_plugin( 
                             appname, IRequest, app['IRequest'],
                             app, self, self.address[0], 
                             self.startline, self.headers, self.body )
-        self._request.appscript = appscript
         app.start( self._request )
         # Flush and finish the response
         # Reset request attributes

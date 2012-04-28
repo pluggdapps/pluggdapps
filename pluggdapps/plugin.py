@@ -81,13 +81,14 @@ class PluginMeta( type ):
 
             def masterinit( self, appname, *args, **kwargs ) :
                 """Component Init function hooked in by ComponentMeta."""
-                from  pluggdapps import get_appsettings
+                from  pluggdapps import get_apps
                 from  pluggdapps.interfaces import IApplication
                 from  pluggdapps.config import app2sec
 
-                appsettings, self.appname, sett = get_appsettings(), appname, {}
+                apps, self.appname, sett = get_apps(), appname, {}
+                self.app = apps[ appname ]
                 # Initialize :class:`ISettings` attributes
-                self.settings = deepcopy( appsettings[ app2sec(self.appname) ] )
+                self.settings = deepcopy( self.app.settings )
                 # Plugin settings
                 pluginnm = pluginname(self)
                 if pluginnm in PluginMeta._implementers[IApplication] :
@@ -311,9 +312,13 @@ class ISettings( Interface ):
         "application is involved (or resolved) then `ROOTAPP` is used as the "
         "plugin's application context."
     )
+    app = Attribute(
+        "Application instance deriving from :class:`Plugin` implementing "
+        ":class:`IApplication` interface. The plugin implementing should be "
+        "correspondingly same to that of appname."
+    )
     settings = Attribute(
-        "This attribute is a copy of application's settings from "
-        "``pluggdapps.appsettings``."
+        "Read only copy of application's settings"
     )
 
     def normalize_settings( settings ):

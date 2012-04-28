@@ -28,4 +28,5 @@ class UnitTestBase( Plugin ):
 
 import pluggdapps.asset
 import pluggdapps.path
+import pluggdapps.bsu
 import pluggdapps.util

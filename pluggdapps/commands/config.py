@@ -32,18 +32,18 @@ class Config( Plugin ):
 
     def run( self, options=None, args=[] ):
         from pluggdapps.config import default_settings, load_inisettings
-        from pluggdapps import ROOTAPP, appsettings
+        from pluggdapps import ROOTAPP, apps
         options = options or self.options
         args = args or self.args
 
         appname = options.appname or ROOTAPP
         if options.defsett :
-            appsettings = default_settings
+            appsett = default_settings
         elif options.inisett :
-            appsettings = load_inisettings( platform.inifile )
+            appsett = load_inisettings( platform.inifile )
 
-        if appname in appsettings :
-            appsett = appsettings[appname]
+        if appname in apps :
+            appsett = apps[appname].settings
         else :
             raise Exception("Application settings for %r not found" % appname)
 

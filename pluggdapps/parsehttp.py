@@ -23,7 +23,7 @@ log = logging.getLogger( __name__ )
 def _port_for_scheme( scheme ):
     if scheme == 'http' :
         port = 80
-    elif scheme = 'https' : 
+    elif scheme == 'https' : 
         port = 443
     else :
         port =None
@@ -45,7 +45,7 @@ def parse_url( scheme, host ):
         host, port = host.split(':', 1)
     elif host and r.port :
         port = r.port
-    else host :
+    elif host :
         port = _port_for_scheme( scheme )
     else :
         host = r.hostname

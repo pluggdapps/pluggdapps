@@ -31,8 +31,6 @@ def options( parser ):
     parser.add_option( '-i', '--import', action="append", dest='imports',
                        default=[],
                        help="specify modules to import")
-    parser.add_option( '-e', '--environment', dest='environment', default=None,
-                       help="apply the given config environment")
     parser.add_option( '--pa', action="append", dest='tostartpath', default=[],
                        help="add given paths to the beginning of sys.path")
     parser.add_option( '--pz', action="append", dest='toendpath', default=[],
@@ -48,7 +46,7 @@ def docommand( platform, command, argv ):
 
 def doscript( paargs, cmd ):
     """Default handling for master script."""
-    from  pluggdapps        import appsettings
+    from  pluggdapps import apps
     parser = parse( usage )
     options, args = parser.parse_args( paargs )
 
@@ -61,10 +59,6 @@ def doscript( paargs, cmd ):
     # -i (import)
     sys.path.insert(0, '')
     for i in options.imports : exec( "import %s" % i )
-
-    # -e environment, setupt cmd-line environment options to appsetting's root
-    if options.environment is not None :
-        appsettings[ROOTAPP]['environment'] = options.environment
 
     if cmd :
         level = None if cmd in ['serve', 'unittest'] else 'info'

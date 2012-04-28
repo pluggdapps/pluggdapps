@@ -107,6 +107,15 @@ class IApplication( Interface ):
     of configuration parameters implementing one or more interface
     specification."""
 
+    appscript = Attribute(
+        "The script name on which the application was mounted. If the "
+        "application is mounted on a sub-domain this will be ``None``"
+    )
+    appdomain = Attibute(
+        "The subdomain name on which the application was mounted. If the "
+        "application is mounted on a script name this will be ``None``"
+    )
+
     def boot( settings ):
         """Do necessary activities to boot this applications. Called at
         platform boot-time.
@@ -163,14 +172,20 @@ class IRouter( Interface ):
         Typically url route mapping is initialized here.
         """
 
+    def baseurl():
+        """Base url for this application. Use scheme, host, port and appscript
+        to generate this base url."""
+
     def route( request ):
         """If a `request` url is treated as a chain of resource and resolved 
-        based on the next path component. Return a `IRouter` plugin that will
+        based on the next path segement return a `IRouter` plugin that will
         be used for further url resolution."""
 
     def match( request ):
         """If route() method should return None, then match must succeed in 
         resolving the `request` url based on mapping urls."""
+
+    def generate( request, *elements, **kwargs ):
 
 
 class ICookie( Interface ):
@@ -210,13 +225,6 @@ class IRequest( Interface ):
     """Request object, the only parameter that will be passed to
     :class:`IRquestHandler`."""
 
-    app = Attribute(
-        "Application instance deriving from :class:`Plugin` implementing "
-        ":class:`IApplication` interface."
-    )
-    appname = Attribute(
-        "Should be same as pluginm(app)."
-    )
     connection = Attribute(
         "An HTTP request is attached to a single HTTP connection, which can "
         "be accessed through the 'connection' attribute. Since connections "
@@ -247,9 +255,6 @@ class IRequest( Interface ):
         "The requested port number, usually taken from the ``Host`` header, "
         "else by parsing the url field. If port is left empty, it assumes the "
         "default port number based on the ``scheme`` field."
-    )
-    appscript = Attribute(
-        "The script name on which the application was mounted."
     )
     path = Attribute(
         "Path portion of HTTP request URI"
@@ -394,9 +399,6 @@ class IRequest( Interface ):
         ``scheme`` is passed as ``http`` and ``port`` is not passed, the
         ``port`` value is assumed to be ``80``.
         """
-
-    def baseurl( *args, **kwargs ) :
-        """Generate url for same application handling the current request."""
 
     def url( *args, **kwargs ) :
         """Generate url for same application handling the current request."""

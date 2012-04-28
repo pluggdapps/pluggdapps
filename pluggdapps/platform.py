@@ -84,30 +84,26 @@ class Platform( Plugin ):
         ``loglevel``,
             loglevel to use. This will override default 'logging.level'.
         """
-        from  pluggdapps import get_appsettings, ROOTAPP
+        from  pluggdapps import apps, ROOTAPP
         log.info( 'Booting platform from %r ...', inifile )
         cls.inifile = inifile
-        # Load application settings
-        appsettings = get_appsettings()
-        appsettings.update( loadsettings( inifile ))
-        cls.appsettings = appsettings
         # Setup logger 
-        cls.setuplog( level=loglevel )
-
-        # Parse master ini file for application mount rules and generate a map
-        cls.map_subdomains, cls.map_scripts = cls._mountmap()
+        cls.setuplog( inifile )
         # Load packages specific to pluggdapps
-        cls._loadpackages( appsettings )
+        cls._loadpackages()
+        # Load application settings
+        cls.appsettings = appsettings = loadsettings( inifile )
+        # Parse master ini file for application mount rules and generate a map
+        cls.map_subdomains, cls.map_scripts = cls._mountmap( appsettings )
         # Initialize plugin data structures
         plugin_init()
-        # Boot applications
-        apps = query_plugins( ROOTAPP, IApplication )
-        for app in apps :
-            appname = pluginname(app)
+        # Load applictions
+        for app in query_plugins( ROOTAPP, IApplication ) :
+            appname = pluginname( app )
+            app.settings = cls.appsettings[ appname ]
             log.debug( "Booting application %r ...", appname )
-            app.boot( appsettings[ app2sec(appname) ] ) 
-
-        return appsettings
+            app.boot( app.settings ) 
+            apps[ appname ] = app
 
     def serve( self ):
         """Use :class:`IServer` interface and `servername` settings to start a
@@ -120,15 +116,15 @@ class Platform( Plugin ):
         self.server.start()  # Blocks !
 
     def shutdown( self ):
-        from pluggdapps import ROOTAPP
+        from pluggdapps import get_apps
         log.info( "Shutting down platform ..." )
-        for app in query_plugin( ROOTAPP, IApplication ) :
-            appname = pluginname(app)
+        for appname, app in get_apps().items() :
             log.debug( "Shutting down application %r ...", appname )
-            app.shutdown( appsettings[ app2sec(appname) ] )
+            app.shutdown( app.settings )
 
     def appfor( self, startline, headers, body ):
         """Resolve applications for `request`."""
+        from  pluggdapps import get_apps
         method, uri, version = h.parse_startline( startline )
         host = headers.get("Host") or "127.0.0.1"
         _, _, path, _, _ = urlparse.urlsplit( h.native_str(uri) )
@@ -149,28 +145,39 @@ class Platform( Plugin ):
             else :
                 appnames = [ cls.map_scripts['/'] ]
                 script = ''
-        return appnames[0], script
+        return get_apps()[appname]
 
     on_subdomains = property( lambda s : s.map_subdomains )
     on_scripts = property( lambda s : s.map_scripts )  
 
     @classmethod
-    def setuplog( cls, level=None, procid=None ):
+    def setuplog( cls, inifile=None, procid=None ):
         """Setup logging."""
-        from   pluggdapps     import ROOTAPP
-        import pluggdapps.log as logm
-        logsett = settingsfor( 'logging.', getsettings(ROOTAPP, plugin='platform' ))
+        from   pluggdapps        import ROOTAPP
+        import pluggdapps.log    as logm
+        from   pluggdapps.compat import configparser
+
+        if inifile :
+            cp = configparser.SafeConfigParser()
+            cp.read( inifile )
+            level = cp.defaults().get('logging.level', None)
+        else :
+            level = None
+
+        logsett = dict([ (k[8:], v) for k,v in _default_settings.items()
+                                    if k.startswith('logging.') ])
+
         logsett['level'] = level or logsett['level']
         logsett['filename'] = logm.logfileusing( procid, logsett['filename'] )
         logm.setup( logsett )
 
     @classmethod
-    def _loadpackages( self, appsettings ):
+    def _loadpackages( self ):
         """Import all packages from this python environment."""
         packages = []
         pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
         for pkgname, d in sorted( pkgs.items(), key=lambda x : x[0] ) :
-            info = h.call_entrypoint(d,  'pluggdapps', 'package', appsettings)
+            info = h.call_entrypoint(d,  'pluggdapps', 'package' )
             if info == None : continue
             __import__( pkgname )
             packages.append( pkgname )
@@ -178,9 +185,9 @@ class Platform( Plugin ):
         return packages
 
     @classmethod
-    def _mountmap( cls ):
+    def _mountmap( cls, appsettings ):
         subdomains, scripts = {}, {}
-        for appname, sett in cls.appsettings.items() :
+        for appname, sett in appsettings.items() :
             subdomain = sett.get('DEFAULT', {}).get('mount_subdomain', None)
             if subdomain :
                 subdomain.setdefault( subdomain, [] ).append( appname )

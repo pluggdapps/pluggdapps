@@ -17,6 +17,11 @@ _default_settings = ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for Application base class for all applications."
 
+_default_settings['debug']  = {
+    'default' : False,
+    'types'   : (bool,),
+    'help'    : "",
+}
 _default_settings['IRequest']  = {
     'default' : 'httprequest',
     'types'   : (str,),
@@ -38,10 +43,10 @@ _default_settings['ICookie']  = {
                 "request cookies and response cookies. This can be overriden "
                 "at corresponding request / response plugin settings."
 }
-_default_settings['debug']  = {
-    'default' : False,
-    'types'   : (bool,),
-    'help'    : "",
+_default_settings['IRouter']  = {
+    'default' : 'routematch',
+    'types'   : (str,),
+    'help'    : ""
 }
 
 class RootApp( Plugin ):
