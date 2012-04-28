@@ -6,10 +6,11 @@
 
 """HTTP utility functions."""
 
-import logging, re, sys, urllib, calendar, email, hashlib
-from   urlparse import parse_qs  # Python 2.6+
+import logging, re, sys, urllib, calendar, email, hashlib, socket
+from   urlparse import urlsplit, parse_qs  # Python 2.6+
 
-from   pluggdapps.util  import ObjectDict
+from   pluggdapps.bsu       import native_str, utf8
+from   pluggdapps.util      import ObjectDict
 
 __all__ = [
     'parse_startline', 'convert_header_value', 'compute_etag', 'HTTPFile', 
@@ -19,16 +20,88 @@ __all__ = [
 
 log = logging.getLogger( __name__ )
 
+def _port_for_scheme( scheme ):
+    if scheme == 'http' :
+        port = 80
+    elif scheme = 'https' : 
+        port = 443
+    else :
+        port =None
+    return port
+
+def parse_scheme( hdrs, xheaders ):
+    if xheaders : # AWS uses X-Forwarded-Proto
+        scheme = hdrs.get("X-Scheme", hdrs.get("X-Forwarded-Proto", None))
+        if scheme not in ("http", "https"):
+            scheme = "http"
+    else :
+        scheme = None
+    return scheme
+
+def parse_url( scheme, host ):
+    sch, _, path, query, frag = r = urlparse.urlsplit( native_str(uri) )
+    scheme = scheme or sch
+    if host and ':' in host :
+        host, port = host.split(':', 1)
+    elif host and r.port :
+        port = r.port
+    else host :
+        port = _port_for_scheme( scheme )
+    else :
+        host = r.hostname
+        port = r.port or _port_for_scheme( scheme )
+    return host, port, path, query, frag
+
 def parse_startline( startline ):
     """Every HTTP request starts with a start line specifying method, uri and
     version. Parse them and return a tuple of (method, uri, version)."""
     try :
         method, uri, version = startline.split(" ")
     except :
-        method = None
+        log.error( "Malformed HTTP version in HTTP Request-Line" )
+        method = uri = version = None
     if not version.startswith("HTTP/") :
-        method = version = None
+        log.error( "Unknown HTTP Version %r", version )
     return method, uri, version
+
+def parse_remoteip( addr, hdrs, xheaders ):
+    if xheaders : # Squid uses X-Forwarded-For, others use X-Real-Ip
+        remote_ip = hdrs.get("X-Real-Ip", hdrs.get("X-Forwarded-For", None))
+        if not valid_ip( remote_ip ):
+            remote_ip = addr
+    else :
+        remote_ip = addr
+    return remote_ip
+
+def parse_query( self, query ):
+    arguments = {}
+    for name, values in parse_qs_bytes(query).iteritems():
+        values = filter( None, values )
+        if values:
+            arguments[name] = values
+    return arguments
+
+def parse_body( method, headers, body ):
+    arguments, files = {}, {}
+    content_type = headers.get( "Content-Type", "" )
+    if method in ("POST", "PUT"):
+        if content_type.startswith( "application/x-www-form-urlencoded" ):
+            for name, values in parse_qs_bytes( native_str(body) ).items() :
+                values = filter(None, values)
+                if values:
+                    arguments.setdefault( name, [] ).extend( values )
+        elif content_type.startswith( "multipart/form-data" ):
+            fields = content_type.split(";")
+            for field in fields:
+                k, sep, v = field.strip().partition("=")
+                if k == "boundary" and v:
+                    args, files = parse_multipart_form_data( utf8(v), body )
+                    arguments.update( args )
+                    files.update( files )
+                    break
+            else:
+                log.warning( "Invalid multipart/form-data" )
+    return arguments, files
 
 def convert_header_value( value ):
     """Transform `value` to marshal them as HTTP header value.
@@ -290,7 +363,7 @@ def url_concat(url, args):
         url += '&' if ('?' in url) else '?'
     return url + urllib.urlencode(args)
 
-def parse_multipart_form_data(boundary, data, arguments, files):
+def parse_multipart_form_data( boundary, data ):
     """Parses a multipart/form-data body.
 
     The boundary and data parameters are both byte strings.
@@ -302,6 +375,7 @@ def parse_multipart_form_data(boundary, data, arguments, files):
     # xmpp).  I think we're also supposed to handle backslash-escapes
     # here but I'll save that until we see a client that uses them
     # in the wild.
+    arguments, files = {}, {}
     if boundary.startswith(b'"') and boundary.endswith(b'"'):
         boundary = boundary[1:-1]
     if data.endswith(b"\r\n"):
@@ -368,4 +442,15 @@ def _parse_header(line):
             pdict[name] = value
     return key, pdict
 
+def valid_ip( ip ):
+    try:
+        res = socket.getaddrinfo( ip, 0, socket.AF_UNSPEC,
+                                  socket.SOCK_STREAM,
+                                  0, socket.AI_NUMERICHOST )
+        return bool(res)
+    except socket.gaierror, e:
+        if e.args[0] == socket.EAI_NONAME:
+            return False
+        raise
+    return True
 

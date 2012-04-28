@@ -142,12 +142,14 @@ class Platform( Plugin ):
         if subdomain :
             for subdom, appnames in cls.map_subdomains.items() :
                 if subdom == subdomain : break
+            script = ''
         else :
             for script, appnames in cls.map_scripts.items() :
                 if script != '/' and path.startswith( script ) : break
             else :
                 appnames = [ cls.map_scripts['/'] ]
-        return appnames[0]
+                script = ''
+        return appnames[0], script
 
     on_subdomains = property( lambda s : s.map_subdomains )
     on_scripts = property( lambda s : s.map_scripts )  

@@ -240,7 +240,16 @@ class IRequest( Interface ):
        "Request body, if present, as a byte string."
     )
     host = Attribute(
-        "The requested hostname, usually taken from the ``Host`` header."
+        "The requested hostname, usually taken from the ``Host`` header, else "
+        "by parsing the url field."
+    )
+    port = Attribute(
+        "The requested port number, usually taken from the ``Host`` header, "
+        "else by parsing the url field. If port is left empty, it assumes the "
+        "default port number based on the ``scheme`` field."
+    )
+    appscript = Attribute(
+        "The script name on which the application was mounted."
     )
     path = Attribute(
         "Path portion of HTTP request URI"
@@ -248,12 +257,8 @@ class IRequest( Interface ):
     query = Attribute(
         "Query portion of HTTP request URI"
     )
-    full_url = Attribute(
-        "Reconstructs the full URL for this request, which is, "
-        "protocol + host + uri"
-    )
-    protocol = Attribute(
-        "The protocol used, either 'http' or 'https'.  If running behind a "
+    scheme = Attribute(
+        "The scheme used, either 'http' or 'https'.  If running behind a "
         "load-balancer or a proxy, the real scheme will be passed along via "
         "via an `X-Scheme` header."
     )
@@ -378,6 +383,20 @@ class IRequest( Interface ):
 
     def onfinish():
         """Callback for asyncrhonous finish()."""
+
+    def application_url( scheme=None, host=None, port=None ):
+        """Construct the URL defined by request.application_url, replacing any
+        of the default scheme, host, or port portions with user-supplied
+        variants.
+
+        If ``scheme`` is passed as ``https``, and the ``port`` is *not*
+        passed, the ``port`` value is assumed to ``443``.  Likewise, if
+        ``scheme`` is passed as ``http`` and ``port`` is not passed, the
+        ``port`` value is assumed to be ``80``.
+        """
+
+    def baseurl( *args, **kwargs ) :
+        """Generate url for same application handling the current request."""
 
     def url( *args, **kwargs ) :
         """Generate url for same application handling the current request."""

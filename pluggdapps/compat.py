@@ -49,7 +49,7 @@ if PY3: # pragma: no cover
         if isinstance(s, text_type):
             s = s.encode('ascii')
         return str(s, 'ascii', 'strict')
-    def native_(s, encoding='latin-1', errors='strict'):
+    def native_(s, encoding='utf-8', errors='strict'):
         if isinstance(s, text_type):
             return s
         return str(s, encoding, errors)
@@ -58,7 +58,7 @@ else:
         if isinstance(s, text_type):
             s = s.encode('ascii')
         return str(s)
-    def native_(s, encoding='latin-1', errors='strict'):
+    def native_(s, encoding='utf-8', errors='strict'):
         if isinstance(s, text_type):
             return s.encode(encoding, errors)
         return str(s)

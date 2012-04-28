@@ -8,11 +8,12 @@ import socket, time, urlparse, logging, re
 from   copy import deepcopy
 
 from   pluggdapps.config     import ConfigDict
-from   pluggdapps.plugin     import Plugin, implements, pluginname, \
-                                    query_plugin
-from   pluggdapps.interfaces import IRequest, IResponse, ICookie
-from   pluggdapps.evserver   import httpiostream
 import pluggdapps.helper     as h
+from   pluggdapps.compat     import url_quote
+from   pluggdapps.plugin     import Plugin, implements, query_plugin
+from   pluggdapps.interfaces import IRequest, IResponse, ICookie
+from   pluggdapps.parsehttp  import parse_scheme, parse_url, parse_startline,\
+                                    parse_remoteip, parse_query, parse_body
 
 log = logging.getLogger( __name__ )
 
@@ -20,12 +21,6 @@ _default_settings = ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPRequest implementing IRequest interface."
 
-_default_settings['default_host']  = {
-    'default' : '127.0.0.1',
-    'types'   : (str,),
-    'help'    : "Default host name to use in the absence of host name not "
-                "available from request headers."
-}
 _default_settings['ICookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
@@ -47,31 +42,28 @@ class HTTPRequest( Plugin ):
         self.receivedat = time.time()
         self.finishedat = None
 
-        if conn :
-            stream, xheaders = conn.stream, conn.xheaders
-        else :
-            stream, xheaders = None, None
+        xheaders = getattr(conn, 'xheaders', None) if conn else None
         self.app = app
         self.connection = conn
         self.platform = conn.platform
         self.docookie = self.query_plugin( 
                 ICookie, self['ICookie'] or app['ICookie'] )
         
-        self.method, self.uri, self.version = self._parse_startline( startline )
+        self.method, self.uri, self.version = parse_startline( startline )
         self.headers = headers or h.HTTPHeaders()
         self.body = body or b""
 
-        self.host = self.headers.get("Host") or self['default_host']
-        _, _, self.path, self.query, _ = urlparse.urlsplit( h.native_str(uri) )
-        self.protocol = self._parse_protocol( stream, headers, xheaders )
-        self.full_url = self.protocol + "://" + self.host + self.uri
+        scheme = parse_scheme( self.headers, xheaders )
+        host = self.headers.get("Host")
+        self.host, self.port, self.path, self.query, _ = parse_url(scheme, host)
 
-        self.remote_ip = self._parse_remoteip( address, headers, xheaders )
+        self.remote_ip = parse_remoteip( address, self.headers, xheaders )
         self.cookies = self.docookie.parse_cookies( self.headers )
         self.files = {}
-        self.arguments = self._parse_query( query )
+        self.arguments = parse_query( query )
         # Updates self.arguments and self.files based on request-body
-        self._parse_body( method, headers, body )
+        args, self.files = self.parse_body( method, self.headers, body )
+        self.arguments.update( args )
         # Reponse object
         self.response = self.query_plugin( IResponse, app['IResponse'], self )
 
@@ -146,8 +138,23 @@ class HTTPRequest( Plugin ):
         return self.docookie.decode_signed_value( name, value ) 
 
     def onfinish( self ):
+        """Callback when :meth:`IResponse.finis()` is called."""
         self.connection.finish()
         self.finishedat = time.time()
+
+    def baseurl( self, scheme=None, host=None, port=None ):
+        """Construct the base URL upto this application's root path, replacing 
+        any of the default scheme, host, or port portions with user-supplied
+        variants."""
+        host = host or self.host
+        port = port or self.port
+        url = scheme or self.scheme + '://'
+        if host :
+            url += host
+        if port :
+            url += ':'+str(port)
+        bscript_name = h.utf8( self.appscript )
+        return url + url_quote( bscript_name, PATH_SAFE )
 
     def query_plugin( self, *args, **kwargs ):
         query_plugin( self.appname, *args, **kwargs )
@@ -156,80 +163,11 @@ class HTTPRequest( Plugin ):
         query_plugin( self.appname, *args, **kwargs )
 
     def __repr__( self ):
-        attrs = ( "protocol", "host", "method", "uri", "version", "remote_ip",
+        attrs = ( "scheme", "host", "method", "uri", "version", "remote_ip",
                   "body" )
-        args = ", ".join(["%s=%r" % (n, getattr(self, n)) for n in attrs])
+        args = ", ".join( "%s=%r" % (n, getattr(self, n)) for n in attrs )
         return "%s(%s, headers=%s)" % (
             self.__class__.__name__, args, dict(self.headers))
-
-    def _valid_ip( self, ip ):
-        try:
-            res = socket.getaddrinfo( ip, 0, socket.AF_UNSPEC,
-                                      socket.SOCK_STREAM,
-                                      0, socket.AI_NUMERICHOST )
-            return bool(res)
-        except socket.gaierror, e:
-            if e.args[0] == socket.EAI_NONAME:
-                return False
-            raise
-        return True
-
-    def _parse_startline( self, startline ):
-        method, uri, version = h.parse_startline( startline )
-        if version == None :
-            log.error( "Malformed HTTP version in HTTP Request-Line" )
-        elif method == None :
-            log.error( "Malformed HTTP request line" )
-        return method, uri, version
-
-    def _parse_protocol( self, stream, hdrs, xheaders ):
-        if xheaders : # AWS uses X-Forwarded-Proto
-            protocol = hdrs.get("X-Scheme", hdrs.get("X-Forwarded-Proto", None))
-            if protocol not in ("http", "https"):
-                protocol = "http"
-        else :
-            if isinstance( stream, httpiostream.SSLIOStream ) :
-                protocol = "https"
-            else :
-                protocol = "http"
-        return protocol
-
-    def _parse_remoteip( self, addr, hdrs, xheaders ):
-        if xheaders : # Squid uses X-Forwarded-For, others use X-Real-Ip
-            remote_ip = hdrs.get("X-Real-Ip", hdrs.get("X-Forwarded-For", addr))
-            if not self._valid_ip( remote_ip ):
-                remote_ip = address
-        else :
-            remote_ip = address
-        return remote_ip
-
-    def _parse_query( self, query ):
-        arguments = {}
-        for name, values in h.parse_qs_bytes(query).iteritems():
-            values = filter( None, values )
-            if values:
-                arguments[name] = values
-        return arguments
-
-    def _parse_body( self, method, headers, body ):
-        content_type = headers.get( "Content-Type", "" )
-        if method in ("POST", "PUT"):
-            if content_type.startswith( "application/x-www-form-urlencoded" ):
-                _args = h.parse_qs_bytes( h.native_str(body) )
-                for name, values in _args.iteritems():
-                    values = filter(None, values)
-                    if values:
-                        self.arguments.setdefault( name, [] ).extend( values )
-            elif content_type.startswith("multipart/form-data"):
-                fields = content_type.split(";")
-                for field in fields:
-                    k, sep, v = field.strip().partition("=")
-                    if k == "boundary" and v:
-                        h.parse_multipart_form_data(
-                            h.utf8(v), body, self.arguments, self.files )
-                        break
-                else:
-                    log.warning( "Invalid multipart/form-data" )
 
     # ISettings interface methods
     @classmethod
