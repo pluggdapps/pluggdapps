@@ -14,6 +14,12 @@ log = logging.getLogger( __name__ )
 class UnitTestBase( Plugin ):
     implements( IUnitTest )
 
+    def __init__( self, *args, **kwargs ):
+        """This function is provided as part of unit-test case for checking
+        masterinit() hook inside PluginMeta."""
+        pass
+    __init__.marker = 'UnitTestBase'
+
     def setup( self, platform ):
         self.platform = platform
 

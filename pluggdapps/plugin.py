@@ -7,16 +7,23 @@
 import sys, inspect, logging
 from   copy import deepcopy
 
+from  pluggdapps.compat import string_types
+                
+
 # TODO :
 #   1. How to check for multiple plugins by name defined for same Interface.
 
 __all__ = [ 
     # API functions
     'implements', 'plugin_init', 'plugin_info',
-    'query_plugin', 'query_plugins', 'pluginname', 'pluginnames',
-    'pluginclass', 'default_settings', 'applications',
+    'pluginname', 'pluginnames', 'pluginclass', 'default_settings', 
+    'applications', 'plugins', 'query_plugin', 'query_plugins',
     # Classes
-    'Interface', 'Attribute'
+    'Plugin', 'Singleton', 'Interface', 'Attribute', 
+    # Library functions
+    'whichmodule',
+    # Interfaces
+    'ISettings', 'IApplication',
 ]
 
 log = logging.getLogger(__name__)
@@ -62,17 +69,20 @@ class PluginMeta( type ):
         PluginMeta._sanitizecls( name, bases, d )
 
         nm = pluginname(name)
-        if Interface in bases :
+        mro_bases = map( None, new_class.mro() )
+
+        if Interface in mro_bases :
             # Interface's information dictionary
             PluginMeta._interfmap[name] = \
                     PluginMeta._interf( new_class, name, bases, d )
-        elif any([ issubclass(b, PluginBase) for b in bases ]) :
+
+        elif PluginBase in mro_bases :
             # Plugin's information dictionary
             PluginMeta._pluginmap[nm] = \
                     PluginMeta._plugin( new_class, nm, bases, d )
             # Register deriving plugin for interfaces implemented by its base
             # classes
-            for b in new_class.mro() :
+            for b in mro_bases :
                 for (i,pmap) in PluginMeta._implementers.items() :
                     if pluginname(b) in pmap :
                         pmap.setdefault( nm, '-na-' )
@@ -81,37 +91,35 @@ class PluginMeta( type ):
             if init == None :
                 # Because we're replacing the initializer, we need to make sure
                 # that any inherited initializers are also called.
-                for b in new_class.mro() :
+                for b in mro_bases :
                     if issubclass(b, PluginBase) and '__init__' in b.__dict__ :
                         init = b.__init__._original
                         break
 
             def masterinit( self, app, *args, **kwargs ) :
-                """Component Init function hooked in by ComponentMeta."""
-                from  pluggdapps.config import app2sec
-                from  pluggdapps.compat import string_types
-                
+                """Component Init function hooked in by ComponentMeta.
+                Consumes ``app`` argument and initialized the plugin with
+                *args and **kwargs parameters. It also handles the special
+                case of instantiating IApplication plugins."""
+                self._settngx = {}
                 pluginnm = pluginname(self)
                 if isinstance(app, string_types) :
                     appname, app = app, None
                 else :
                     appname = pluginname(app)
 
-                if pluginnm in PluginMeta._applications :
+                if pluginnm in PluginMeta._applications : # IApplication plugin
                     self.appname, self.app = pluginnm, self
-                    self.settings = args[0][pluginnm]
+                    self.settings = deepcopy( args[0][pluginnm] )
+                    self._settngx.update( self.settings['DEFAULT'] )
                 elif not app :
                     self.appname = appname
                     self.app = query_plugin( appname, IApplication, appname )
                     self.settings = deepcopy( self.app.settings )
+                    self._settngx.update( self.settings['plugin:'+pluginnm] )
+
                 # Plugin settings
-                sett = {}
-                if pluginnm in PluginMeta._implementers[IApplication] :
-                    sett.update( self.settings['DEFAULT'] )
-                else :
-                    sett.update( self.settings['plugin:'+pluginnm] )
-                sett.update( kwargs.pop( 'settings', {} ))
-                self._settngx = sett
+                self._settngx.update( kwargs.pop( 'settings', {} ))
                 # Call the original plugin's __init__
                 if init :
                     init( self, *args, **kwargs )
@@ -178,7 +186,7 @@ class PluginBase( object ):
         return super( PluginBase, cls ).__new__( cls )
 
 
-class Singleton( PluginBase ):
+class Singleton( object ):
     """If a plugin sub-class inherits from this Singleton class, then query_*
     methods / functions for plugins will always return a singleton instance of
     the plugin sub-class."""
@@ -268,17 +276,6 @@ def interface_info( *args ):
         return PluginMeta._interfmap.get( *args )
 
 
-def pluginnames( interface ):
-    """Return a list of plugin names implementing `interface`."""
-    return PluginMeta._implementers[interface].keys()
-
-
-def pluginclass( interface, name ):
-    """Return the plugin class by ``name`` implementing interface."""
-    nm = pluginname( name )
-    return PluginMeta._implementers.get( interface, {} ).get( nm, None )
-
-
 def pluginname( o ):
     """Plugin names are nothing but normalized form of plugin's class name,
     where normalization is done by lower casing plugin's class name.
@@ -297,6 +294,17 @@ def pluginname( o ):
     return name
 
 
+def pluginnames( interface ):
+    """Return a list of plugin names implementing `interface`."""
+    return PluginMeta._implementers[interface].keys()
+
+
+def pluginclass( interface, name ):
+    """Return the plugin class by ``name`` implementing interface."""
+    nm = pluginname( name )
+    return PluginMeta._implementers.get( interface, {} ).get( nm, None )
+
+
 def default_settings():
     """Return dictionary default settings for every loaded plugin."""
     psetts = dict([ ( info['name'], info['cls'].default_settings() )
@@ -307,71 +315,15 @@ def default_settings():
 def applications():
     """Return a list of application names (which are actually plugins
     implementing :class:`IApplication` interface."""
-    from  pluggdapps import ROOTAPP
     return PluginMeta._applications
 
 
 def plugins():
-    """Returns a list of plugin names."""
+    """Return the complete list of loaded plugin names."""
     return sorted( PluginMeta._pluginmap.keys() )
 
 
 # Core Interfaces
-
-class IApplication( Interface ):
-    """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
-    of configuration parameters implementing one or more interface
-    specification."""
-
-    appscript = Attribute(
-        "The script name on which the application was mounted. If the "
-        "application is mounted on a sub-domain this will be ``None``"
-    )
-    appdomain = Attribute(
-        "The subdomain name on which the application was mounted. If the "
-        "application is mounted on a script name this will be ``None``"
-    )
-
-    def onboot( settings ):
-        """Do necessary activities to boot this applications. Called at
-        platform boot-time.
-
-        ``settings``,
-            configuration dictionary for this application. Dictionary is a
-            collection of sections and its settings. Plugin section names will
-            follow the following format, 'plugin:<pluginname>'. There is a
-            special section by name 'DEFAULT', whose settings are global to
-            all other section settings.
-        """
-
-    def start( request ):
-        """Once a `request` is resolved for an application, this method is the
-        entry point for the request into the resolved application. Typically 
-        this method will be implemented by :class:`Application` base class 
-        which automatically does url route-mapping and invokes the configured 
-        request handler."""
-
-    def router( request ):
-        """Return the router plugin implementing :class:`IRouter` 
-        interface."""
-
-    def onfinish( request ):
-        """A finish is called on the response. And this call back is issued to 
-        Start a finish sequence for this ``request`` in the application's 
-        context. Plugin's implementing this method must call
-        request.onfinish()."""
-
-    def shutdown( settings ):
-        """Shutdown this application. Reverse of boot.
-        
-        ``settings``,
-            configuration dictionary for this application. Dictionary is a
-            collection of sections and its settings. Plugin section names will
-            follow the following format, 'plugin:<pluginname>'. There is a
-            special section by name 'DEFAULT', whose settings are global to
-            all other section settings.
-        """
-
 
 class ISettings( Interface ):
     """ISettings is a mixin interface implemented by the base class 
@@ -433,6 +385,61 @@ class ISettings( Interface ):
         """
 
 
+class IApplication( Interface ):
+    """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
+    of configuration parameters implementing one or more interface
+    specification."""
+
+    appscript = Attribute(
+        "The script name on which the application was mounted. If the "
+        "application is mounted on a sub-domain this will be ``None``"
+    )
+    appdomain = Attribute(
+        "The subdomain name on which the application was mounted. If the "
+        "application is mounted on a script name this will be ``None``"
+    )
+
+    def onboot( settings ):
+        """Do necessary activities to boot this applications. Called at
+        platform boot-time.
+
+        ``settings``,
+            configuration dictionary for this application. Dictionary is a
+            collection of sections and its settings. Plugin section names will
+            follow the following format, 'plugin:<pluginname>'. There is a
+            special section by name 'DEFAULT', whose settings are global to
+            all other section settings.
+        """
+
+    def start( request ):
+        """Once a `request` is resolved for an application, this method is the
+        entry point for the request into the resolved application. Typically 
+        this method will be implemented by :class:`Application` base class 
+        which automatically does url route-mapping and invokes the configured 
+        request handler."""
+
+    def router( request ):
+        """Return the router plugin implementing :class:`IRouter` 
+        interface."""
+
+    def onfinish( request ):
+        """A finish is called on the response. And this call back is issued to 
+        Start a finish sequence for this ``request`` in the application's 
+        context. Plugin's implementing this method must call
+        request.onfinish()."""
+
+    def shutdown( settings ):
+        """Shutdown this application. Reverse of boot.
+        
+        ``settings``,
+            configuration dictionary for this application. Dictionary is a
+            collection of sections and its settings. Plugin section names will
+            follow the following format, 'plugin:<pluginname>'. There is a
+            special section by name 'DEFAULT', whose settings are global to
+            all other section settings.
+        """
+
+
 # Plugin base class implementing ISettings
 
 class Plugin( PluginBase ):
@@ -450,6 +457,11 @@ class Plugin( PluginBase ):
     consolidated from web-backend, ini-files and default_settings() method, in
     the order of decreasing priority, and made available as a dictionary of 
     key,value pairs on plugin instance.
+
+    Important Note :
+    * All plugin classes must be defined at module top-level.
+    * For the plugins to be automatically available for querying, make sure to
+      import the module implementing the plugin inside <package>/__init.py
     """
 
     implements( ISettings )
@@ -539,14 +551,51 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
 
 # Unit-test
 from pluggdapps.unittest import UnitTestBase
+from pluggdapps.interfaces import IUnitTest
+from random import choice
 
-class UnitTest_Plugin( UnitTestBase ):
+class UnitTest_Plugin( UnitTestBase, Singleton ):
 
     def test( self ):
         self.test_whichmodule()
+        self.test_pluginmeta()
 
     def test_whichmodule( self ):
         log.info("Testing whichmodule() ...")
         assert whichmodule(UnitTest_Plugin).__name__ == 'pluggdapps.plugin'
         assert whichmodule(self).__name__ == 'pluggdapps.plugin'
         assert whichmodule(whichmodule).__name__ == 'pluggdapps.plugin'
+
+    def test_pluginmeta( self ):
+        from  pluggdapps import ROOTAPP
+
+        log.info("Testing plugin-meta() ...")
+        # Test plugins
+        assert sorted( PluginMeta._pluginmap.keys() ) == sorted( plugins() )
+        nm = choice( PluginMeta._pluginmap.keys() )
+        info = PluginMeta._pluginmap[nm]
+        assert info['name'] == pluginname( info['cls'] )
+
+        # Test Singleton, master_init
+        p = query_plugin( ROOTAPP, IUnitTest, 'unittest_plugin' )
+        assert p == self
+        assert p.__init__.im_func.func_name == 'masterinit'
+        assert p.__init__._original.marker == 'UnitTestBase'
+
+
+class UnitTest_Plugin1( UnitTestBase ):
+
+    def __init__( self, *args, **kwargs ):
+        pass
+    __init__.marker = 'UnitTest_Plugin1'
+
+    def test( self ):
+        self.test_pluginmeta()
+
+    def test_pluginmeta( self ):
+        from pluggdapps import ROOTAPP
+        # Test Singleton, master_init
+        p = query_plugin( ROOTAPP, IUnitTest, 'unittest_plugin1' )
+        assert p == self
+        assert p.__init__.im_func.func_name == 'masterinit'
+        assert p.__init__._original.marker == 'UnitTest_Plugin1'

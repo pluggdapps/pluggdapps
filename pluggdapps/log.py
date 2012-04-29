@@ -21,12 +21,9 @@ def setup( logsett ):
     function, rest of the system can acquire a log object by,
         log = logging.getLogger(__name__)
     and perform necessary logging."""
-    if logsett['level'] != None :
-        logging.getLogger().setLevel( logsett['level'] ) 
-    else :
-        None
-
+    level = getattr( logging, logsett['level'].upper(), None )
     root_logger = logging.getLogger()
+    root_logger.setLevel( level )
 
     # Set up color if we are in a tty and curses is installed
     color = logsett['color']
