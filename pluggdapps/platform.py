@@ -98,7 +98,8 @@ class Platform( Plugin ):
         # Initialize plugin data structures
         plugin_init()
         # Load applictions
-        for app in query_plugins( '', IApplication, appsettings ) :
+        apps = query_plugins( '', IApplication, appsettings )
+        for app in apps :
             appname = pluginname( app )
             app.settings = cls.appsettings[ appname ]
             log.debug( "Booting application %r ...", appname )

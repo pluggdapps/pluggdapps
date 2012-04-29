@@ -49,8 +49,35 @@ _default_settings['IRouter']  = {
     'help'    : ""
 }
 
-class RootApp( Plugin, Singleton ):
+class Application( Singleton ):
     implements( IApplication )
+
+    def onboot( self, settings ):
+        pass
+
+    def start( self, request ):
+        pass
+
+    def router( self, request ):
+        pass
+
+    def onfinish( self, request ):
+        pass
+
+    def shutdown( self, settings ):
+        pass
+
+    # ISettings interface methods
+    @classmethod
+    def default_settings( cls ):
+        return _default_settings
+
+    @classmethod
+    def normalize_settings( cls, settings ):
+        return settings
+
+
+class RootApp( Application ):
 
     def onboot( self, settings ):
         pass

@@ -28,6 +28,8 @@ __all__ = [
 
 log = logging.getLogger(__name__)
 
+core_classes = [ 'Interface', 'PluginBase', 'Singleton' ]
+
 def whichmodule( attr ):
     """Try to fetch the module name in which `attr` is defined."""
     modname = getattr( attr, '__module__' )
@@ -50,12 +52,6 @@ class PluginMeta( type ):
     class. If a plugin sub-class derives from Singleton then query_* methods
     and functions will return the same object all the time."""
 
-    _singletons = {}
-    """A map of plugin name and its singleton instance."""
-
-    _applications = []
-    """List of application plugin names."""
-
     # Error messages
     err1 = 'Class `%s` derives both Interface and Plugin'
     err2 = 'Interface %r defined multiple times in %s'
@@ -63,7 +59,7 @@ class PluginMeta( type ):
     def __new__( cls, name='', bases=(), d={} ):
         new_class = type.__new__( cls, name, bases, d )
 
-        if name in [ 'Interface', 'PluginBase', 'Singleton' ] :
+        if name in core_classes :
             return new_class
 
         PluginMeta._sanitizecls( name, bases, d )
@@ -101,6 +97,11 @@ class PluginMeta( type ):
                 Consumes ``app`` argument and initialized the plugin with
                 *args and **kwargs parameters. It also handles the special
                 case of instantiating IApplication plugins."""
+
+                # Singleton object. Already initialized, so skip
+                # initialization.
+                if hasattr( self, 'settings' ) : return
+
                 self._settngx = {}
                 pluginnm = pluginname(self)
                 if isinstance(app, string_types) :
@@ -108,7 +109,7 @@ class PluginMeta( type ):
                 else :
                     appname = pluginname(app)
 
-                if pluginnm in PluginMeta._applications : # IApplication plugin
+                if pluginnm in applications() : # IApplication plugin
                     self.appname, self.app = pluginnm, self
                     self.settings = deepcopy( args[0][pluginnm] )
                     self._settngx.update( self.settings['DEFAULT'] )
@@ -182,15 +183,18 @@ class PluginBase( object ):
     PluginMeta."""
     __metaclass__ = PluginMeta
 
+    _singletons = {}
+    """A map of plugin name and its singleton instance."""
+
     def __new__( cls, *args, **kwargs ):
-        return super( PluginBase, cls ).__new__( cls )
-
-
-class Singleton( object ):
-    """If a plugin sub-class inherits from this Singleton class, then query_*
-    methods / functions for plugins will always return a singleton instance of
-    the plugin sub-class."""
-    pass
+        singleton = PluginBase._singletons.get( cls, None )
+        if singleton != None and issubclass( cls, Singleton ):
+            return singleton
+        elif issubclass( cls, Singleton ):
+            self = super( PluginBase, cls ).__new__( cls )
+            return PluginBase._singletons.setdefault( cls, self )
+        else :
+            return super( PluginBase, cls ).__new__( cls )
 
 
 class Interface( object ):
@@ -218,8 +222,6 @@ def implements( *interfaces ):
     of a class deriving from :class:`Plugin`."""
     frame = sys._getframe(1)
     nm = pluginname( frame.f_code.co_name )
-    if IApplication in interfaces :
-        PluginMeta._applications.append( nm )
     for i in interfaces :
         if nm in PluginMeta._implementers.get(i, {}).keys() :
             raise Exception( 
@@ -315,7 +317,7 @@ def default_settings():
 def applications():
     """Return a list of application names (which are actually plugins
     implementing :class:`IApplication` interface."""
-    return PluginMeta._applications
+    return PluginMeta._implementers[IApplication]
 
 
 def plugins():
@@ -502,6 +504,13 @@ class Plugin( PluginBase ):
         return settings
 
 
+class Singleton( Plugin ):
+    """If a plugin sub-class inherits from this Singleton class, then query_*
+    methods / functions for plugins will always return a singleton instance of
+    the plugin sub-class."""
+    pass
+
+
 def query_plugins( appname, interface, *args, **kwargs ):
     """Use this API to query for plugins using the `interface` class it
     implements. Positional and keyword arguments will be used to instantiate
@@ -516,13 +525,7 @@ def query_plugins( appname, interface, *args, **kwargs ):
     plugins = []
     appname = appname or ROOTAPP
     for pcls in PluginMeta._implementers.get(interface, {}).values() :
-        if issubclass(pcls, Singleton) :
-            pname = pluginname(pcls) 
-            if pname not in PluginMeta._singletons :
-                PluginMeta._singletons[pname] = pcls(appname, *args, **kwargs)
-            plugins.append( PluginMeta._singletons[pname] )
-        else :
-            plugins.append( pcls( appname, *args, **kwargs ))
+        plugins.append( pcls( appname, *args, **kwargs ))
     return plugins
 
 
@@ -540,13 +543,7 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
     appname = appname or ROOTAPP
     nm = pluginname( name )
     cls = PluginMeta._implementers.get( interface, {} ).get( nm, None )
-    if issubclass(cls, Singleton) :
-        if nm not in PluginMeta._singletons :
-            PluginMeta._singletons[nm] = cls( appname, *args, **kwargs )
-        plugin = PluginMeta._singletons[nm]
-    else : 
-        plugin = cls( appname, *args, **kwargs )
-    return plugin
+    return cls( appname, *args, **kwargs )
 
 
 # Unit-test
