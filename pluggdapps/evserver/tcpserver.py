@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Derived work from Facebook's tornado server.
 
 """TCPServer using non-blocking evented polling loop."""

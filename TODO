@@ -6,3 +6,6 @@
 
 * config sub-command for pa-script should include options to display settings
   help.
+
+* -*- coding:utf-8 -*- 
+  should always be prefixed at the beginning of the file ?

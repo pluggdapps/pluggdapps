@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Derived work from Facebook's tornado server.
 
 """StackContext allows applications to maintain threadlocal-like state
