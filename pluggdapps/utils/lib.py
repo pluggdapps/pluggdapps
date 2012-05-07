@@ -7,28 +7,27 @@
 # TODO :
 #   * Improve function asbool() implementation.
 
-from   __future__ import absolute_import, division, with_statement
-import os, fcntl, logging, time
+import sys, os, fcntl, time
 import datetime as dt
 
-from   pluggdapps.compat    import class_types, ver_int
-
 __all__ = [
-    'parsecsv', 'parsecsvlines', 'subclassof', 'asbool', 'asint', 'asfloat',
-    'timedelta_to_seconds', 'docstr',
+    'parsecsv', 'parsecsvlines', 'classof', 'subclassof',
+    'asbool', 'asint', 'asfloat',
+    'timedelta_to_seconds', 
     'set_close_exec', 'set_nonblocking',
-    'call_entrypoint',
+    'call_entrypoint', 'docstr', 
+    # Classes
     'ObjectDict', 'Context',
 ]
 
-log = logging.getLogger( __name__ )
+ver_int = int( str(sys.version_info[0]) + str(sys.version_info[1]) )
 
 #---- Generic helper functions.
 
 def parsecsv( line ):
     """Parse a single line of comma separated values, into a list of strings"""
     vals = line.split(',') if line else []
-    vals = filter( None, [v.strip(' \t') for v in vals] )
+    vals = [ x for x in [v.strip(' \t') for v in vals] if x ]
     return vals
 
 def parsecsvlines( lines ):
@@ -40,7 +39,7 @@ def parsecsvlines( lines ):
 def classof( obj ): 
     """If `obj` is class object return the same. Other wise assume that it is
     an instance object and return its class."""
-    if isinstance( obj, class_types) : 
+    if isinstance( obj, type ) : 
         return obj
     else : 
         return getattr( obj, '__class__', None )
@@ -60,7 +59,7 @@ def subclassof( cls, supers ):
 def asbool( val, default=None ):
     """Convert a string representation of boolean value to boolean type."""
     try :
-        if val and isinstance(val, basestring) :
+        if val and isinstance(val, str) :
             v = True if val.lower() == 'true' else False
         else :
             v = bool(val)
@@ -105,8 +104,8 @@ def call_entrypoint( distribution, group, name, *args, **kwargs ):
     """If an entrypoint is callable, use this api to both identify the entry
     point, evaluate them by loading and calling it. 
     
-    Return the result from the called function. Note that the entrypoint must be
-    uniquely identified using
+    Return the result from the called function. Note that the entrypoint must
+    be uniquely identified using
         ``dist``, ``group`` and ``name``.
     """
     devmod = kwargs.pop( 'devmod', False )
@@ -148,6 +147,9 @@ from random              import choice
 
 class UnitTest_Util( UnitTestBase ):
 
+    def setup( self ):
+        super().setup()
+
     def test( self ):
         self.test_parsecsv()
         self.test_parsecsvlines()
@@ -160,9 +162,13 @@ class UnitTest_Util( UnitTestBase ):
         self.test_docstr()
         self.test_objectdict()
         self.test_timedelta_to_seconds()
+        super.test()
+
+    def teardown( self ):
+        super.teardown()
 
     def test_parsecsv( self ):
-        log.info("Testing parsecsv() ...")
+        self.log.info("Testing parsecsv() ...")
         assert parsecsv('a,b,c') == ['a','b','c']
         assert parsecsv(' a,,b,c') == ['a','b','c']
         assert parsecsv(',a,b,c,') == ['a','b','c']
@@ -170,7 +176,7 @@ class UnitTest_Util( UnitTestBase ):
         assert parsecsv('') == []
 
     def test_parsecsvlines( self ):
-        log.info("Testing parsecsvlines() ...")
+        self.log.info("Testing parsecsvlines() ...")
         assert parsecsvlines('a,\nb\nc') == ['a','b','c']
         assert parsecsvlines(' a,\n,b,c\n') == ['a','b','c']
         assert parsecsvlines('\n,a,b,c,\n') == ['a','b','c']
@@ -178,12 +184,12 @@ class UnitTest_Util( UnitTestBase ):
         assert parsecsvlines('\n') == []
 
     def test_classof( self ):
-        log.info("Testing classof() ...")
+        self.log.info("Testing classof() ...")
         assert classof( Context ) == Context
         assert classof( Context() ) == Context
 
     def test_subclassof( self ):
-        log.info("Testing subclassof() ...")
+        self.log.info("Testing subclassof() ...")
         class Base : pass
         class Derived( Base ) : pass
         d = Derived()
@@ -193,7 +199,7 @@ class UnitTest_Util( UnitTestBase ):
         assert subclassof( d, [] ) == None
 
     def test_asbool( self ):
-        log.info("Testing asbool() ...")
+        self.log.info("Testing asbool() ...")
         assert asbool( 'true' ) == True
         assert asbool( 'false' ) == False
         assert asbool( 'True' ) == True
@@ -202,19 +208,19 @@ class UnitTest_Util( UnitTestBase ):
         assert asbool( False ) == False
 
     def test_asint( self ):
-        log.info("Testing asint() ...")
+        self.log.info("Testing asint() ...")
         assert asint( '10' ) == 10
         assert asint( '10.1' ) == None
         assert asint( '10.1', True ) == True
 
     def test_asfloat( self ):
-        log.info("Testing asfloat() ...")
+        self.log.info("Testing asfloat() ...")
         assert asfloat( '10' ) == 10.0
         assert asfloat( 'hello' ) == None
         assert asfloat( 'hello', 10 ) == 10
 
     def test_timedelta_to_seconds( self ):
-        log.info("Testing timedelta_to_seconds() ...")
+        self.log.info("Testing timedelta_to_seconds() ...")
         t1 = dt.datetime.utcnow()
         time.sleep(2)
         t2 = dt.datetime.utcnow()
@@ -222,17 +228,17 @@ class UnitTest_Util( UnitTestBase ):
 
     def test_call_entrypoint( self ):
         import pkg_resources as pkg
-        log.info("Testing call_entrypoint() ...")
+        self.log.info("Testing call_entrypoint() ...")
         dist = pkg.WorkingSet().by_key['pluggdapps']
         info = call_entrypoint( dist, 'pluggdapps', 'package' )
         assert info == {}
 
     def test_docstr( self ):
-        log.info("Testing docstr() ...")
+        self.log.info("Testing docstr() ...")
         assert docstr(docstr) == "Return the doc-string for the object."
 
     def test_objectdict( self ):
-        log.info("Testing ObjectDict() ...")
+        self.log.info("Testing ObjectDict() ...")
         d = ObjectDict( a=10, b=20 )
         assert d.a == 10
         assert d.b == 20

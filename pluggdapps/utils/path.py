@@ -1,21 +1,27 @@
 # -*- coding: utf-8 -*-
 
-import sys, pkg_resources, logging, imp
-from   os.path  import isabs, join, split, abspath, isdir, exists
-from   os       import listdir
+import sys, pkg_resources, imp
+from   os.path import isabs, join, split, abspath, isdir, exists
+from   os import listdir
 
-from   pluggdapps.compat    import string_types
+__all__ = [
+    'package_path', 'caller_module', 'caller_path', 'package_name',
+    'package_of', 'caller_package',
+    # Class
+    'Package', 'AssetResolver', 'DottedNameResolver',
+    'PkgResourcesAssetDescriptor', 'FSAssetDescriptor', 
 
-log = logging.getLogger( __name__ )
+]
 
 ignore_types = [ imp.C_EXTENSION, imp.C_BUILTIN ]
-init_names = [ '__init__%s' % x[0] for x in imp.get_suffixes() 
-                                   if x[0] and x[2] not in ignore_types ]
+init_names = [ '__init__%s' % x[0]
+               for x in imp.get_suffixes() 
+               if x[0] and (x[2] not in ignore_types) ]
 
 def package_path( package ):
-    """Compute directory path to package. To avoid repeating the same
+    """Compute directory path for `package`. To avoid repeating the same
     computing, the abspath is cached on the package object."""
-    cachedpath = getattr(package, '__abspath__', None)
+    cachedpath = getattr( package, '__abspath__', None )
     if cachedpath : return cachedpath
     abspath = pkg_resources.resource_filename( package.__name__, '' )
     # pkg_resources doesn't care whether we feed it a package
@@ -25,12 +31,17 @@ def package_path( package ):
     return abspath
 
 def caller_module( level=2, sys=sys ):
+    """Return the module object from which the call was made. For instance, if
+    A defined in module M makes a call to B and B, by calling this function,
+    can know the module of the caller."""
+    the caller, it can use this fu
     module_globals = sys._getframe(level).f_globals
     module_name = module_globals.get('__name__') or '__main__'
     module = sys.modules[module_name]
     return module
 
 def caller_path( path, level=2 ):
+    """Return the module path of caller."""
     if isabs( path ) : return path
     module = caller_module( level+1 )
     prefix = package_path(module)
@@ -42,6 +53,7 @@ def package_name( pkg_or_module ):
     package name of the package in which the module lives. If this
     function is passed a package, return the dotted Python package
     name of the package itself."""
+    # TODO : Should we rework this logic based on py3k's __package__ attr.
     if pkg_or_module is None or pkg_or_module.__name__ == '__main__':
         return '__main__'
     pkg_filename = pkg_or_module.__file__
@@ -91,7 +103,7 @@ class Package(object):
     If package input is not provided, then caller's package is assumed."""
 
     def __init__( self, package=CALLER_PACKAGE ):
-        if isinstance(package, string_types):
+        if isinstance(package, str):
             __import__(package) # Could be a package or module
             self.package = package_of( sys.modules[package] )
         else :
@@ -253,7 +265,7 @@ class DottedNameResolver( Package ):
            v = r.resolve('xml') # v is the xml module
 
         """
-        if not isinstance(dotted, string_types):
+        if not isinstance(dotted, str):
             raise ValueError('%r is not a string' % (dotted,))
         package = self.package
         if package is CALLER_PACKAGE:
@@ -274,7 +286,7 @@ class DottedNameResolver( Package ):
            v = r.maybe_resolve(xml)
            # v is the xml module; no exception raised
         """
-        if isinstance(dotted, string_types):
+        if isinstance(dotted, str):
             package = self.package
             if package is CALLER_PACKAGE:
                 package = caller_package()
@@ -392,6 +404,9 @@ from os.path import dirname, join
 
 class UnitTest_Path( UnitTestBase ):
 
+    def setup( self ):
+        super().setup()
+
     def test( self ):
         self.test_package_path()
         self.test_caller_module()
@@ -399,24 +414,28 @@ class UnitTest_Path( UnitTestBase ):
         self.test_package_name()
         self.test_package_of()
         self.test_caller_package()
+        super().test()
+
+    def teardown( self ):
+        super().teardown()
 
     def test_package_path( self ):
         import pluggdapps.commands.unittest
-        log.info("Testing package_path() ...")
+        self.log.info("Testing package_path() ...")
         assert package_path(sys.modules[self.__module__]) == dirname(__file__)
         refpath = join( dirname(__file__), 'commands', )
         assert package_path( pluggdapps.commands.unittest ) == refpath
 
     def test_caller_module( self ):
         import pluggdapps.path
-        log.info("Testing caller_module() ...")
+        self.log.info("Testing caller_module() ...")
         assert caller_module(1) == sys.modules['pluggdapps.path']
         assert caller_module(2) == sys.modules['pluggdapps.path']
         assert caller_module(3) == sys.modules['pluggdapps.commands.unittest']
         assert caller_module(4) == sys.modules['pluggdapps.commands.unittest']
 
     def test_caller_path( self ):
-        log.info("Testing caller_path() ...")
+        self.log.info("Testing caller_path() ...")
         unittestpath = join( dirname(__file__), 'commands', 'unittest.py' )
         assert caller_path('path.py', 1) == join(dirname(__file__), 'path.py')
         assert caller_path('path.py', 2) == join(dirname(__file__), 'path.py')
@@ -427,9 +446,10 @@ class UnitTest_Path( UnitTestBase ):
         import pluggdapps.commands
         import pluggdapps.commands.unittest
         import os, os.path
-        log.info("Testing package_name() ...")
+        self.log.info("Testing package_name() ...")
         assert package_name(pluggdapps.commands) == 'pluggdapps.commands'
-        assert package_name(pluggdapps.commands.unittest) == 'pluggdapps.commands'
+        assert package_name(pluggdapps.commands.unittest) == \
+               'pluggdapps.commands'
         assert package_name(os.path) == 'posixpath'
         assert package_name(os) == 'os'
 
@@ -437,14 +457,14 @@ class UnitTest_Path( UnitTestBase ):
         import pluggdapps.commands
         import pluggdapps.commands.unittest
         import os, os.path, posixpath
-        log.info("Testing package_of() ...")
+        self.log.info("Testing package_of() ...")
         assert package_of(pluggdapps.commands) == pluggdapps.commands
         assert package_of(pluggdapps.commands.unittest) == pluggdapps.commands
         assert package_of(os.path) == posixpath
         assert package_of(os) == os
 
     def test_caller_package( self ):
-        log.info("Testing caller_package() ...")
+        self.log.info("Testing caller_package() ...")
         assert caller_package(1) == sys.modules['pluggdapps']
         assert caller_package(2) == sys.modules['pluggdapps']
         assert caller_package(3) == sys.modules['pluggdapps.commands']

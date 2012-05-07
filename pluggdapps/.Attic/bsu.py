@@ -9,7 +9,7 @@
 
 import logging
 
-from pluggdapps.compat import binary_type, text_type, string_types
+from pluggdapps.compat import binary_type, text_type
 
 __all__ = [ 
     'tobytes', 'totext', 'utf8', 'to_unicode', 'recursive_unicode', 
@@ -48,10 +48,10 @@ def recursive_unicode( obj ):
     """Walks a simple data structure, converting byte strings to unicode.
     Supports lists, tuples, and dictionaries."""
     if isinstance(obj, dict):
-        return dict( (recursive_unicode(k), recursive_unicode(v))
-                     for (k, v) in obj.iteritems() )
+        return { recursive_unicode(k) : recursive_unicode(v) 
+                 for k, v in list(obj.items()) }
     elif isinstance(obj, list):
-        return map( recursive_unicode, obj )
+        return list( map( recursive_unicode, obj ))
     elif isinstance(obj, tuple):
         return tuple( map( recursive_unicode, obj ))
     elif isinstance( obj, bytes ):
@@ -77,8 +77,8 @@ class UnitTest_BSU( UnitTestBase ):
 
     def test_bytes_and_text( self ):
         log.info("Testing tobytes() and totext() ...")
-        u = u"华语/華語 Huáyǔ; 中文"
-        s = u"Hello world"
+        u = "华语/華語 Huáyǔ; 中文"
+        s = "Hello world"
         assert totext( tobytes(u, encoding='utf-8'), encoding='utf-8' ) == u
         assert totext( tobytes(s) ) == s
         u = b"华语/華語 Huáyǔ; 中文"
@@ -88,8 +88,8 @@ class UnitTest_BSU( UnitTestBase ):
 
     def test_utf8_and_unicode( self ): 
         log.info("Testing utf8() and to_unicode() ...")
-        u = u"华语/華語 Huáyǔ; 中文"
-        s = u"Hello world"
+        u = "华语/華語 Huáyǔ; 中文"
+        s = "Hello world"
         assert to_unicode( utf8(u) ) == u
         assert to_unicode( utf8(s) ) == s
         u = b"华语/華語 Huáyǔ; 中文"
@@ -101,13 +101,13 @@ class UnitTest_BSU( UnitTestBase ):
         log.info("Testing recursive_unicode() ...")
         d1 = { b"华语/華語 Huáyǔ; 中文" : b"Hello world" }
         d2 = { b"Hello world" : b"华语/華語 Huáyǔ; 中文" }
-        assert recursive_unicode(d1) == { u"华语/華語 Huáyǔ; 中文" : u"Hello world" }
-        assert recursive_unicode(d2) == { u"Hello world" : u"华语/華語 Huáyǔ; 中文" }
+        assert recursive_unicode(d1) == { "华语/華語 Huáyǔ; 中文" : "Hello world" }
+        assert recursive_unicode(d2) == { "Hello world" : "华语/華語 Huáyǔ; 中文" }
 
     def test_native( self ):
         log.info("Testing native_str() and ascii_native() ...")
-        u = u"华语/華語 Huáyǔ; 中文"
-        assert isinstance( native_str(u, encoding='utf-8'), string_types )
+        u = "华语/華語 Huáyǔ; 中文"
+        assert isinstance( native_str(u, encoding='utf-8'), str )
         u = b"华语/華語 Huáyǔ; 中文"
         assert type( ascii_native(u) ) == str
-        assert isinstance( native_str(u, encoding='utf-8'), string_types )
+        assert isinstance( native_str(u, encoding='utf-8'), str )

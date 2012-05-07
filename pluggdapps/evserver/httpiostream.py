@@ -4,8 +4,6 @@
 
 """A utility class to write to and read from a non-blocking socket."""
 
-from __future__ import absolute_import, division, with_statement
-
 import sys, re, collections, errno, logging, socket
 import ssl  # Python 2.6+
 
@@ -115,7 +113,7 @@ class HTTPIOStream( Plugin ):
         self._connecting = True
         try:
             self.socket.connect(address)
-        except socket.error, e:
+        except socket.error as e:
             # In non-blocking mode we expect connect() to raise an
             # exception with EINPROGRESS or EWOULDBLOCK.
             #
@@ -151,7 +149,7 @@ class HTTPIOStream( Plugin ):
         ``callback`` will be empty.
         """
         self._set_read_callback(callback)
-        assert isinstance(num_bytes, (int, long))
+        assert isinstance(num_bytes, int)
         self._read_bytes = num_bytes
         self._streaming_callback = sc.wrap(streaming_callback)
         self._try_inline_read()
@@ -375,7 +373,7 @@ class HTTPIOStream( Plugin ):
         """
         try:
             chunk = self.socket.recv( self['read_chunk_size'] )
-        except socket.error, e:
+        except socket.error as e:
             if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                 return None
             else:
@@ -394,7 +392,7 @@ class HTTPIOStream( Plugin ):
         """
         try:
             chunk = self._read_from_socket()
-        except socket.error, e:
+        except socket.error as e:
             # ssl.SSLError is a subclass of socket.error
             log.warning( "Read error on %d: %s", self.socket.fileno(), e )
             self.close()
@@ -512,7 +510,7 @@ class HTTPIOStream( Plugin ):
                 self._write_buffer_frozen = False
                 _merge_prefix(self._write_buffer, num_bytes)
                 self._write_buffer.popleft()
-            except socket.error, e:
+            except socket.error as e:
                 if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                     self._write_buffer_frozen = True
                     break
@@ -627,7 +625,7 @@ class HTTPSSLIOStream( HTTPIOStream ):
             self._handshake_reading = False
             self._handshake_writing = False
             self.socket.do_handshake()
-        except ssl.SSLError, err:
+        except ssl.SSLError as err:
             if err.args[0] == ssl.SSL_ERROR_WANT_READ:
                 self._handshake_reading = True
                 return
@@ -641,7 +639,7 @@ class HTTPSSLIOStream( HTTPIOStream ):
                 log.warning( "SSL Error on %d: %s", self.socket.fileno(), err )
                 return self.close()
             raise
-        except socket.error, err:
+        except socket.error as err:
             if err.args[0] == errno.ECONNABORTED:
                 return self.close()
         else:
@@ -682,14 +680,14 @@ class HTTPSSLIOStream( HTTPIOStream ):
             # called when there is nothing to read, so we have to use
             # read() instead.
             chunk = self.socket.read( self['read_chunk_size'] )
-        except ssl.SSLError, e:
+        except ssl.SSLError as e:
             # SSLError is a subclass of socket.error, so this except
             # block must come first.
             if e.args[0] == ssl.SSL_ERROR_WANT_READ:
                 return None
             else:
                 raise
-        except socket.error, e:
+        except socket.error as e:
             if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                 return None
             else:

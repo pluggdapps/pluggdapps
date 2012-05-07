@@ -34,19 +34,19 @@ class Mounts( Plugin ):
         options = options or self.options
         args = args or self.args
         if options.subdomains :
-            print "Applications mounted on subdomain : \n"
+            print( "Applications mounted on subdomain : \n" )
             pprint( self.platform.on_subdomains )
-            print
+            print()
         elif options.scripts :
-            print "Applications mounted on script path : \n"
+            print( "Applications mounted on script path : \n" )
             pprint( self.platform.on_scripts )
-            print
+            print()
         else :
-            print "Applications mounted on subdomain : \n"
+            print( "Applications mounted on subdomain : \n" )
             pprint( self.platform.on_subdomains )
-            print "\nApplications mounted on script path : \n"
+            print( "\nApplications mounted on script path : \n" )
             pprint( self.platform.on_scripts )
-            print
+            print()
 
     def _parse( self, usage ):
         return self._options( OptionParser( usage=usage ))

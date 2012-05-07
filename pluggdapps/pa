@@ -1,51 +1,57 @@
-# -*- coding: utf-8 -*-
+#! /usr/bin/env python3.2
 
-#! /usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
 import sys
-from   optparse      import OptionParser
+from   argparse import ArgumentParser
 
 import pluggdapps
-from   pluggdapps               import ROOTAPP
-from   pluggdapps.platform      import Platform
-from   pluggdapps.plugin        import plugin_init, pluginnames, \
-                                       query_plugin, ISettings
-from   pluggdapps.interfaces    import ICommand
+from   pluggdapps.const import ROOTAPP, DEFAULT_INI
+from   pluggdapps.config import loadsettings
+from   pluggdapps.platform import Platform
+from   pluggdapps.plugin import plugin_init, pluginnames, query_plugin, \
+                                ISettings
+from   pluggdapps.interfaces import ICommand
 
-usage = "pa [options] <command> [command_options]"
+description = "Pluggdapps command line script."
+parser = ArgumentParser( description=description )
 
-
-def parse( usage ):
-    """Parse master script options."""
-    return options( OptionParser( usage=usage ))
-
-
-def options( parser ):
-    """Supported command options for master script."""
-    parser.add_option( '-c', '--config', dest='config', default=None,
+def arguments( parser ):
+    parser.add_option( '-c', '--config',
+                       dest='config', default=None,
                        help="specify config file(s)" )
-    parser.add_option( '-i', '--import', action="append", dest='imports',
-                       default=[],
+    parser.add_option( '-i', '--import', 
+                       action="append", dest='imports', default=[],
                        help="specify modules to import")
-    parser.add_option( '--pa', action="append", dest='tostartpath', default=[],
+    parser.add_option( '--pa', 
+                       action="append", dest='tostartpath', default=[],
                        help="add given paths to the beginning of sys.path")
-    parser.add_option( '--pz', action="append", dest='toendpath', default=[],
-                       help="add given paths to the end of sys.path")
+    parser.add_option( '--pz', 
+                       action="append", dest='toendpath', default=[],
+                       help="add given paths to the end of sys.path" )
     return parser
 
+def main( cls ):
+    # Fetch ini file (configuration file) from sys.argv, if not supplied use
+    # the default ini-file.
+    argv = sys.argv[:]
+    try :
+        while argv :
+            arg = argv.pop(0)
+            if arg == '-c' :
+                inifile = argv.pop(0)
+                break
+        else :
+            inifile = DEFAULT_INI
+    except :
+        inifile = DEFAULT_INI
+    # Load complete chain of configuration from one or more ini files.
+    Platform.boot( inifile )
 
-def docommand( platform, command, argv ):
-    """Handle sub-commands."""
-    comm = query_plugin( ROOTAPP, ICommand, command, platform, argv=argv )
-    comm.run()
-
-
-def doscript( paargs, cmd ):
-    """Default handling for master script."""
     parser = parse( usage )
     options, args = parser.parse_args( paargs )
 
@@ -62,11 +68,18 @@ def doscript( paargs, cmd ):
     if cmd :
         level = None if cmd in ['serve', 'unittest'] else 'info'
         # -c (config file)
-        Platform.boot( options.config, loglevel=level )
+        Platform.boot( loglevel=level )
         platform = query_plugin( ROOTAPP, ISettings, 'platform' )
         docommand( platform, cmd, cmdargs )
     else :
         parser.print_help()
+
+
+
+def docommand( platform, command, argv ):
+    """Handle sub-commands."""
+    comm = query_plugin( ROOTAPP, ICommand, command, platform, argv=argv )
+    comm.run()
 
 
 if __name__ == '__main__' :

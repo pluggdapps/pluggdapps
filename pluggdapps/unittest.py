@@ -20,8 +20,8 @@ class UnitTestBase( Plugin ):
         pass
     __init__.marker = 'UnitTestBase'
 
-    def setup( self, platform ):
-        self.platform = platform
+    def setup( self ):
+        self.log = logging.getLogger( type(self).__name__ )
 
     def test( self ):
         pass
@@ -34,5 +34,4 @@ class UnitTestBase( Plugin ):
 
 import pluggdapps.asset
 import pluggdapps.path
-import pluggdapps.bsu
 import pluggdapps.util

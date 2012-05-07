@@ -13,8 +13,7 @@ try :
 except ImportError :
     curses = None
 
-# TODO :
-#   1. Examine more formatting options for message logging.
+from pluggdapps.plugin import query_plugin
 
 def setup( logsett ):
     """Setup and configure python's standard logging. After calling this
@@ -76,14 +75,15 @@ class LogFormatter( logging.Formatter ):
     def format(self, record):
         try:
             record.message = record.getMessage()
-        except Exception, e:
-            record.message = "Bad message (%r): %r" % (e, record.__dict__)
+        except Exception as e:
+            record.message = "Bad message (%r): %r" % (e, vars(record))
         record.asctime = time.strftime(
             "%y:%m:%d %H:%M:%S", self.converter(record.created))
         prefix = '[%(levelname)1.1s proc:%(process)d %(asctime)s ' \
-                 '%(module)s:%(lineno)d]' % record.__dict__
+                 '%(module)s:%(lineno)d]' % vars(record)
         if self._color:
-            prefix = self._colors.get(record.levelno, self._normal) + prefix + self._normal
+            prefix = self._colors.get(record.levelno, self._normal) + \
+                        prefix + self._normal
         formatted = prefix + " " + record.message
         if record.exc_info:
             if not record.exc_text:
@@ -97,18 +97,17 @@ class LogFormatter( logging.Formatter ):
         # python3.  Until version 3.2.3, most methods return
         # bytes, but only accept strings.  In addition, we want to
         # output these strings with the logging module, which
-        # works with unicode strings.  The explicit calls to
-        # unicode() below are harmless in python2 but will do the
-        # right conversion in python 3.
-        fg_color = ( curses.tigetstr("setaf") or curses.tigetstr("setf") or "" )
+        # works with strings.
+        fg_color = ( curses.tigetstr("setaf") or 
+                     curses.tigetstr("setf") or "" )
         if (3, 0) < sys.version_info < (3, 2, 3) :
-            fg_color = unicode(fg_color, "ascii")
-        normal = unicode(curses.tigetstr("sgr0"), "ascii")
+            fg_color = str(fg_color, "ascii")
+        normal = str(curses.tigetstr("sgr0"), "ascii")
         colors = {
-            logging.DEBUG  : unicode(curses.tparm(fg_color, 4), "ascii"), # Blue
-            logging.INFO   : unicode(curses.tparm(fg_color, 2), "ascii"), # Green
-            logging.WARNING: unicode(curses.tparm(fg_color, 3), "ascii"), # Yellow
-            logging.ERROR  : unicode(curses.tparm(fg_color, 1), "ascii"), # Red
+            logging.DEBUG  : str(curses.tparm(fg_color, 4), "ascii"), # Blue
+            logging.INFO   : str(curses.tparm(fg_color, 2), "ascii"), # Green
+            logging.WARNING: str(curses.tparm(fg_color, 3), "ascii"), # Yellow
+            logging.ERROR  : str(curses.tparm(fg_color, 1), "ascii"), # Red
         }
         return normal, colors
 

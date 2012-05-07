@@ -55,7 +55,6 @@ Here are a few rules of thumb for when it's necessary:
   block that references your `StackContext`.
 """
 
-from __future__ import absolute_import, division, with_statement
 import contextlib, functools, itertools, sys, threading, logging
 
 log = logging.getLogger( __name__ )
@@ -179,7 +178,7 @@ def wrap(fn):
         # NullContext to clear the state and then recreate from contexts.
         elif (len(_state.contexts) > len(contexts) or
             any(a[1] is not b[1]
-                for a, b in itertools.izip(_state.contexts, contexts))):
+                for a, b in zip(_state.contexts, contexts))):
             # contexts have been removed or changed, so start over
             new_contexts = ([NullContext()] +
                             [cls(arg) for (cls, arg) in contexts])
@@ -233,4 +232,4 @@ def _nested(*managers):
             # Don't rely on sys.exc_info() still containing
             # the right information. Another exception may
             # have been raised and caught by an exit method
-            raise exc[0], exc[1], exc[2]
+            raise exc[0](exc[1]).with_traceback( exc[2] )

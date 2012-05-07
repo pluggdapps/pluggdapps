@@ -6,13 +6,15 @@
 
 """HTTP utility functions."""
 
-import logging, re, sys, urllib, calendar, email, hashlib, socket
-from   urlparse import urlsplit, parse_qs  # Python 2.6+
+import logging, re, sys, calendar, email, hashlib, socket
+import urllib.request, urllib.error
+from   urllib.parse import urlsplit, parse_qs, unquote_plus, \
+                           unquote_to_bytes, urlencode
 
-from   pluggdapps.bsu       import native_str, utf8
 from   pluggdapps.util      import ObjectDict
 
 __all__ = [
+    'parse_scheme'
     'parse_startline', 'convert_header_value', 'compute_etag', 'HTTPFile', 
     'HTTPHeaders', 'url_unescape', 'parse_qs_bytes', 'url_concat',
     'parse_multipart_form_data',
@@ -29,7 +31,7 @@ def _port_for_scheme( scheme ):
         port =None
     return port
 
-def parse_scheme( hdrs, xheaders ):
+def parse_xscheme( hdrs, xheaders ):
     if xheaders : # AWS uses X-Forwarded-Proto
         scheme = hdrs.get("X-Scheme", hdrs.get("X-Forwarded-Proto", None))
         if scheme not in ("http", "https"):
@@ -38,8 +40,8 @@ def parse_scheme( hdrs, xheaders ):
         scheme = None
     return scheme
 
-def parse_url( scheme, host ):
-    sch, _, path, query, frag = r = urlparse.urlsplit( native_str(uri) )
+def parse_url( uri, host, xscheme=None ):
+    sch, _, path, query, frag = r = urlsplit( uri )
     scheme = scheme or sch
     if host and ':' in host :
         host, port = host.split(':', 1)
@@ -75,8 +77,8 @@ def parse_remoteip( addr, hdrs, xheaders ):
 
 def parse_query( self, query ):
     arguments = {}
-    for name, values in parse_qs_bytes(query).iteritems():
-        values = filter( None, values )
+    for name, values in list( parse_qs_bytes(query).items() ) :
+        values = [ x for x in values if x ]
         if values:
             arguments[name] = values
     return arguments
@@ -86,8 +88,8 @@ def parse_body( method, headers, body ):
     content_type = headers.get( "Content-Type", "" )
     if method in ("POST", "PUT"):
         if content_type.startswith( "application/x-www-form-urlencoded" ):
-            for name, values in parse_qs_bytes( native_str(body) ).items() :
-                values = filter(None, values)
+            for name, values in list( parse_qs_bytes( body ).items() ) :
+                values = [ x for x in values if x ]
                 if values:
                     arguments.setdefault( name, [] ).extend( values )
         elif content_type.startswith( "multipart/form-data" ):
@@ -95,7 +97,7 @@ def parse_body( method, headers, body ):
             for field in fields:
                 k, sep, v = field.strip().partition("=")
                 if k == "boundary" and v:
-                    args, files = parse_multipart_form_data( utf8(v), body )
+                    args, files = parse_multipart_form_data( v, body )
                     arguments.update( args )
                     files.update( files )
                     break
@@ -111,9 +113,9 @@ def convert_header_value( value ):
     a string. All header values are then encoded as UTF-8."""
     if isinstance( value, bytes ):
         pass
-    elif isinstance( value, unicode ):
+    elif isinstance( value, str ):
         value = value.encode('utf-8')
-    elif isinstance( value, (int, long) ):
+    elif isinstance( value, int ):
         # return immediately since we know the converted value will be safe
         return str(value)
     elif isinstance( value, dt.datetime ):
@@ -132,7 +134,7 @@ def convert_header_value( value ):
 def compute_etag( write_buffer ) :
     """Computes the etag header to be used for this request's response."""
     hasher = hashlib.sha1()
-    map( hasher.update, write_buffer )
+    list( map( hasher.update, write_buffer ))
     return '"%s"' % hasher.hexdigest()
 
 class HTTPFile( ObjectDict ):
@@ -217,7 +219,7 @@ class HTTPHeaders( dict ):
         If a header has multiple values, multiple pairs will be
         returned with the same name.
         """
-        for name, list in self._as_list.iteritems():
+        for name, list in list( self._as_list.items() ) :
             for value in list:
                 yield (name, value)
 
@@ -244,7 +246,7 @@ class HTTPHeaders( dict ):
         """Returns a dictionary from HTTP header text.
 
         >>> h = HTTPHeaders.parse("Content-Type: text/html\\r\\nContent-Length: 42\\r\\n")
-        >>> sorted(h.iteritems())
+        >>> sorted(h.items())
         [('Content-Length', '42'), ('Content-Type', 'text/html')]
         """
         h = cls()
@@ -277,7 +279,7 @@ class HTTPHeaders( dict ):
 
     def update(self, *args, **kwargs):
         # dict.update bypasses our __setitem__
-        for k, v in dict(*args, **kwargs).iteritems():
+        for k, v in list( dict(*args, **kwargs).items() ) :
             self[k] = v
 
     _NORMALIZED_HEADER_RE = re.compile(r'^[A-Z0-9][a-z0-9]*(-[A-Z0-9][a-z0-9]*)*$')
@@ -314,9 +316,9 @@ if sys.version_info[0] < 3:
         the result is a unicode string in the specified encoding.
         """
         if encoding is None:
-            return urllib.unquote_plus( utf8(value) )
+            return unquote_plus( utf8(value) )
         else:
-            return unicode( urllib.unquote_plus(utf8(value)), encoding )
+            return str( unquote_plus(utf8(value)), encoding )
 
     parse_qs_bytes = parse_qs
 else:
@@ -329,12 +331,12 @@ else:
         the result is a unicode string in the specified encoding.
         """
         if encoding is None:
-            return urllib.parse.unquote_to_bytes(value)
+            return unquote_to_bytes(value)
         else:
-            return urllib.unquote_plus(to_unicode(value), encoding=encoding)
+            return unquote_plus( to_unicode(value), encoding=encoding)
 
     def parse_qs_bytes(qs, keep_blank_values=False, strict_parsing=False):
-        """Parses a query string like urlparse.parse_qs, but returns the
+        """Parses a query string like parse_qs, but returns the
         values as byte strings.
 
         Keys still become type str (interpreted as latin1 in python3!)
@@ -346,7 +348,7 @@ else:
         result = parse_qs( qs, keep_blank_values, strict_parsing,
                            encoding='latin1', errors='strict' )
         encoded = {}
-        for k, v in result.iteritems():
+        for k, v in list( result.items() ) :
             encoded[k] = [i.encode('latin1') for i in v]
         return encoded
 
@@ -361,7 +363,7 @@ def url_concat(url, args):
         return url
     if url[-1] not in ('?', '&'):
         url += '&' if ('?' in url) else '?'
-    return url + urllib.urlencode(args)
+    return url + urlencode(args)
 
 def parse_multipart_form_data( boundary, data ):
     """Parses a multipart/form-data body.
@@ -429,7 +431,7 @@ def _parse_header(line):
     """Parse a Content-type like header.
     Return the main content-type and a dictionary of options."""
     parts = _parseparam(';' + line)
-    key = parts.next()
+    key = next( parts )
     pdict = {}
     for p in parts:
         i = p.find('=')
@@ -448,7 +450,7 @@ def valid_ip( ip ):
                                   socket.SOCK_STREAM,
                                   0, socket.AI_NUMERICHOST )
         return bool(res)
-    except socket.gaierror, e:
+    except socket.gaierror as e:
         if e.args[0] == socket.EAI_NONAME:
             return False
         raise

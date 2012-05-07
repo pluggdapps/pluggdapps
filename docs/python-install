@@ -1,0 +1,12 @@
+Installing python 3.2
+
+> sudo apt-get install build-essential libncursesw5-dev 
+> sudo apt-get install libreadline5-dev libssl-dev libgdbm-dev 
+> sudo apt-get install libc6-dev libsqlite3-dev tk-dev libbz2-dev
+
+> cd python-3.2
+> ./configure
+> make
+> sudo make altinstall
+
+make sure to do `altinstall`

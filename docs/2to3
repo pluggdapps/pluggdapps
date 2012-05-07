@@ -1,0 +1,15 @@
+Python manual says,
+
+"On the other hand, the actual search for names is done dynamically, at run
+time — however, the language definition is evolving towards static name
+resolution, at "compile" time, so don't rely on dynamic name resolution!
+(In fact, local variables are already determined statically.)
+
+So to make sure that the source base of pluggdapps and its dependant packages
+have not taken the runtime black-magic for granted, check for the following
+code patterns.
+
+* Usage of functions like globals(), locals(), vars() to effect a namespace
+  behaviour
+* Using __dict__ on objects.
+* Importing modules and packages in un-expected ways.

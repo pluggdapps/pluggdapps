@@ -6,10 +6,9 @@
 
 import logging
 
+from   pluggdapps.core       import implements
 from   pluggdapps.config     import ConfigDict
-from   pluggdapps.plugin     import Plugin, Singleton, Interface, implements
-from   pluggdapps.interfaces import IApplication
-import pluggdapps.helper     as h
+from   pluggdapps.plugin     import Plugin, Singleton, IApplication
 
 log = logging.getLogger(__name__)
 
@@ -17,11 +16,6 @@ _default_settings = ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for Application base class for all applications."
 
-_default_settings['debug']  = {
-    'default' : False,
-    'types'   : (bool,),
-    'help'    : "",
-}
 _default_settings['IRequest']  = {
     'default' : 'httprequest',
     'types'   : (str,),
@@ -44,7 +38,7 @@ _default_settings['ICookie']  = {
                 "at corresponding request / response plugin settings."
 }
 _default_settings['IRouter']  = {
-    'default' : 'routematch',
+    'default' : 'router',
     'types'   : (str,),
     'help'    : ""
 }
@@ -58,16 +52,14 @@ class Application( Singleton ):
     def start( self, request ):
         pass
 
-    def router( self, request ):
-        pass
-
     def onfinish( self, request ):
         pass
 
     def shutdown( self, settings ):
         pass
 
-    # ISettings interface methods
+    #---- ISettings interface methods
+
     @classmethod
     def default_settings( cls ):
         return _default_settings
@@ -75,31 +67,3 @@ class Application( Singleton ):
     @classmethod
     def normalize_settings( cls, settings ):
         return settings
-
-
-class RootApp( Application ):
-
-    def onboot( self, settings ):
-        pass
-
-    def start( self, request ):
-        pass
-
-    def router( self, request ):
-        pass
-
-    def onfinish( self, request ):
-        request.onfinish()
-
-    def shutdown( self, settings ):
-        pass
-
-    # ISettings interface methods
-    @classmethod
-    def default_settings( cls ):
-        return _default_settings
-
-    @classmethod
-    def normalize_settings( cls, settings ):
-        return settings
-

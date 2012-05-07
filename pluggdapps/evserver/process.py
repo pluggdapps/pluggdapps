@@ -4,8 +4,6 @@
 
 """Utilities for working with multiple processes."""
 
-from __future__ import absolute_import, division, with_statement
-
 import os, sys, time, logging, errno, random
 from   binascii import hexlify
 import multiprocessing  # Python 2.6+
@@ -31,7 +29,7 @@ def _reseed_random():
     # random.seed (at least as of python 2.6).  If os.urandom is not
     # available, we mix in the pid in addition to a timestamp.
     try:
-        seed = long(hexlify(os.urandom(16)), 16)
+        seed = int(hexlify(os.urandom(16)), 16)
     except NotImplementedError:
         seed = int(time.time() * 1000) ^ os.getpid()
     random.seed(seed)
@@ -90,7 +88,7 @@ def fork_processes( num_processes, max_restarts ):
     while children:
         try:
             pid, status = os.wait()
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.EINTR:
                 continue
             raise

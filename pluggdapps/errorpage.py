@@ -8,14 +8,14 @@ import logging
 
 from   pluggdapps.plugin        import Plugin, implements
 from   pluggdapps.interfaces    import IErrorPage
-import pluggdapps.helper        as h
+import pluggdapps.utils         as h
 
 log = logging.getLogger(__name__)
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for HTTPErrorPage implementing IErrorPage "
-    "interface."
+    ("Configuration settings for HTTPErrorPage implementing IErrorPage "
+     "interface.")
 
 _default_settings['errortemplate']  = {
     'default' : '',

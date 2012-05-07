@@ -1,0 +1,57 @@
+Before justifying why pluggdapps, a short introduction on pluggdapps.
+
+* pluggdapps is a web back-end along with a collection of tools for
+  html templating, text markup, CSS scripting. All of them developed inhouse
+  to service the need for a complete web-development platform.
+
+* Main dependency for pluggdapps are python, python standard library and PLY
+  (lexer and yaccer in python).
+
+* Almost every thing in pluggdapps is pluggable, even applications.
+
+* That brings us to the fact that pluggdapps can host multiple applications in
+  the same environment.
+
+* pluggdapps comes with a http server derived from facebook's tornado and based
+  on epoll, py3k's concurrency primitives.
+
+* pluggdapps exclusively supports py3k environment and plans to support pypy
+  environment as well.
+
+* Simplicity. The core of pluggdapps contains about 500-1000 lines of code.
+  Which provides a plugin framework, singleton pattern using metaclassing.
+
+* Configuration. A plugin is nothing but a dictionary of configuration
+  settings gathered from sources like ini-files, web-admin backend etc.
+
+* Plugins are configured and instantiated in the context of an application.
+
+* pluggdapps is released under GPL V3 license.
+
+Now on the reasoning of why pluggdapps,
+
+* Attempts to blend MVC design pattern and a plugin architecture.
+
+  This means we had to create a templating language and CSS scripting
+  language that can work in tandem with our web framework.
+
+* Now, in pluggdapps, developers can create their templates as plugins and 
+  distribute them as packages. Same is the case with CSS styling.
+
+* Plugin framework in pluggdapps is highly simplified. Just create interface
+  specifications and encourage developers to develop plugins for your
+  specifications. Almost every piece of code is a plugin.
+
+* Open source is a proven way to create and distribute software. But most of
+  the open source license comes with no-warranty.
+  
+  This puts developers in a tricky state especially when they are using third
+  party tools (and packages) while creating their web applications.
+  Its hard for them to provide a promise of warrantly for their clients 
+  without getting similar promises for their third party open source 
+  packages that they depend upon.
+
+  Now, this becomes even more pronounced for developers in India who are
+  depending on communities functioning else-where. Without a physical
+  connection with such communities it is difficult for developer and
+  entrepreneurs to meet obligations from their clients.

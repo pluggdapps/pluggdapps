@@ -59,37 +59,40 @@ class List( Plugin ):
         return parser
 
     def _listinterfs( self, options, args ):
-        for iname, info in PluginMeta._interfmap.items() :
-            print "%s in %r" % (iname, info['file'])
+        for iname, info in list( PluginMeta._interfmap.items() ) :
+            print(( "%s in %r" % (iname, info['file']) ))
             for line in docstr( info['cls'] ).splitlines() :
-                print "    ", line.strip()
-            print
+                print(( "    ", line.strip() ))
+            print()
 
     def _listplugins( self, options, args ):
-        for pname, info in PluginMeta._pluginmap.items() :
-            print "%-15s: defined as %r in %r" % (pname, info['name'], info['file'])
+        for pname, info in list( PluginMeta._pluginmap.items() ) :
+            print(( "%-15s: defined as %r in %r" % (
+                        pname, info['name'], info['file']) ))
 
     def _listinterf( self, options, args ):
         nm = options.interface
         info = PluginMeta._interfmap.get( nm, None )
         if info == None :
-            print "Interface %r not defined" % nm
+            print(( "Interface %r not defined" % nm ))
         else :
-            print "%-15s: defined as %r in %r" % (nm, info['name'], info['file'])
-            print "\nConfiguration dictionary"
+            print(( "%-15s: defined as %r in %r" % (
+                        nm, info['name'], info['file']) ))
+            print( "\nConfiguration dictionary" )
             pprint( info['config'] )
-            print "\nAttribute dictionary"
+            print( "\nAttribute dictionary" )
             pprint( info['attributes'] )
-            print "\nMethod dictionary"
+            print( "\nMethod dictionary" )
             pprint( info['methods'] )
 
     def _listplugin( self, options, args ):
         nm = options.plugin
         info = PluginMeta._pluginmap.get( nm, None )
         if info == None :
-            print "Plugin %r not defined" % nm
+            print(( "Plugin %r not defined" % nm ))
         else :
-            print "%-15s: defined as %r in %r" % (nm, info['name'], info['file'])
-            print "\nConfiguration dictionary"
+            print(( "%-15s: defined as %r in %r" % (
+                        nm, info['name'], info['file']) ))
+            print( "\nConfiguration dictionary" )
             pprint( info['config'] )
 

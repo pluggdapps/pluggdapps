@@ -1,0 +1,14 @@
+* Python 2.7 is the last 2.x major release.
+
+* Support for 2.7 is expected to end sometime around 2016.
+
+* Interesting features like string handling (unicode), concurrency, are
+  available only in 3.x releases
+
+* Supporing both 2.x and 3.x leads to kludge in source base.
+
+* There is a moratorium on python feature additions giving developers in 2.x
+  to catch up with 3.x
+
+* Not to mention that it feels better to program in p3k, given the fact that
+  substantial cleaning up has been done to standard library as well.

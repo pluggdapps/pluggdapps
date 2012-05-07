@@ -4,12 +4,13 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-import logging, hmac, hashlib, Cookie, base64
+import logging, hmac, hashlib, base64
+import http.cookies
 
 from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import Plugin, implements
 from   pluggdapps.interfaces    import ICookie
-import pluggdapps.helper        as h
+import pluggdapps.utils         as h
 
 log = logging.getLogger( __name__ )
 
@@ -24,17 +25,19 @@ _default_settings['secret']  = {
                 "response.",
 }
 _default_settings['max_age_seconds']  = {
-    'default' : 3600 * 24 * 30,     # 30 days
+    'default' : 3600 * 24 * 30,
     'types'   : (int,),
     'help'    : "Maximum age, in seconds, for a cookie to live after its "
-                "creation time.",
+                "creation time. The default is 30 days.",
 }
 
 class HTTPCookie( Plugin ):
     implements( ICookie )
 
-    def parse_cookies( self, headers )
-        cookies = Cookie.SimpleCookie()
+    def parse_cookies( self, headers ):
+        """Parse cookies from header fields and return a SimpleCookie object
+        from python's standard library."""
+        cookies = http.cookies.SimpleCookie()
         try    : 
             cookies.load( h.native_str( headers['Cookie']  ))
         except : 
@@ -77,7 +80,7 @@ class HTTPCookie( Plugin ):
                 timestamp, localtime=False, usegmt=True )
         if path:
             morsel["path"] = path
-        for k, v in kwargs.iteritems() :
+        for k, v in list( kwargs.items() ) :
             if k == 'max_age' :
                 k = 'max-age'
             morsel[k] = v

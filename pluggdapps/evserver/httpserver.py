@@ -9,8 +9,6 @@ class except to start a server at the beginning of the process
 (and even that is often done indirectly via `Platform.listen`).
 """
 
-from __future__ import absolute_import, division, with_statement
-
 import logging, socket
 import ssl  # Python 2.6+
 
@@ -302,7 +300,7 @@ class HTTPConnection(object):
                 return
             self.dispatch()
 
-        except _BadRequestException, e:
+        except _BadRequestException as e:
             logging.info( "Malformed HTTP request from %s: %s",
                           self.address[0], e )
             self.stream.close()

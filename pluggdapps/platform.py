@@ -4,15 +4,22 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-import pkg_resources         as pkg
-import logging, urlparse
+"""Handles platform related functions, like parsing configuration settings,
+booting applications, setting up logging, loading plugins and application
+mount points. All of these functions are carried out by :class:`Platform`
+plugin, which is a singleton class."""
 
-from   pluggdapps.config     import ConfigDict, settingsfor
-from   pluggdapps.plugin     import Plugin, query_plugin, query_plugins, \
-                                    pluginname, plugin_init
-from   pluggdapps.config     import loadsettings, getsettings, app2sec
+import logging
+from   urllib.parse          import urlsplit
+from   configparser          import SafeConfigParser
+
+from   pluggdapps import packages
+from   pluggdapps.const import ROOTAPP
+from   pluggdapps.config import ConfigDict, settingsfor
+from   pluggdapps.plugin import Singleton, ISettings, log_statistics, \
+                                query_plugin, query_plugins
 from   pluggdapps.interfaces import IApplication
-import pluggdapps.helper     as h
+import pluggdapps.utils      as h
 
 log = logging.getLogger(__name__)
 
@@ -28,47 +35,11 @@ _default_settings['servername']  = {
     'types'   : (str,),
     'help'    : "IServer plugin to as http server."
 }
-_default_settings['logging.level']  = {
-    'default' : 'debug',
-    'types'   : (str,),
-    'options' : [ 'debug', 'info', 'warning', 'error', 'none' ],
-    'help'    : "Set Python log level. If 'none', logging configuration won't "
-                "be touched.",
-}
-_default_settings['logging.stderr'] = {
-    'default' : True,
-    'types'   : (bool,),
-    'help'    : "Send log output to stderr (colorized if possible).",
-}
-_default_settings['logging.filename'] = {
-    'default' : 'apps.log',
-    'types'   : (str,),
-    'help'    : "Path prefix for log files. Note that if you are "
-                "running multiple processes, log_file_prefix must be "
-                "different for each of them (e.g. include the port number).",
-}
-_default_settings['logging.file_maxsize'] = {
-    'default' : 100*1024*1024,
-    'types'   : (int,),
-    'help'    : "max size of log files before rollover.",
-}
-_default_settings['logging.file_maxbackups'] = {
-    'default' : 10,
-    'types'   : (int,),
-    'help'    : "number of log files to keep.",
-}
-_default_settings['logging.color'] = {
-    'default' : True,
-    'types'   : (bool,),
-    'help'    : "If logs have to be send to terminal should you want it "
-                "colored."
-}
 
-
-class Platform( Plugin ):
+class Platform( Singleton ):
 
     @classmethod
-    def boot( cls, inifile=None, loglevel=None ):
+    def boot( cls, inifile ):
         """Do the following,
         * Boot platform using an optional master configuration file `inifile`.
         * Setup logging.
@@ -77,55 +48,75 @@ class Platform( Plugin ):
         * Load pluggdapps packages.
         * Initalize plugins
         * Boot applications.
-
-        ``inifile``,
-            Master configuration file.
-        ``loglevel``,
-            loglevel to use. This will override default 'logging.level'.
         """
-        from  pluggdapps import ROOTAPP
-        log.info( 'Booting platform from %r ...', inifile )
-        cls.inifile = inifile
-        # Setup logger 
-        cls.setuplog( inifile, loglevel=loglevel )
-        # Load packages specific to pluggdapps
-        cls._loadpackages()
-        # Load application settings
         cls.appsettings = appsettings = loadsettings( inifile )
-        # Parse master ini file for application mount rules and generate a map
-        cls.map_subdomains, cls.map_scripts = cls._mountmap( appsettings )
-        # Initialize plugin data structures
-        plugin_init()
-        # Load applictions
-        apps = query_plugins( '', IApplication, appsettings )
+
+        # Mount configurations for application (on subdomains and scriptpaths)
+        cls.m_subdomains, cls.m_scripts = {}, {}
+        for appname, sett in list( appsettings.items() ) :
+            subdomain = sett.get('DEFAULT', {}).get('mount_subdomain', None)
+            if subdomain :
+                cls.m_subdomains.setdefault( subdomain, appname )
+            script = sett.get('DEFAULT', {}).get('mount_script', None)
+            if script :
+                cls.m_scripts.setdefault( script, appname )
+        cls.m_scripts.setdefault( '/', 'rootapp' )
+
+        # Load applications
+        # Note : All applications are expected to be singleton objects. And
+        #   they are first instantiated here.
+        # Note1 : Create a singleton platform object. Make sure that no query_*
+        #   is called before instantiating application singletons.
+        platform.apps = query_plugins( '', IApplication, appsettings )
+        platform = query_plugin( ROOTAPP, ISettings, 'platform' )
+        platform.rootapp = query_plugin( ROOTAPP, IApplication, ROOTAPP )
+
+        # Setup loggings
+        logsett = settingsfor( 'logging.', platform.rootapp )
+        setuplog( rootapp, inifile, loglevel=loglevel )
+
+        # Print information about what has gone this far ...
+        log.info( "%s pluggdapps packages loaded", len(packages) )
+        log_statistics()
+
+        # Mount and Boot applications
         for app in apps :
-            appname = pluginname( app )
-            app.settings = cls.appsettings[ appname ]
+            appname = app.appname
+            mount = cls.m_subdomains.get( appname, None )
+            if mount :
+                log.debug( "%r mounted on subdomain %r", appname, mount )
+            else :
+                mount = cls.m_scripts.get( appname, None )
+                if mount :
+                    log.debug( "%r mounted on scripts %r", appname, mount )
+                else :
+                    cls.m_scripts.setdefault( appname, appname )
+                    log.debug( "%r mounted on scripts %r", appname, appname )
             log.debug( "Booting application %r ...", appname )
-            app.onboot( app.settings ) 
+            app.onboot( app.settings )
+            app.platform = platform
+        return platform
+
+    def shutdown( self ):
+        log.info( "Shutting down platform ..." )
+        for app in query_plugins( '', IApplication ) :
+            log.debug( "Shutting down application %r ...", app.appname )
+            app.shutdown( app.settings )
 
     def serve( self ):
         """Use :class:`IServer` interface and `servername` settings to start a
         http server."""
-        from pluggdapps import ROOTAPP
         from pluggdapps.interfaces import IServer
 
         servername = self['servername']
         self.server = query_plugin( ROOTAPP, IServer, servername, self )
         self.server.start()  # Blocks !
 
-    def shutdown( self ):
-        from pluggdapps import ROOTAPP
-        log.info( "Shutting down platform ..." )
-        for app in query_plugins( '', IApplication ) :
-            log.debug( "Shutting down application %r ...", pluginname(app) )
-            app.shutdown( app.settings )
-
     def appfor( self, startline, headers, body ):
         """Resolve applications for `request`."""
         method, uri, version = h.parse_startline( startline )
         host = headers.get("Host") or "127.0.0.1"
-        _, _, path, _, _ = urlparse.urlsplit( h.native_str(uri) )
+        _, _, path, _, _ = urlsplit( uri )
 
         if ':' in host :
             host, port = host.split(':', 1)
@@ -134,84 +125,24 @@ class Platform( Plugin ):
         except : subdomain = None
 
         if subdomain :
-            for subdom, appnames in cls.map_subdomains.items() :
+            for subdom, appname in list( cls.m_subdomains.items() ) :
                 if subdom == subdomain : break
             script = ''
         else :
-            for script, appnames in cls.map_scripts.items() :
+            for script, appname in list( cls.m_scripts.items() ) :
                 if script != '/' and path.startswith( script ) : break
             else :
-                appnames = [ cls.map_scripts['/'] ]
+                appname = cls.m_scripts['/']
                 script = ''
-        return appnames[0]
+        return appname
 
-    on_subdomains = property( lambda s : s.map_subdomains )
-    on_scripts = property( lambda s : s.map_scripts )  
 
-    @classmethod
-    def setuplog( cls, inifile=None, loglevel=None, procid=None ):
-        """Setup logging."""
-        from   pluggdapps        import ROOTAPP
-        import pluggdapps.log    as logm
-        from   pluggdapps.compat import configparser
+    #---- ISettings interface methods
 
-        if inifile :
-            cp = configparser.SafeConfigParser()
-            cp.read( inifile )
-            level = cp.defaults().get('logging.level', None)
-        else :
-            level = None
-
-        logsett = dict([ (k[8:], v) for k,v in _default_settings.items()
-                                    if k.startswith('logging.') ])
-
-        logsett['level'] = loglevel or level or logsett['level']
-        logsett['filename'] = logm.logfileusing( procid, logsett['filename'] )
-        logm.setup( logsett )
-
-    @classmethod
-    def _loadpackages( self ):
-        """Import all packages from this python environment."""
-        packages = []
-        pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
-        for pkgname, d in sorted( pkgs.items(), key=lambda x : x[0] ) :
-            info = h.call_entrypoint(d,  'pluggdapps', 'package' )
-            if info == None : continue
-            __import__( pkgname )
-            packages.append( pkgname )
-        log.debug( "%s pluggdapps packages loaded" % len(packages) )
-        return packages
-
-    @classmethod
-    def _mountmap( cls, appsettings ):
-        subdomains, scripts = {}, {}
-        for appname, sett in appsettings.items() :
-            subdomain = sett.get('DEFAULT', {}).get('mount_subdomain', None)
-            if subdomain :
-                subdomain.setdefault( subdomain, [] ).append( appname )
-            script = sett.get('DEFAULT', {}).get('mount_script', None)
-            if script :
-                scripts.setdefault( script, [] ).append( appname )
-        scripts.setdefault( '/', [] ).append( 'rootapp' )
-        log.debug( "%s applications mounted on subdomains", len(subdomains) )
-        log.debug( "%s applications mounted on script-path", len(scripts) )
-        return subdomains, scripts
-
-    # ISettings interface methods
     @classmethod
     def default_settings( cls ):
         return _default_settings
 
     @classmethod
     def normalize_settings( cls, settings ):
-        settings['logging.stderr'] = h.asbool( settings['logging.stderr'] )
-        settings['logging.file_maxsize'] = \
-                h.asint( settings['logging.file_maxsize'] )
-        settings['logging.file_maxbackups'] = \
-                h.asint( settings['logging.file_maxbackups'] )
-        settings['logging.color'] = h.asbool( settings['logging.color'] )
-        # Logging level
-        level = settings['logging.level']
-        level = getattr(logging, level.upper()) if level != 'none' else None
-        settings['logging.level'] = level
         return settings

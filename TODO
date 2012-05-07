@@ -9,3 +9,7 @@
 
 * -*- coding:utf-8 -*- 
   should always be prefixed at the beginning of the file ?
+
+* Follow through
+    http://rhettinger.wordpress.com/2011/05/26/super-considered-super/
+  and work out method-resolution-order using super().

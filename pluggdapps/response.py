@@ -5,14 +5,14 @@
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
 import logging
-import httplib, calendar, email, time, base64, hmac, hashlib, itertools
+import http.client, calendar, email, time, base64, hmac, hashlib, itertools
 import datetime as dt
 
 from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import Plugin, implements, query_plugin
 from   pluggdapps.interfaces    import IResponse, IResponseTransformer, \
                                        ICookie, IErrorPage
-import pluggdapps.helper        as h
+import pluggdapps.utils         as h
 import pluggdapps.stack_context as sc
 
 # TODO :
@@ -89,7 +89,7 @@ class HTTPResponse( Plugin ):
 
     def set_status( self, status_code ):
         """Sets the status code for our response."""
-        assert status_code in httplib.responses
+        assert status_code in http.client.responses
         self._status_code = status_code
 
     def get_status( self ):
@@ -141,7 +141,7 @@ class HTTPResponse( Plugin ):
         """
         value = self.docookie.create_signed_value(name, value)
         return self.docookie.set_cookie( 
-                self.cookies, name, value, expires_days=expires_days, **kwargs )
+            self.cookies, name, value, expires_days=expires_days, **kwargs )
 
     def clear_cookie( self, name, path="/", domain=None ):
         """Deletes the cookie with the given name."""
@@ -151,7 +151,7 @@ class HTTPResponse( Plugin ):
 
     def clear_all_cookies(self):
         """Deletes all the cookies the user sent with this request."""
-        [ self.clear_cookie(name) for name in self.cookies.iterkeys() ]
+        [ self.clear_cookie(name) for name in list( self.cookies.keys() ) ]
 
     def set_close_callback( self, callback ):
         """Set a call back to be called when either the server or client
@@ -183,7 +183,8 @@ class HTTPResponse( Plugin ):
             raise Exception( "Cannot write() after finish()." )
         if isinstance( chunk, dict ):
             chunk = h.json_encode(chunk)
-            self.set_header( "Content-Type", "application/json; charset=UTF-8" )
+            self.set_header( 
+                    "Content-Type", "application/json; charset=UTF-8" )
         self._write_buffer.append( h.utf8(chunk) )
 
     def flush( self, finishing=False, callback=None ):
@@ -298,7 +299,8 @@ class HTTPResponse( Plugin ):
         self.set_status( status )
         # Remove whitespace
         url = re.sub(b(r"[\x00-\x20]+"), "", h.utf8(url))
-        self.set_header( "Location", urlparse.urljoin( h.utf8(self.request.uri), url) )
+        self.set_header( 
+                "Location", urlparse.urljoin( h.utf8(self.request.uri), url) )
 
     def render( self, templatefile, c ):
         """Generate HTML content for request and write them using
@@ -315,14 +317,16 @@ class HTTPResponse( Plugin ):
                 self.set_header( "Connection", "Keep-Alive" )
 
     def _generate_headers( self ):
-        lines = [ h.utf8( ' '.join([ self.request.version, 
-                                     str(self._status_code), 
-                                     httplib.responses[self._status_code] ])
+        lines = [ h.utf8( ' '.join([
+                            self.request.version, 
+                            str(self._status_code), 
+                            http.client.responses[self._status_code] ])
                         )]
-        headers = itertools.chain(self._headers.iteritems(), self._list_headers)
+        headers = itertools.chain(
+                    list(self._headers.items()), self._list_headers )
         lines.extend([ h.utf8(n) + b": " + h.utf8(v) for n, v in headers ])
         [ lines.append( h.utf8("Set-Cookie: " + cookie.OutputString(None)) )
-          for cookie in self.cookies.values() ]
+          for cookie in list(self.cookies.values()) ]
         return b"\r\n".join(lines) + b"\r\n\r\n"
 
     def _dowrite( self, chunk, callback=None ):

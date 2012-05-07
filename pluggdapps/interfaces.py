@@ -21,19 +21,23 @@ class ICommand( Interface ):
     `arguments` and handle sub-commands as pluggable functions."""
 
     description = Attribute(
-        "Description about this command"
+        "Text to display before the argument help."
+    )
+    usage = Attribute(
+        "The string describing the program usage"
     )
 
-    def __init__( platform, argv=[] ):
+    def __init__( argv=[] ):
         """Parse command line arguments using argv list and return a tuple of
         (options, args).
 
-        ``platform``,
-            :class:`Platform` instance.
         ``argv``,
             A list of command line arguments that comes after the sub-command.
             This can be overridden by calling :method:`ICommand.argparse` API.
         """
+
+    def options():
+        pass
 
     def argparse( argv ):
         """Parse command line arguments using argv list and return a tuple of
@@ -55,11 +59,8 @@ class ICommand( Interface ):
 class IServer( Interface ):
     """Interface to bind, listen, accept HTTP server."""
 
-    def __init__( platform, *args, **kwargs ):
-        """
-        ``platform``
-            instance of :class:`Platform`
-        """
+    def __init__( *args, **kwargs ):
+        """Initialize server."""
 
     def listen( port, address="" ):
         """Starts accepting connections on the given port and address.
@@ -103,32 +104,165 @@ class IServer( Interface ):
 
 
 class IRouter( Interface ):
-    """Every `IRouter` plugin must either treat a request's url as a chain
-    of resource and resolve them based on the next path component or 
-    the plugin must resolve the request's url by mapping rules."""
+    """Every `IRouter` plugin must treat a request's url as a chain of 
+    resource and resolve them based on the next path segment which are
+    pluggable using :meth:`IRouter.router` method, in the absence
+    of which, the plugin must match request's url against mapping rules.
+    
+    To avoid repeated initialization, the root-router instance will be
+    rememebered by the application during :meth:`IApplication.onboot`. 
+    Chained routers can either be remembered or queried every time. It is left
+    as implementation choice."""
+
+    resource = Attribute(
+        "Plugin name implementing :class:`IResource` interface that accepts "
+        "an :class:`IRequest` instance and :class:`Context` dictionary as "
+        "its arguments. It can freely update the context dictionary. This "
+        "dictionary will be made available to the view system."
+    )
 
     def onboot( settings ):
-        """During application boot time, every router object will be resolved,
-        if available, using :method:`IApplication.router' or 
-        :method:`IRouter.route` methods, which will return an instance of 
-        plugin implementing this interface. And `onboot` will be called on
-        those plugins.
-        
-        Typically url route mapping is initialized here.
-        """
+        """Chained call from :meth:`IApplication.onboot`. Implementation 
+        should chain the onboot() call further down.
 
-    def baseurl():
-        """Base url for this application. Use scheme, host, port and appscript
-        to generate this base url."""
+        Typically, path-segment resolution and url route-mapping is constructed
+        here."""
 
-    def route( request ):
-        """If a `request` url is treated as a chain of resource and resolved 
-        based on the next path segement return a `IRouter` plugin that will
-        be used for further url resolution."""
+    def router( request, c ):
+        """If routing involves pluggable resolution based on ``interface`` and
+        path segments from :attr:`IRequest.resolve_url` then this method will 
+        resolve to next router instance. If :attr:`IRouter.resource` plugin
+        is defined, it will be called with ``request`` and context dictionary
+        ``c``.
 
-    def match( request ):
+        Like :meth:`IRouter.onboot` method, this method will also be chained
+        down the line. As the call propogates down the line,
+        :attr:`IRequest.resolve_path` will be consumed. If resolve_path is
+        fully consumed then a callable object must be returned to the
+        application, via the root router. Otherwise, the router instance at
+        the tail-end of the chain must return itself which will then be used
+        by application to match() the remaining resolve_path."""
+
+    def match( request, c ):
         """If route() method should return None, then match must succeed in 
         resolving the `request` url based on mapping urls."""
+
+    def add_route( name, resource=None,
+                   # Predicate arguments
+                   pattern=None, xhr=None, method=None, arguments=None,
+                   header=None, accept=None, path_info=None,
+                   # View controler
+                   view=None, attr=None, permission=None ):
+        """Add a router mapping rule for this router object which will be used
+        by match() method.
+        
+        ``name``,
+            The name of the route. This attribute is required and it must be
+            unique among all defined routes in a given application.
+
+        ``resource``,
+            A plugin name implementing :class:`IResource` interface.
+
+        ``pattern``,
+            The pattern of the route like blog/{year}/{month}/{date}. This 
+            argument is required. If the pattern doesn't match the current 
+            URL, route matching continues.
+
+        ``xhr``,
+            This value should be either True or False. If this value is 
+            specified and is True, the request must possess an 
+            HTTP_X_REQUESTED_WITH (aka X-Requested-With) header for this route 
+            to match. This is useful for detecting
+            AJAX requests.
+            If this predicate returns False, route matching continues.
+
+        ``method``,
+            A string representing an HTTP method name, like 'GET', 'POST' ...
+            If this argument is not specified, this route will match if
+            the request has any request method. 
+            If specified and the predicate doesn't match, route matching 
+            continues.
+
+        ``path_info``,
+            This value represents a regular expression pattern that will be
+            tested against the resolve_path request attribute.
+            If the regex matches, this predicate will return True.
+            If this predicate returns False, route matching continues.
+            Note that path_info is matched after ``pattern``.
+
+        ``arguments``,
+            A dictionary of key,value pairs, when specified, ensures that the 
+            associated route will match only when the request has a key in the 
+            :attr:`IRequest.arguments` dictionary with the supplied value. If
+            the supplied value is None, then the predicate will return True
+            if supplied key is present in the request arguments.
+            If this predicate returns False, route matching continues.
+
+        ``headers``,
+            A dictionary of key,value pairs, when specified, ensures that the
+            associated route will match only when the request has key in the
+            :attr:`IRequest.headers` dictionary with the supplied value.
+            Supplied value can be a compiled regular expression, in which
+            case, it will be matched against the request header value. If
+            value is None, then the predicate will return True if supplied key
+            is present in the request's header dictionary.
+            If this predicate returns False, route matching contines.
+
+        ``accept``,
+            This value represents a match query for one or more mimetypes in 
+            the Accept HTTP request header. If this value is specified, it 
+            must be in one of the following forms:
+              * a mimetype match token in the form text/plain, a wildcard
+                mimetype.
+              * match token in the form text/*.
+              * or a match-all wildcard mimetype match token in the form */*. 
+            If any of the forms matches the Accept header of the request, this
+            predicate will be True. If this predicate returns False, route
+            matching continues.
+
+        ``view``,
+            Plugin name implementing :class:`IController` interface
+            specification.
+
+        ``attr``,
+            Callable method attribute for ``view`` plugin.
+
+        ``permission``,
+            The permission name required to invoke the view associated with
+            this route. 
+        """
+
+    def add_static_view( name, path, **kwargs ):
+        """Register directory paths to provide static assets like CSS files
+        and images.
+
+        ``name``,
+            A string representing an application-relative local URL prefix.
+            It may alternately be a full URL.
+        ``path``,
+            is the path on disk where the static files reside. This can be
+            an absolute path, a package-relative path, or a asset 
+            specification.
+
+        Key word arguments can be specified as,
+
+        ``cache_max_age``,
+            Used to set the `Expires` and `Cache-Control` headers for static
+            assets served. By default, this argument is None, meaning that no
+            particular Expires or Cache-Control headers are set in the 
+            response.
+
+        ``permission``,
+            Used to specify the permission required by a user to execute the 
+            static view. By default, no permission is required.
+        """
+
+
+class IResource( Interface ):
+    """Interface specification for resource or model plugins."""
+
+    def __call__( request, c ):
+        """For ``request``, populate :class:`Context` dictionary ``c``."""
 
 
 class ICookie( Interface ):
@@ -209,6 +343,12 @@ class IRequest( Interface ):
         "The scheme used, either 'http' or 'https'.  If running behind a "
         "load-balancer or a proxy, the real scheme will be passed along via "
         "via an `X-Scheme` header."
+    )
+    resolve_path = Attribute(
+        "Remaining portion of uri after removing the `baseurl` part that can "
+        "be used to url routing. As and when a segment is consumed for "
+        "routing it is removed from resolve_path and the remaining portion "
+        "is eventually matched with route mapping."
     )
     remote_ip = Attribute(
        "Client's IP address as a string. If running behind a load-balancer "
@@ -325,6 +465,10 @@ class IRequest( Interface ):
 
     def get_secure_cookie( name, value=None ):
         """Returns the given signed cookie if it validates, or None."""
+
+    def baseurl():
+        """Base url for this application. Use scheme, host, port and appscript
+        to generate this base url."""
 
     def onfinish():
         """Callback for asyncrhonous finish()."""
@@ -660,7 +804,7 @@ class IRenderer( Interface ):
 class IUnitTest( Interface ):
     """Local interface to performing unit-testing on various modules."""
 
-    def setup( platform ):
+    def setup():
         """Setup fixtures before executing the test cases."""
 
     def test():

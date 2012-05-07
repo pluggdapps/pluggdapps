@@ -12,10 +12,8 @@ events.  `HTTPIOLoop.add_timeout` is a non-blocking alternative to
 `time.sleep`.
 """
 
-from __future__ import absolute_import, division, with_statement
-
 import datetime, errno, heapq, logging, time
-import os, select, thread, threading, traceback, signal
+import os, select, _thread, threading, traceback, signal
 
 from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import Plugin
@@ -160,7 +158,7 @@ class HTTPIOLoop( Plugin ):
         `stop`. """
         self.remove_handler(self._waker.fileno())
         if all_fds:
-            for fd in self._handlers.keys()[:]:
+            for fd in list(self._handlers.keys())[:]:
                 try:
                     os.close(fd)
                 except Exception:
@@ -234,7 +232,7 @@ class HTTPIOLoop( Plugin ):
         if self._stopped:
             self._stopped = False
             return
-        self._thread_ident = thread.get_ident()
+        self._thread_ident = _thread.get_ident()
         self._running = True
         while True:
             poll_timeout = self['poll_timeout']
@@ -276,7 +274,7 @@ class HTTPIOLoop( Plugin ):
 
             try:
                 event_pairs = self._impl.poll(poll_timeout)
-            except Exception, e:
+            except Exception as e:
                 # Depending on python version and HTTPIOLoop implementation,
                 # different exception types may be thrown and there are
                 # two ways EINTR might be signaled:
@@ -302,7 +300,7 @@ class HTTPIOLoop( Plugin ):
                 fd, events = self._events.popitem()
                 try:
                     self._handlers[fd](fd, events)
-                except (OSError, IOError), e:
+                except (OSError, IOError) as e:
                     if e.args[0] == errno.EPIPE:
                         # Happens when the client closes the connection
                         pass
@@ -385,7 +383,7 @@ class HTTPIOLoop( Plugin ):
         with self._callback_lock:
             list_empty = not self._callbacks
             self._callbacks.append(sc.wrap(callback))
-        if list_empty and thread.get_ident() != self._thread_ident:
+        if list_empty and _thread.get_ident() != self._thread_ident:
             # If we're in the HTTPIOLoop's thread, we know it's not currently
             # polling.  If we're not, and we added the first callback to an
             # empty list, we may need to wake it up (it may wake up on its
@@ -433,7 +431,7 @@ class _Timeout( object ):
     __slots__ = ['deadline', 'callback']
 
     def __init__( self, deadline, callback ):
-        if isinstance(deadline, (int, long, float)):
+        if isinstance(deadline, (int, float)):
             self.deadline = deadline
         elif isinstance(deadline, datetime.timedelta):
             self.deadline = time.time() + h.timedelta_to_seconds(deadline)

@@ -39,12 +39,12 @@ class Config( Plugin ):
 
         appname = options.appname or ROOTAPP
         if options.defsett :
-            appsett = default_appsettings
+            appsett = default_appsettings()
         elif options.inisett :
             appsett = load_inisettings( platform.inifile )
-
-        app = query_plugin( appname, IApplication, appname )
-        appsett = app.settings
+        else :
+            app = query_plugin( appname, IApplication, appname )
+            appsett = app.settings
 
         plugin = options.plugin and ('plugin:' + options.plugin)
         if plugin in appsett :

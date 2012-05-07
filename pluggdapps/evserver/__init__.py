@@ -4,6 +4,6 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-import httpioloop
-import httpiostream
-import httpserver
+from . import httpioloop
+from . import httpiostream
+from . import httpserver

@@ -4,8 +4,6 @@
 
 """TCPServer using non-blocking evented polling loop."""
 
-from __future__ import absolute_import, division, with_statement
-
 import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
@@ -26,8 +24,8 @@ class TCPServer( object ):
 
     `TCPServer` can serve SSL traffic with Python 2.6+ and OpenSSL.
     To make this server serve SSL traffic, configure the sub-class plugin with
-    `ssloptions.*` settings. which is required for the `ssl.wrap_socket` method,
-    including "certfile" and "keyfile" 
+    `ssloptions.*` settings. which is required for the `ssl.wrap_socket` 
+    method, including "certfile" and "keyfile" 
     """
 
     def __init__( self ):
@@ -136,7 +134,7 @@ class TCPServer( object ):
         Requests currently in progress may still continue after the
         server is stopped.
         """
-        for fd, sock in self._sockets.iteritems():
+        for fd, sock in list( self._sockets.items() ) :
             self.ioloop.remove_handler(fd)
             sock.close()
 
@@ -156,12 +154,12 @@ class TCPServer( object ):
                                         server_side=True,
                                         do_handshake_on_connect=False,
                                         **ssloptions )
-            except ssl.SSLError, err:
+            except ssl.SSLError as err:
                 if err.args[0] == ssl.SSL_ERROR_EOF:
                     return conn.close()
                 else:
                     raise
-            except socket.error, err:
+            except socket.error as err:
                 if err.args[0] == errno.ECONNABORTED:
                     return conn.close()
                 else:
@@ -247,7 +245,7 @@ def add_accept_handler(sock, callback, ioloop):
         while True:
             try:
                 connection, address = sock.accept()
-            except socket.error, e:
+            except socket.error as e:
                 if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                     return
                 raise

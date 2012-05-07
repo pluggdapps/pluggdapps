@@ -1,6 +1,7 @@
 develop :
 	rm -rf pa-env
-	virtualenv pa-env --no-site-packages
+	@echo "Setting up virtual environment for python 3.x"
+	virtualenv --python=python3.2 --no-site-packages pa-env 
 	bash -c "source pa-env/bin/activate ; python ./setup.py develop"
 
 bdist_egg : copy

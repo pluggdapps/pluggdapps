@@ -10,7 +10,8 @@ here = abspath( dirname(__file__) )
 README = open(join(here, 'README.rst')).read()
 
 v = open(join(dirname(__file__), 'pluggdapps', '__init__.py'))
-version = re.compile(r".*__version__[ ]*=[ ]*'(.*?)'", re.S).match(v.read()).group(1)
+version = re.compile( r".*__version__[ ]*=[ ]*'(.*?)'", re.S
+                    ).match(v.read()).group(1)
 v.close()
 
 description='Web platform'

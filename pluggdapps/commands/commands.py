@@ -54,8 +54,7 @@ class Commands( Plugin ):
         commands = sorted( commands, key=lambda x : pluginname(x) )
         for command in commands :
             rows = self._formatdescr(pluginname(command), command.description)
-            for row in rows :
-                print row
+            for r in rows : print(r)
 
     def _parse( self, usage ):
         return self._options( OptionParser( usage=usage ))
@@ -75,7 +74,7 @@ class Commands( Plugin ):
                 rows.append( fmtstr % (name, line) )
                 line, name = word, ''
             else :
-                line = ' '.join(filter(None, [line, word]))
+                line = ' '.join([ x for x in [line,word] if x ])
         rows.append( fmtstr % (name, line) ) if line else None
         return rows
 

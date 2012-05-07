@@ -4,18 +4,17 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-import socket, time, urlparse, logging, re
+import socket, time, logging, re
+from   urllib.parse import quote as url_quote
 from   copy import deepcopy
 
 from   pluggdapps.config     import ConfigDict
-import pluggdapps.helper     as h
-from   pluggdapps.compat     import url_quote
+import pluggdapps.utils      as h
 from   pluggdapps.plugin     import Plugin, implements, query_plugin
 from   pluggdapps.interfaces import IRequest, IResponse, ICookie
-from   pluggdapps.parsehttp  import parse_scheme, parse_url, parse_startline,\
+from   pluggdapps.parsehttp  import parse_xscheme, parse_url, parse_startline,\
                                     parse_remoteip, parse_query, parse_body
 
-log = logging.getLogger( __name__ )
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
@@ -52,9 +51,10 @@ class HTTPRequest( Plugin ):
         self.headers = headers or h.HTTPHeaders()
         self.body = body or b""
 
-        scheme = parse_scheme( self.headers, xheaders )
-        host = self.headers.get("Host")
-        self.host, self.port, self.path, self.query, _ = parse_url(scheme, host)
+        self.host, self.port, self.path, self.query, _ = \
+                parse_url( self.uri, 
+                           self.headers.get("Host"), 
+                           parse_xscheme(self.headers, xheaders) )
 
         self.remote_ip = parse_remoteip( address, self.headers, xheaders )
         self.cookies = self.docookie.parse_cookies( self.headers )
@@ -65,6 +65,9 @@ class HTTPRequest( Plugin ):
         self.arguments.update( args )
         # Reponse object
         self.response = self.query_plugin(IResponse, self.app['IResponse'], self)
+
+        self._baseurl = self.baseurl()
+        self.resolve_path = re.sub( r"^"+baseurl, '', url )
 
     def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
@@ -104,7 +107,7 @@ class HTTPRequest( Plugin ):
         values = []
         for v in self.arguments.get( name, [] ) :
             v = self.decode_argument( v, name=name )
-            if isinstance(v, unicode):
+            if isinstance(v, str):
                 # Get rid of any weird control chars (unless decoding gave
                 # us bytes, in which case leave it alone)
                 v = re.sub( r"[\x00-\x08\x0e-\x1f]", " ", v )
@@ -136,15 +139,12 @@ class HTTPRequest( Plugin ):
             value = self.get_cookie(name)
         return self.docookie.decode_signed_value( name, value ) 
 
-    def onfinish( self ):
-        """Callback when :meth:`IResponse.finish()` is called."""
-        self.connection.finish()
-        self.finishedat = time.time()
-
     def baseurl( self, scheme=None, host=None, port=None ):
-        """Construct the base URL upto this application's root path, replacing 
+        """Construct the base URL upto this application's root path, replacing
         any of the default scheme, host, or port portions with user-supplied
         variants."""
+        if (scheme, host, port) == (None, None, None) :
+            return self._baseurl
         host = host or self.host
         port = port or self.port
         url = (scheme or self.scheme) + '://'
@@ -153,7 +153,16 @@ class HTTPRequest( Plugin ):
         if port :
             url += ':'+str(port)
         bscript_name = h.utf8( self.app.appscript )
-        return url + url_quote( bscript_name, PATH_SAFE )
+        baseurl = url + url_quote( bscript_name, PATH_SAFE ) 
+        baseurl = baseurl.rstrip('/')
+        if self.app['debug'] == True :
+            assert self.uri.startswith( baseurl )
+        return baseurl
+
+    def onfinish( self ):
+        """Callback when :meth:`IResponse.finish()` is called."""
+        self.connection.finish()
+        self.finishedat = time.time()
 
     def query_plugin( self, *args, **kwargs ):
         query_plugin( self.app, *args, **kwargs )
