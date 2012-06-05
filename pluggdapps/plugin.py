@@ -11,7 +11,10 @@ import sys, inspect, logging
 from   copy import deepcopy
 
 from   pluggdapps.const import ROOTAPP
-from   pluggdapps.core  import Interface, PluginBase, PluginMeta
+from   pluggdapps.core  import PluginBase, PluginMeta, Interface, Attribute, \
+                               implements, pluginname
+
+log = logging.getLogger( __name__ )
 
 __all__ = [ 
     # Interfaces
@@ -19,20 +22,18 @@ __all__ = [
     # Classes
     'Plugin', 'Singleton',
     # API functions
-    'plugin_init', 'plugin_info', 'interface_info', 'pluginnames',
-    'pluginclass', 'default_settings', 'applications', 'plugins',
-    'query_plugin', 'query_plugins', 'log_statistics',
+    'isimplement', 'interfaces', 'interface', 'plugin_init', 'plugin_info',
+    'interface_info', 'pluginnames', 'pluginclass', 'default_settings',
+    'applications', 'plugins', 'query_plugin', 'query_plugins',
 ]
-
-core_classes = [ 'Interface', 'PluginBase', 'Singleton' ]
 
 # Core Interfaces
 
 class ISettings( Interface ):
     """Every plugin is a dictionary of configuration. And its configuration
-    settings are implemented using ISettings specification via 
-    :class:`Plugin` base class. The base class provides default methods for
-    configuration settings which can later be overriden by deriving plugins.
+    settings are implicitly implemented via :class:`Plugin` base class. The
+    base class provides default methods for configuration settings which can
+    later be overriden by deriving plugins.
 
     While instantiating plugins via `query_plugin()` or `query_plugins()`
     method, passing a ``settings`` key-word argument will override plugin's
@@ -56,17 +57,6 @@ class ISettings( Interface ):
         "Read only copy of application's settings"
     )
 
-    def normalize_settings( settings ):
-        """Class method.
-        ``settings`` is a dictionary of configuration parameters. This method
-        will be called after aggregating all configuration parameters for a
-        plugin and before updating the plugin instance with its configuration
-        parameters.
-
-        Use this method to do any post processing on plugin's configuration
-        parameter and return the final form of configuration parameters.
-        Processed parameters in ``settings`` are updated in-pace."""
-
     def default_settings():
         """Class method.
         Return instance of :class:`ConfigDict` providing meta data
@@ -74,11 +64,22 @@ class ISettings( Interface ):
         like, default value, value type, help text, whether web configuration
         is allowed, optional values, etc ...
         
-        To be implemented by classed deriving :class:`Plugin`.
-        """
+        To be implemented by classes deriving :class:`Plugin`."""
+
+    def normalize_settings( settings ):
+        """Class method.
+        ``settings`` is a dictionary of configuration parameters. This method
+        will be called after aggregating all configuration parameters for a
+        plugin and before updating the plugin instance with its configuration
+        parameters.
+
+        Override this method to do any post processing on plugin's 
+        configuration parameter and return the final form of configuration 
+        parameters. Processed parameters in ``settings`` are updated 
+        in-pace."""
 
     def web_admin( settings ):
-        """Class method.
+        """Class method. 
         Plugin settings can be configured via web interfaces and stored in
         a backend like database, files etc ... Use this method for the
         following,
@@ -87,53 +88,108 @@ class ISettings( Interface ):
         * To persist new `settings` in a backend data-store.
        
         Web-admin settings will override settings from ini-files.
+
+        Important : This feature is still evolving.
         """
 
 
 class IApplication( Interface ):
     """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
     of configuration parameters implementing one or more interface
-    specification. Note that application plugins are the first ones to be
-    instantiated and are expected to be singletons. Attributes, `platform`,
-    `appscript`, `appdomain` are initialized by platform initialization code.
+    specification. Note that application plugins are singletons are the first
+    ones to be instantiated along with platform singleton. Attributes,
+        `platform`, `script`, `subdomain`
+    are initialized by platform initialization code. 
+
+    There is a base class :class:`Application` which implements this interface
+    and provides necessary support functions for application creators.
+    Therefore application plugins must derive from this base class.
     """
 
     platform = Attribute(
         "Platfrom plugin instance. It is a singleton object accessible to all "
         "plugins via its :attr:`ISettings.app` attribute."
     )
-    appscript = Attribute(
-        "The script name on which the application was mounted. If the "
+    script = Attribute(
+        "The script name on which the application will be mounted. If the "
         "application is mounted on a sub-domain this will be ``None``"
     )
-    appdomain = Attribute(
-        "The subdomain name on which the application was mounted. If the "
+    subdomain = Attribute(
+        "The subdomain name on which the application will be mounted. If the "
         "application is mounted on a script name this will be ``None``"
     )
     router = Attribute(
         "Plugin instance implementing :class:`IRouter` interface. This is the "
-        "root router to map url to controller object."
+        "root router using which request urls will be resolved to a view "
+        "callable. Should be instantiated during boot time inside "
+        ":meth:`onboot` method."
     )
 
     def onboot():
-        """Do necessary activities to boot this applications. Called at
-        platform boot-time."""
-
-    def start( request ):
-        """Once a `request` is resolved for an application, this method is the
-        entry point for the request into the resolved application. Typically 
-        this method will be implemented by :class:`Application` base class 
-        which will resolve url-routing and finally match with a route-mapping
-        to invoke :class:`IController` plugin."""
-
-    def onfinish( request ):
-        """A finish is called on the response. And this call back is issued to 
-        Start a finish sequence for this ``request`` in the application's 
-        context. Plugin's implementing this method must call
-        request.onfinish()."""
+        """Boot this applications. Called at platform boot-time. 
+        
+        Instantiate :attr:`router` attribute with root router for the
+        application. The root router can be chained further down the line with
+        other IRouter plugins, for every path segments, and are collectively 
+        responsible for traversing and matching request-urls."""
 
     def shutdown():
         """Shutdown this application. Reverse of boot."""
+
+    def start( request ):
+        """Once a `request` is resolved to an application, this method is the
+        entry point for the application. Typically this method will be
+        implemented by :class:`Application` base class which will resolve
+        url-routing and finally match with a route-mapping to invoke
+        :class:`IController` plugin."""
+
+    def onfinish( request ):
+        """When a finish is called on the response. And this call back is 
+        issued beginning a finish sequence for this ``request`` in the 
+        application's context. Plugin's implementing this method must call
+        request.onfinish()."""
+
+    def urlfor( appname, request, name, *traverse, **matchdict, ):
+        """Generate url (full url) identified by routing-name `name`. Use
+        `pathfor` method to generate the relative url and join the result
+        with the `base_url` for application.
+        """
+
+    def pathfor( request, name, *traverse, **matchdict ):
+        """Generate relative url for application request using a route
+        definition.
+
+        ``appname``,
+            name of the application for which the url needs to be generated.
+            If supplied as None, url will be generate for _this_ application.
+
+        ``name``,
+            Name of the route definition to use. Note that the path will be
+            prefixed with *traverse segments before using name and matchdict
+            arguments.
+
+        ``request``,
+            The :class:`IRequest` object for which url is generated.
+
+        ``traverse``,
+            Tuple of :class:`IRouter` plugin-names to prefix the path.
+
+        ``matchdict``,
+            A dictionary of variables in url-patterns and their corresponding
+            value string. Every route definition will have variable (aka
+            dynamic components in path segments) that will be matched with
+            url. If matchdict contains the following keys,
+
+            `_remains`, its value, which must be a string, will be appended 
+            (suffixed) to the url-path.
+
+            `_query`, its value, which must be a dictionary similar to 
+            :attr:`IRequest.getparams`, will be interpreted as query
+            parameters and encoded to query string.
+
+            `_anchor`, its value will be attached at the end of the url as
+            "#<fragment".
+        """
 
 
 # Plugin base class implementing ISettings
@@ -163,9 +219,6 @@ class Plugin( PluginBase ):
     # Dictionary like interface to plugin instances
     def __len__( self ):
         return self._settngx.__len__()
-
-    def __bool__( self ):
-        return self._settngx.__bool__()
 
     def __getitem__( self, key ):
         return self._settngx[key]
@@ -203,6 +256,22 @@ class Singleton( Plugin ):
     pass
 
 
+def isimplement( plugin, interface ):
+    """Is ``interface`` implemented by ``plugin``."""
+    return interface in  plugin._interfs
+
+
+def interfaces():
+    """Return a list of interfaces defined in this environment."""
+    return [ x['cls'] for x in PluginMeta.interfmap.values() ]
+
+
+def interface( interf ):
+    """Return the interface class specified by string ``interf``."""
+    c = PluginMeta.interfmap[interf]['cls'] if isinstance(i, str) else interf
+    return c
+
+
 def plugin_init():
     """It is a chicken egg situation here.
     * The plugin class objects are not availabe until the class is fully
@@ -224,6 +293,7 @@ def plugin_init():
             cls._interfs.append(i)
         d[i] = x
     PluginMeta._implementers = d
+
 
 def plugin_info( *args ):
     """Return information dictionary gathered by :class:`PluginMeta` for 
@@ -269,14 +339,17 @@ def default_settings():
     return { info['name'] : info['cls'].default_settings()
              for info in PluginMeta._pluginmap.values() }
 
+
 def applications():
     """Return a list of application names (which are actually plugins
     implementing :class:`IApplication` interface."""
     return PluginMeta._implementers[IApplication]
 
+
 def plugins():
     """Return the complete list of loaded plugin names."""
     return sorted( PluginMeta._pluginmap.keys() )
+
 
 def query_plugins( appname, interface, *args, **kwargs ):
     """Use this API to query for plugins using the `interface` class it
@@ -293,6 +366,7 @@ def query_plugins( appname, interface, *args, **kwargs ):
                 for pcls in PluginMeta._implementers[interface].values() ]
     return plugins
 
+
 def query_plugin( appname, interface, name, *args, **kwargs ):
     """Same as queryPlugins, but returns a single plugin instance as opposed
     an entire list. Positional and keyword arguments will be used to 
@@ -307,12 +381,5 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
     nm = pluginname(name)
     cls = PluginMeta._implementers[interface][nm]
     return cls( appname, *args, **kwargs )
-
-
-def log_statistics( levelstr='info' ) :
-    fn = getattr( log, levelstr )
-    fn( "%s interfaces defined and %s plugins loaded",
-        len(PluginMeta._interfmap), len(PluginMeta._pluginmap) )
-    fn( "%s applications loaded", len(applications()) ) 
 
 

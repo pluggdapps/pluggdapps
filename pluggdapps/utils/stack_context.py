@@ -33,8 +33,6 @@ Example usage::
         # in the ioloop.
         http_client.fetch(url, callback)
 
-    query_plugin( ROOTAPP, ISettings, 'httpioloop' ).start()
-
 Most applications shouln't have to work with `StackContext` directly.
 Here are a few rules of thumb for when it's necessary:
 

@@ -5,16 +5,16 @@
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
 import socket, time, logging, re
-from   urllib.parse import quote as url_quote
+from   urllib.parse import urlunsplit
 from   copy import deepcopy
 
-from   pluggdapps.config     import ConfigDict
-import pluggdapps.utils      as h
-from   pluggdapps.plugin     import Plugin, implements, query_plugin
-from   pluggdapps.interfaces import IRequest, IResponse, ICookie
-from   pluggdapps.parsehttp  import parse_xscheme, parse_url, parse_startline,\
-                                    parse_remoteip, parse_query, parse_body
+from pluggdapps.config import ConfigDict
+import pluggdapps.utils as h
+from pluggdapps.core import implements
+from pluggdapps.plugin import Plugin, query_plugin
+from pluggdapps.interfaces import IRequest, IResponse, ICookie
 
+log = logging.getLogger(__name__)
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
@@ -24,7 +24,7 @@ _default_settings['ICookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
     'help'    : "Plugin class implementing ICookie interface specification. "
-                "methods from this plugin will be used to process request "
+                "Methods from this plugin will be used to process request "
                 "cookies. Overrides :class:`ICookie` if defined in "
                 "application plugin."
 }
@@ -37,37 +37,54 @@ class HTTPRequest( Plugin ):
     elapsedtime = property( lambda self : time.time() - self.receivedat )
 
     # IRequest interface methods and attributes
-    def __init__( self, conn, address, startline, headers, body ):
+    def __init__( self, conn, address, method, uri, uriparts, version,
+                  headers, body ):
         self.receivedat = time.time()
         self.finishedat = None
+        xheaders = getattr( conn, 'xheaders', None ) if conn else None
 
-        xheaders = getattr(conn, 'xheaders', None) if conn else None
-        self.connection = conn
-        self.platform = conn.platform
-        self.docookie = self.query_plugin( 
-                ICookie, self['ICookie'] or self.app['ICookie'] )
+        self.cookie_plugin = \
+            self.query_plugin(ICookie, self['ICookie'] or self.app['ICookie'])
         
-        self.method, self.uri, self.version = parse_startline( startline )
+        # Socket attributes
+        self.connection = conn
+
+        # Request attributes
+        self.method = method
+        self.uriparts = uriparts
+        self.version = version
         self.headers = headers or h.HTTPHeaders()
         self.body = body or b""
+        self.baseurl = self.app.platform.baseurl( self )
+        self.uri = h.make_url(
+            self.baseurl, uriparts['path'], uriparts['query'],
+            uriparts['fragment'] )
+        # Client's ip-address and port number
+        remoteip, port = address
+        self.address = (
+            h.parse_remoteip( remoteip, self.headers, xheaders ),
+            port )
+        # A dictionary of http.cookies.Morsel
+        self.cookies = self.cookie_plugin.parse_cookies( self.headers )
+        self.getparams = uriparts.query
+        # Parse request body here.
+        self.postparams, self.files = \
+                        h.parse_body( method, self.headers, body )
 
-        self.host, self.port, self.path, self.query, _ = \
-                parse_url( self.uri, 
-                           self.headers.get("Host"), 
-                           parse_xscheme(self.headers, xheaders) )
+        # Processed attributes
+        self.params = {}
+        self.params.update( self.getparams )
+        self.params.update( self.postparams )
 
-        self.remote_ip = parse_remoteip( address, self.headers, xheaders )
-        self.cookies = self.docookie.parse_cookies( self.headers )
-        self.files = {}
-        self.arguments = parse_query( query )
-        # Updates self.arguments and self.files based on request-body
-        args, self.files = self.parse_body( method, self.headers, body )
-        self.arguments.update( args )
-        # Reponse object
-        self.response = self.query_plugin(IResponse, self.app['IResponse'], self)
+        # Framework attributes
+        self.session = None
 
-        self._baseurl = self.baseurl()
-        self.resolve_path = re.sub( r"^"+baseurl, '', url )
+        # Router attributes
+        self.resolve_path = uriparts.path
+        self.traversed = []
+        self.matchrouter = None
+        self.matchdict = None
+        self.view_name = None
 
     def supports_http_1_1( self ):
         return self.version == "HTTP/1.1"
@@ -78,57 +95,6 @@ class HTTPRequest( Plugin ):
         except :
             return None
 
-    def get_argument( self, name, default=None, strip=True ):
-        """Returns the value of the argument with the given name.
-
-        If default is not provided, the argument is considered to be
-        required, and we throw an exception if it is missing.
-
-        If the argument appears in the url more than once, we return the
-        last value.
-
-        The returned value is always unicode.
-        """
-        args = self.get_arguments( name, strip=strip )
-        if args :
-            return arg[-1]
-        elif default is not None : 
-            return default
-        else :
-            raise Exception( "Missing argument" )
-
-    def get_arguments( self, name, strip=True ):
-        """Returns a list of the arguments with the given name.
-
-        If the argument is not present, returns an empty list.
-
-        The returned values are always unicode.
-        """
-        values = []
-        for v in self.arguments.get( name, [] ) :
-            v = self.decode_argument( v, name=name )
-            if isinstance(v, str):
-                # Get rid of any weird control chars (unless decoding gave
-                # us bytes, in which case leave it alone)
-                v = re.sub( r"[\x00-\x08\x0e-\x1f]", " ", v )
-            values.append( v.strip() if strip else v )
-        return values
-
-    def decode_argument(self, value, name=None):
-        """Decodes an argument from the request.
-
-        The argument has been percent-decoded and is now a byte string.
-        By default, this method decodes the argument as utf-8 and returns
-        a unicode string, but this may be overridden in subclasses.
-
-        This method is used as a filter for both get_argument() and for
-        values extracted from the url and passed to get()/post()/etc.
-
-        The name of the argument is provided if known, but may be None
-        (e.g. for unnamed groups in the url regex).
-        """
-        return h.to_unicode( value )
-
     def get_cookie( self, name, default=None ):
         """Gets the value of the cookie with the given name, else default."""
         return self.cookies[name].value if name in self.cookies else default
@@ -137,27 +103,7 @@ class HTTPRequest( Plugin ):
         """Returns the given signed cookie if it validates, or None."""
         if value is None :
             value = self.get_cookie(name)
-        return self.docookie.decode_signed_value( name, value ) 
-
-    def baseurl( self, scheme=None, host=None, port=None ):
-        """Construct the base URL upto this application's root path, replacing
-        any of the default scheme, host, or port portions with user-supplied
-        variants."""
-        if (scheme, host, port) == (None, None, None) :
-            return self._baseurl
-        host = host or self.host
-        port = port or self.port
-        url = (scheme or self.scheme) + '://'
-        if host :
-            url += host
-        if port :
-            url += ':'+str(port)
-        bscript_name = h.utf8( self.app.appscript )
-        baseurl = url + url_quote( bscript_name, PATH_SAFE ) 
-        baseurl = baseurl.rstrip('/')
-        if self.app['debug'] == True :
-            assert self.uri.startswith( baseurl )
-        return baseurl
+        return self.cookie_plugin.decode_signed_value( name, value ) 
 
     def onfinish( self ):
         """Callback when :meth:`IResponse.finish()` is called."""
@@ -165,24 +111,35 @@ class HTTPRequest( Plugin ):
         self.finishedat = time.time()
 
     def query_plugin( self, *args, **kwargs ):
-        query_plugin( self.app, *args, **kwargs )
+        return query_plugin( self.app, *args, **kwargs )
 
     def query_plugins( self, *args, **kwargs ):
-        query_plugin( self.app, *args, **kwargs )
+        return query_plugin( self.app, *args, **kwargs )
+
+    def urlfor( name, *traverse, **matchdict ):
+        return self.app.urlfor( None, self, name, *traverse, **matchdict )
+
+    def pathfor( name, *traverse, **matchdict ):
+        return self.app.pathfor( self, name, *traverse, **matchdict )
+
+    def appurl( appname, name, *traverse, **matchdict ):
+        return self.app.urlfor( appname, self, name *traverse, **matchdict )
 
     def __repr__( self ):
-        attrs = ( "scheme", "host", "method", "uri", "version", "remote_ip",
-                  "body" )
-        args = ", ".join( "%s=%r" % (n, getattr(self, n)) for n in attrs )
+        attrs = ( "uriparts", "address", "body" )
+        args = ", ".join( 
+                    "%s=%r" % (n, getattr(self, n, None)) for n in attrs )
         return "%s(%s, headers=%s)" % (
-            self.__class__.__name__, args, dict(self.headers))
+            self.__class__.__name__, args, dict(getattr(self,'headers',{})) )
 
-    # ISettings interface methods
+    #---- ISettings interface methods
+
     @classmethod
     def default_settings( cls ):
         return _default_settings
 
     @classmethod
     def normalize_settings( cls, settings ):
-        return settings
+        sett = super().normalize_settings( settings )
+        return sett
 

@@ -28,10 +28,3 @@ class UnitTestBase( Plugin ):
 
     def teardown( self ):
         pass
-
-
-# modules with unittest cases
-
-import pluggdapps.asset
-import pluggdapps.path
-import pluggdapps.util

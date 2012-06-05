@@ -20,9 +20,8 @@ def setup( logsett ):
     function, rest of the system can acquire a log object by,
         log = logging.getLogger(__name__)
     and perform necessary logging."""
-    level = getattr( logging, logsett['level'].upper(), None )
     root_logger = logging.getLogger()
-    root_logger.setLevel( level )
+    root_logger.setLevel( logsett['level'] )
 
     # Set up color if we are in a tty and curses is installed
     color = logsett['color']
@@ -35,14 +34,16 @@ def setup( logsett ):
                         filename=filename,
                         maxBytes=logsett['file_maxsize'],
                         backupCount=logsett['file_maxbackups'] )
-        channel.setFormatter( LogFormatter(color=False) )
+        logsett['color'] = False
+        channel.setFormatter( LogFormatter( logsett ) )
         root_logger.addHandler( channel )
         log = log or logging.getLogger(__name__)
         log.debug( "Setting up log file %r ...", filename )
 
     if logsett['stderr'] :
         channel = logging.StreamHandler()
-        channel.setFormatter( LogFormatter(color=color) )
+        logsett['color'] = color
+        channel.setFormatter( LogFormatter( logsett ) )
         root_logger.addHandler( channel )
         log = log or logging.getLogger(__name__)
         log.debug( "Setting up log stream in stderr ..." )
@@ -66,10 +67,11 @@ def logfileusing( index, filename ):
 
 
 class LogFormatter( logging.Formatter ):
-    def __init__(self, color, *args, **kwargs):
-        logging.Formatter.__init__( self, *args, **kwargs )
-        self._color = color
-        if color :
+    def __init__(self, logsett, *args, **kwargs):
+        super().__init__( *args, **kwargs )
+        self.logsett = logsett
+        self._color = logsett['color']
+        if self._color :
             self._normal, self._colors = self._docoloring()
 
     def format(self, record):
@@ -79,8 +81,7 @@ class LogFormatter( logging.Formatter ):
             record.message = "Bad message (%r): %r" % (e, vars(record))
         record.asctime = time.strftime(
             "%y:%m:%d %H:%M:%S", self.converter(record.created))
-        prefix = '[%(levelname)1.1s proc:%(process)d %(asctime)s ' \
-                 '%(module)s:%(lineno)d]' % vars(record)
+        prefix = self.logsett['format'] % vars(record)
         if self._color:
             prefix = self._colors.get(record.levelno, self._normal) + \
                         prefix + self._normal

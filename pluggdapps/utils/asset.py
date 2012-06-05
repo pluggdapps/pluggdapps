@@ -68,7 +68,7 @@ class UnitTest_Asset( UnitTestBase ):
         super().test()
 
     def teardown( self ):
-        super.teardown()
+        super().teardown()
 
     def test_parse_assetspec( self ):
         import pluggdapps
@@ -84,15 +84,14 @@ class UnitTest_Asset( UnitTestBase ):
         import pluggdapps
         import os
         self.log.info("Testing asset_spec_from_abspath() ...")
-        basenm = basename(__file__)
         assert asset_spec_from_abspath(__file__, pluggdapps) == \
-               'pluggdapps:'+basenm
+               'pluggdapps:utils/asset.py'
         assert asset_spec_from_abspath(__file__, os) == __file__
 
     def test_abspath_from_asset_spec( self ):
         self.log.info("Testing abspath_from_asset_spec() ...")
         assert abspath_from_asset_spec( __file__, None ) == __file__
-        assert abspath_from_asset_spec('pluggdapps:asset.py', '') == \
+        assert abspath_from_asset_spec('pluggdapps:utils/asset.py', '') == \
                __file__.rstrip('c')
-        assert abspath_from_asset_spec('asset.py', 'pluggdapps') == \
+        assert abspath_from_asset_spec('utils/asset.py', 'pluggdapps') == \
                __file__.rstrip('c')

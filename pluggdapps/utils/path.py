@@ -34,7 +34,6 @@ def caller_module( level=2, sys=sys ):
     """Return the module object from which the call was made. For instance, if
     A defined in module M makes a call to B and B, by calling this function,
     can know the module of the caller."""
-    the caller, it can use this fu
     module_globals = sys._getframe(level).f_globals
     module_name = module_globals.get('__name__') or '__main__'
     module = sys.modules[module_name]
@@ -138,8 +137,8 @@ class AssetResolver( Package ):
 
     If the value :attr:`pluggdapps.asset.CALLER_PACKAGE` is supplied as the
     ``package``, the resolver will treat relative asset specifications as
-    relative to the caller of the :meth:`pluggdapps.asset.AssetResolver.resolve`
-    method.
+    relative to the caller of the
+    :meth:`pluggdapps.asset.AssetResolver.resolve` method.
 
     If a *module* or *module name* (as opposed to a package or package name)
     is supplied as ``package``, its containing package is computed and this
@@ -147,16 +146,16 @@ class AssetResolver( Package ):
     to packages, never to modules).  For example, if the ``package`` argument
     to this type was passed the string ``xml.dom.expatbuilder``, and
     ``template.pt`` is supplied to the
-    :meth:`pluggdapps.path.AssetResolver.resolve` method, the resulting absolute
-    asset spec would be ``xml.minidom:template.pt``, because
+    :meth:`pluggdapps.utils.path.AssetResolver.resolve` method, the resulting
+    absolute asset spec would be ``xml.minidom:template.pt``, because
     ``xml.dom.expatbuilder`` is a module object, not a package object.
 
     If a *package* or *package name* (as opposed to a module or module name)
     is supplied as ``package``, this package will be used to compute relative
     asset specifications.  For example, if the ``package`` argument to this
     type was passed the string ``xml.dom``, and ``template.pt`` is supplied
-    to the :meth:`pluggdapps.path.AssetResolver.resolve` method, the resulting
-    absolute asset spec would be ``xml.minidom:template.pt``.
+    to the :meth:`pluggdapps.utils.path.AssetResolver.resolve` method, the 
+    resulting absolute asset spec would be ``xml.minidom:template.pt``.
     """
 
     def resolve( self, spec ):
@@ -423,20 +422,21 @@ class UnitTest_Path( UnitTestBase ):
         import pluggdapps.commands.unittest
         self.log.info("Testing package_path() ...")
         assert package_path(sys.modules[self.__module__]) == dirname(__file__)
-        refpath = join( dirname(__file__), 'commands', )
+        refpath = join( dirname( dirname(__file__)), 'commands', )
         assert package_path( pluggdapps.commands.unittest ) == refpath
 
     def test_caller_module( self ):
-        import pluggdapps.path
+        import pluggdapps.utils.path
         self.log.info("Testing caller_module() ...")
-        assert caller_module(1) == sys.modules['pluggdapps.path']
-        assert caller_module(2) == sys.modules['pluggdapps.path']
+        assert caller_module(1) == sys.modules['pluggdapps.utils.path']
+        assert caller_module(2) == sys.modules['pluggdapps.utils.path']
         assert caller_module(3) == sys.modules['pluggdapps.commands.unittest']
         assert caller_module(4) == sys.modules['pluggdapps.commands.unittest']
 
     def test_caller_path( self ):
         self.log.info("Testing caller_path() ...")
-        unittestpath = join( dirname(__file__), 'commands', 'unittest.py' )
+        unittestpath = join( dirname( dirname(__file__)), 
+                             'commands', 'unittest.py' )
         assert caller_path('path.py', 1) == join(dirname(__file__), 'path.py')
         assert caller_path('path.py', 2) == join(dirname(__file__), 'path.py')
         assert caller_path('unittest.py', 3) == unittestpath
@@ -465,8 +465,8 @@ class UnitTest_Path( UnitTestBase ):
 
     def test_caller_package( self ):
         self.log.info("Testing caller_package() ...")
-        assert caller_package(1) == sys.modules['pluggdapps']
-        assert caller_package(2) == sys.modules['pluggdapps']
+        assert caller_package(1) == sys.modules['pluggdapps.utils']
+        assert caller_package(2) == sys.modules['pluggdapps.utils']
         assert caller_package(3) == sys.modules['pluggdapps.commands']
         assert caller_package(4) == sys.modules['pluggdapps.commands']
 

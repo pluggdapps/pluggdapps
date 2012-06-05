@@ -7,22 +7,29 @@
 # TODO :
 #   * Improve function asbool() implementation.
 
-import sys, os, fcntl, time
+import sys, os, fcntl, time, multiprocessing, random
 import datetime as dt
+from   binascii import hexlify
 
 __all__ = [
-    'parsecsv', 'parsecsvlines', 'classof', 'subclassof',
-    'asbool', 'asint', 'asfloat',
-    'timedelta_to_seconds', 
-    'set_close_exec', 'set_nonblocking',
-    'call_entrypoint', 'docstr', 
+    'sourcepath', 'parsecsv', 'parsecsvlines', 'classof', 'subclassof',
+    'asbool', 'asint', 'asfloat', 'timedelta_to_seconds', 'set_close_exec', 
+    'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
+    'reseed_random',
     # Classes
-    'ObjectDict', 'Context',
+    'Context',
 ]
 
 ver_int = int( str(sys.version_info[0]) + str(sys.version_info[1]) )
 
 #---- Generic helper functions.
+
+def sourcepath( obj ):
+    mod = getattr( obj, '__module__', None )
+    if mod :
+        module = sys.modules[mod]
+        return module.__file__
+    return None
 
 def parsecsv( line ):
     """Parse a single line of comma separated values, into a list of strings"""
@@ -85,7 +92,8 @@ def timedelta_to_seconds( td ) :
     if ver_int >= 27 :
         sec = td.total_seconds()
     else :
-        sec= (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
+        sec= (td.microseconds + 
+                (td.seconds + td.days * 24 * 3600) * 10 ** 6) / float(10 ** 6)
     return sec
 
 
@@ -122,23 +130,21 @@ def docstr( obj ):
     return getattr( obj, '__doc__', '' ) or ''
 
 
-class ObjectDict(dict):
-    """Makes a dictionary behave like an object."""
-    def __getattr__(self, name):
-        try:
-            return self[name]
-        except KeyError:
-            raise AttributeError(name)
-
-    def __setattr__(self, name, value):
-        self[name] = value
-
-
 class Context( dict ):
     """Dictionary like context object passed to controller methods, which in
     turn populates it with template variables, and then made available to
     template files."""
     pass
+
+def cpu_count():
+    """Returns the number of processors on this machine."""
+    return multiprocessing.cpu_count()
+
+def reseed_random():
+    """If os.urandom is available, this method does the same thing as
+    random.seed ! (at least as of python 2.6).  If os.urandom is not 
+    available, we mix in the pid in addition to a timestamp."""
+    random.seed( int( hexlify( os.urandom(16) ), 16 ))
 
 
 # Unit-test
@@ -160,12 +166,11 @@ class UnitTest_Util( UnitTestBase ):
         self.test_asfloat()
         self.test_call_entrypoint()
         self.test_docstr()
-        self.test_objectdict()
         self.test_timedelta_to_seconds()
-        super.test()
+        super().test()
 
     def teardown( self ):
-        super.teardown()
+        super().teardown()
 
     def test_parsecsv( self ):
         self.log.info("Testing parsecsv() ...")
@@ -236,10 +241,3 @@ class UnitTest_Util( UnitTestBase ):
     def test_docstr( self ):
         self.log.info("Testing docstr() ...")
         assert docstr(docstr) == "Return the doc-string for the object."
-
-    def test_objectdict( self ):
-        self.log.info("Testing ObjectDict() ...")
-        d = ObjectDict( a=10, b=20 )
-        assert d.a == 10
-        assert d.b == 20
-

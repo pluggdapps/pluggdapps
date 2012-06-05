@@ -6,9 +6,10 @@
 
 import logging
 
-from   pluggdapps.plugin        import Plugin, implements
+from   pluggdapps.config        import ConfigDict
+from   pluggdapps.plugin        import Plugin
+from   pluggdapps.core          import implements
 from   pluggdapps.interfaces    import IErrorPage
-import pluggdapps.utils         as h
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class HTTPErrorPage( Plugin ):
         exception may not be the "current" exception for purposes of
         methods like ``sys.exc_info()`` or ``traceback.format_exc``.
         """
-        debug = request.app['debug']
+        debug = request.app.platform['debug']
         response = request.response
 
         if debug and "exc_info" in kwargs :
@@ -47,3 +48,16 @@ class HTTPErrorPage( Plugin ):
 
         if self['errotemplate'] :
             conte
+
+    #---- ISettings interface methods
+
+    @classmethod
+    def default_settings( cls ):
+        super().default_settings()
+        return _default_settings
+
+    @classmethod
+    def normalize_settings( cls, settings ):
+        sett = super().normalize_settings( settings )
+        return sett
+

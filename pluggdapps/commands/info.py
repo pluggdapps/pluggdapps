@@ -4,10 +4,10 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-from   optparse                 import OptionParser
 import sys
 
-from   pluggdapps.plugin        import PluginMeta, Plugin, implements
+from   pluggdapps.core          import implements, pluginname
+from   pluggdapps.plugin        import Plugin
 from   pluggdapps.interfaces    import ICommand
 
 
@@ -15,24 +15,14 @@ class Info( Plugin ):
     implements( ICommand )
 
     description = "Platform's environment Information"
-    usage = "usage: pa [options] info"
 
-    def __init__( self, platform, argv=[] ):
-        self.platform = platform
-        parser = self._parse( Info.usage )
-        self.options, self.args = parser.parse_args( argv )
+    def subparser( self, parser, subparsers ):
+        name = pluginname( self )
+        self.subparser = subparsers.add_parser( 
+                                name, description=self.description )
+        self.subparser.set_defaults( handler=self.handle )
 
-    def argparse( self, argv ):
-        parser = self._parse( Info.usage )
-        self.options, self.args = parser.parse_args( argv )
-        return self.options, self.args
+    def handle( self, args ):
+        print( "Yet to be implemented" )
 
-    def run( self, options=None, args=[] ):
-        options = options or self.options
-        args = args or self.args
 
-    def _parse( self, usage ):
-        return self._options( OptionParser( usage=usage ))
-
-    def _options( self, parser ):
-        return parser

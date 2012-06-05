@@ -4,14 +4,16 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-from   optparse   import OptionParser
-from   pprint     import pprint
+from pprint import pprint
 import logging
 
-from   pluggdapps.plugin        import Plugin, implements, query_plugin,\
-                                       IApplication
-from   pluggdapps.interfaces    import ICommand
-import pluggdapps.helper        as h
+from pluggdapps.const import ROOTAPP
+from pluggdapps.config import default_appsettings, load_inisettings
+from pluggdapps.plugin import Plugin, query_plugin, IApplication
+from pluggdapps.core import implements, pluginname
+from pluggdapps.interfaces import ICommand
+import pluggdapps.utils as h
+
 
 log = logging.getLogger(__name__)
 
@@ -19,50 +21,38 @@ class Config( Plugin ):
     implements( ICommand )
 
     description = "Display application's configuration settings."
-    usage = "usage: pa [options] commands"
 
-    def __init__( self, platform, argv=[] ):
-        self.platform = platform
-        parser = self._parse( Config.usage )
-        self.options, self.args = parser.parse_args( argv )
+    def subparser( self, parser, subparsers ):
+        name = pluginname( self )
+        self.subparser = subparsers.add_parser( 
+                                name, description=self.description )
+        self.subparser.set_defaults( handler=self.handle )
+        self._arguments( self.subparser )
 
-    def argparse( self, argv ):
-        parser = self._parse( List.usage )
-        self.options, self.args = parser.parse_args( argv )
-        return self.options, self.args
-
-    def run( self, options=None, args=[] ):
-        from pluggdapps.config import default_appsettings, load_inisettings
-        from pluggdapps import ROOTAPP
-        options = options or self.options
-        args = args or self.args
-
-        appname = options.appname or ROOTAPP
-        if options.defsett :
+    def handle( self, args ):
+        appname = args.appname or ROOTAPP
+        if args.defsett :
             appsett = default_appsettings()
-        elif options.inisett :
+        elif args.inisett :
             appsett = load_inisettings( platform.inifile )
         else :
             app = query_plugin( appname, IApplication, appname )
             appsett = app.settings
 
-        plugin = options.plugin and ('plugin:' + options.plugin)
+        plugin = args.plugin and ('plugin:' + args.plugin)
         if plugin in appsett :
             pprint( appsett[plugin] )
         else :
             pprint( appsett )
 
-    def _parse( self, usage ):
-        return self._options( OptionParser( usage=usage ))
-
-    def _options( self, parser ):
-        parser.add_option( "-a", dest="appname", default=None,
-                           help="application's settings" )
-        parser.add_option( "-p", dest="plugin", default=None,
-                           help="plugin's settings" )
-        parser.add_option( "-d", action="store_true", dest="defsett",
-                           help="Show default settings" )
-        parser.add_option( "-i", action="store_true", dest="inisett",
-                           help="Show Ini settings" )
+    def _arguments( self, parser ):
+        parser.add_argument( "-a", dest="appname", default=None,
+                             help="application's settings" )
+        parser.add_argument( "-p", dest="plugin", default=None,
+                             help="plugin's settings" )
+        parser.add_argument( "-d", action="store_true", dest="defsett",
+                             help="Show default settings" )
+        parser.add_argument( "-i", action="store_true", dest="inisett",
+                             help="Show Ini settings" )
         return parser
 

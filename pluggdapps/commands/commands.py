@@ -4,14 +4,14 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-from   optparse                 import OptionParser
 import logging
 
+from   pluggdapps.const         import ROOTAPP
 from   pluggdapps.config        import ConfigDict
-from   pluggdapps.plugin        import Plugin, implements, query_plugins, \
-                                       pluginname
+from   pluggdapps.core          import implements, pluginname
+from   pluggdapps.plugin        import Plugin, query_plugins
 from   pluggdapps.interfaces    import ICommand
-import pluggdapps.helper        as h
+import pluggdapps.utils         as h
 
 log = logging.getLogger(__name__)
 
@@ -34,33 +34,19 @@ class Commands( Plugin ):
     implements( ICommand )
 
     description = "list of script commands and their short description."
-    usage = "usage: pa [options] commands"
 
-    def __init__( self, platform, argv=[] ):
-        self.platform = platform
-        parser = self._parse( Commands.usage )
-        self.options, self.args = parser.parse_args( argv )
+    def subparser( self, parser, subparsers ):
+        name = pluginname( self )
+        self.subparser = subparsers.add_parser( 
+                                name, description=self.description )
+        self.subparser.set_defaults( handler=self.handle )
 
-    def argparse( self, argv ):
-        parser = self._parse( List.usage )
-        self.options, self.args = parser.parse_args( argv )
-        return self.options, self.args
-
-    def run( self, options=None, args=[] ):
-        from pluggdapps import ROOTAPP
-        options = options or self.options
-        args = args or self.args
-        commands = query_plugins( ROOTAPP, ICommand, self.platform )
+    def handle( self, args ):
+        commands = query_plugins( ROOTAPP, ICommand )
         commands = sorted( commands, key=lambda x : pluginname(x) )
         for command in commands :
             rows = self._formatdescr(pluginname(command), command.description)
             for r in rows : print(r)
-
-    def _parse( self, usage ):
-        return self._options( OptionParser( usage=usage ))
-
-    def _options( self, parser ):
-        return parser
 
     def _formatdescr( self, name, description ):
         fmtstr = '%-' + str(self['command_width']) + 's %s'

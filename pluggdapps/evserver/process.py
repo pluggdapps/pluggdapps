@@ -4,42 +4,16 @@
 
 """Utilities for working with multiple processes."""
 
-import os, sys, time, logging, errno, random
-from   binascii import hexlify
-import multiprocessing  # Python 2.6+
+import os, sys, time, logging, errno
+
+import pluggdapps.utils as h
 
 log = logging.getLogger( __name__ )
 
-def cpu_count():
-    """Returns the number of processors on this machine."""
-    try:
-        return multiprocessing.cpu_count()
-    except :
-        try:
-            return os.sysconf("SC_NPROCESSORS_CONF")
-        except ValueError:
-            log.error( "Could not detect number of processors; assuming 1" )
-    return 1
-
-
-def _reseed_random():
-    if 'random' not in sys.modules:
-        return
-    # If os.urandom is available, this method does the same thing as
-    # random.seed (at least as of python 2.6).  If os.urandom is not
-    # available, we mix in the pid in addition to a timestamp.
-    try:
-        seed = int(hexlify(os.urandom(16)), 16)
-    except NotImplementedError:
-        seed = int(time.time() * 1000) ^ os.getpid()
-    random.seed(seed)
-
-
 _task_id = None
 
-
 def fork_processes( num_processes, max_restarts ):
-    """Starts multiple worker processes.
+    """Starts multiple listener cum worker processes.
 
     If ``num_processes`` is None or <= 0, we detect the number of cores
     available on this machine and fork that number of child
@@ -65,7 +39,7 @@ def fork_processes( num_processes, max_restarts ):
     global _task_id
     assert _task_id is None
     if num_processes is None or num_processes <= 0:
-        num_processes = cpu_count()
+        num_processes = h.cpu_count()
     children = {}
 
     def start_child(i):
@@ -73,27 +47,32 @@ def fork_processes( num_processes, max_restarts ):
         pid = os.fork()
         if pid == 0:
             # child process
-            _reseed_random()
+            h.reseed_random()
             global _task_id
             _task_id = i
             return i
         else:
             children[pid] = i
             return None
+        
     for i in range(num_processes):
         id = start_child(i)
-        if id is not None:
+        if id is not None: # Return from child process
             return id
+        # continue with spawning.
+
     num_restarts = 0
-    while children:
+    while children :
         try:
             pid, status = os.wait()
         except OSError as e:
-            if e.errno == errno.EINTR:
+            if e.errno == errno.EINTR :
                 continue
             raise
-        if pid not in children:
+
+        if pid not in children :
             continue
+
         id = children.pop(pid)
         if os.WIFSIGNALED(status):
             log.warning( "child %d (pid %d) killed by signal %d, restarting",
@@ -104,12 +83,15 @@ def fork_processes( num_processes, max_restarts ):
         else:
             log.info( "child %d (pid %d) exited normally", id, pid )
             continue
+
         num_restarts += 1
         if num_restarts > max_restarts:
             raise RuntimeError("Too many child restarts, giving up")
+
         new_id = start_child(id)
         if new_id is not None:
             return new_id
+
     # All child processes exited cleanly, so exit the master process
     # instead of just returning to right after the call to
     # fork_processes (which will probably just start up another HTTPIOLoop

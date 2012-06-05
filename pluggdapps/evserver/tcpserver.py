@@ -7,12 +7,13 @@
 import os, socket, errno, logging, stat
 import ssl  # Python 2.6+
 
-from   pluggdapps.config                import settingsfor
-import pluggdapps.helper                as h
-from   pluggdapps.plugin                import ISettings, query_plugin
-from   pluggdapps.evserver              import process
-from   pluggdapps.evserver.httpioloop   import HTTPIOLoop
+from   pluggdapps.const import ROOTAPP
+from   pluggdapps.config import settingsfor
+from   pluggdapps.evserver import process
+from   pluggdapps.evserver.httpioloop import HTTPIOLoop
 from   pluggdapps.evserver.httpiostream import HTTPIOStream, HTTPSSLIOStream
+import pluggdapps.utils as h
+
 
 log = logging.getLogger( __name__ )
 
@@ -28,13 +29,15 @@ class TCPServer( object ):
     method, including "certfile" and "keyfile" 
     """
 
-    def __init__( self ):
+    def __init__( self, sett ):
+        # configuration settings
+        self.sett = sett
         self._sockets = {}  # fd -> socket object
         self._pending_sockets = []
         self._started = False
         self.ioloop = None
 
-    def listen( self, port, address="" ):
+    def listen( self ):
         """Starts accepting connections on the given port.
 
         This method may be called more than once to listen on multiple ports.
@@ -42,58 +45,44 @@ class TCPServer( object ):
         `TCPServer.start` afterwards.  It is, however, necessary to start
         the `HTTPIOLoop`.
         """
-        sockets = bind_sockets( port, address, None, self['backlog'] )
+        sett = self.sett
+        sockets = bind_sockets( 
+                        sett['port'], sett['host'], None, sett['backlog'] )
         self.add_sockets(sockets)
 
     def add_sockets( self, sockets ):
-        """Makes this server start accepting connections on the given sockets.
+        """Make the server start accepting connections using event loop on the
+        given sockets.
 
         The ``sockets`` parameter is a list of socket objects such as
         those returned by `bind_sockets`.
-        `add_sockets` is typically used in combination with that
-        method and `process.fork_processes` to provide greater
-        control over the initialization of a multi-process server.
         """
-        from pluggdapps import ROOTAPP
-
-        if self.ioloop == None :
-            self.ioloop = query_plugin( ROOTAPP, ISettings, 'httpioloop' )
+        self.ioloop = HTTPIOLoop( self.sett )
         for sock in sockets:
-            self._sockets[sock.fileno()] = sock
+            self._sockets[ sock.fileno()] = sock
             add_accept_handler( sock, self._handle_connection, self.ioloop )
 
     def add_socket( self, socket ):
         """Singular version of `add_sockets`.  Takes a single socket object."""
         self.add_sockets([socket])
 
-    def bind( self, port, address=None, family=socket.AF_UNSPEC ):
-        """Binds this server to the given port on the given address.
-
-        To start the server, call `start`. If you want to run this server
-        in a single process, you can call `listen` as a shortcut to the
-        sequence of `bind` and `start` calls.
-
-        Address may be either an IP address or hostname.  If it's a hostname,
-        the server will listen on all IP addresses associated with the
-        name.  Address may be an empty string or None to listen on all
-        available interfaces.  Family may be set to either ``socket.AF_INET``
-        or ``socket.AF_INET6`` to restrict to ipv4 or ipv6 addresses, otherwise
-        both will be used if available.
-
-        The ``backlog`` argument has the same meaning as for
-        `socket.listen`.
+    def bind( self ):
+        """Binds this server to the addres, port and family configured in
+        server settings.
 
         This method may be called multiple times prior to `start` to listen
-        on multiple ports or interfaces.
-        """
-        sockets = bind_sockets( port, address, family, self['backlog'] )
-        if self._started:
-            self.add_sockets(sockets)
+        on multiple ports or interfaces."""
+        family = socket.AF_UNSPEC 
+        sett = self.sett
+        sockets = bind_sockets( 
+                    sett['port'], sett['host'], family, sett['backlog'] )
+        if self._started :
+            self.add_sockets( sockets )
         else:
-            self._pending_sockets.extend(sockets)
+            self._pending_sockets.extend( sockets )
 
     def start( self ):
-        """Starts this server in the HTTPIOLoop.
+        """Starts this server using HTTPIOloop.
 
         By default, we run the server in this process and do not fork any
         additional child process.
@@ -113,20 +102,21 @@ class TCPServer( object ):
         """
         assert not self._started
         self._started = True
-        multiprocess = self['multiprocess']
-        host, port = self['host'], self['port']
+        sett = self.sett
 
-        if multiprocess <= 0:   # Single process
+        if sett['multiprocess'] <= 0:  # Single process
             log.info("Starting server in single process mode ...")
-            self.listen( port, host )
-        else :                  # multi-process
+            self.listen()
+        else :                      # multi-process
             log.info("Starting server in multi process mode ...")
-            sockets = bind_sockets( port, host, None, self['backlog'] )
-            process.fork_processes( multiprocess, self['max_restart'] )
+            sockets = bind_sockets( 
+                        sett['port'], sett['host'], None, sett['backlog'] )
+            process.fork_processes( sett['multiprocess'], sett['max_restart'] )
             self.add_sockets( sockets )
         # TODO : Setup logging for multiple process ?
 
         self.ioloop.start() # Block !
+
 
     def stop(self):
         """Stops listening for new connections.
@@ -134,7 +124,7 @@ class TCPServer( object ):
         Requests currently in progress may still continue after the
         server is stopped.
         """
-        for fd, sock in list( self._sockets.items() ) :
+        for fd, sock in self._sockets.items() :
             self.ioloop.remove_handler(fd)
             sock.close()
 
@@ -143,12 +133,9 @@ class TCPServer( object ):
         raise NotImplementedError()
 
     def _handle_connection( self, conn, address ):
-        from pluggdapps import ROOTAPP
-
-        ssloptions = settingsfor( 'ssloptions.', self )
+        ssloptions = settingsfor( 'ssloptions.', self.sett )
         is_ssl = ssloptions['keyfile'] and ssloptions['certfile']
         if is_ssl :
-            assert ssl, "Python 2.6+ and OpenSSL required for SSL"
             try:
                 conn = ssl.wrap_socket( conn,
                                         server_side=True,
@@ -166,12 +153,11 @@ class TCPServer( object ):
                     raise
         try:
             if is_ssl :
-                stream = query_plugin( ROOTAPP,
-                            ISettings, 'httpssliostream', conn, self.ioloop,
-                            ssloptions=ssloptions )
+                stream = HTTPSSLIOStream( 
+                            conn, address, self.ioloop, 
+                            self.sett, ssloptions=ssloptions )
             else :
-                stream = query_plugin( ROOTAPP,
-                            ISettings, 'httpiostream', conn, self.ioloop )
+                stream = HTTPIOStream( conn, address, self.ioloop, self.sett ) 
             self.handle_stream( stream, address )
         except Exception:
             log.error("Error in connection callback", exc_info=True)
@@ -205,8 +191,10 @@ def bind_sockets( port, address, family, backlog ):
         # exist on some platforms (specifically WinXP, although
         # newer versions of windows have it)
         flags |= socket.AI_ADDRCONFIG
-    for res in set(socket.getaddrinfo(address, port, family, socket.SOCK_STREAM,
-                                  0, flags)):
+        addrinfo = set(
+            socket.getaddrinfo(
+                address, port, family, socket.SOCK_STREAM, 0, flags))
+    for res in addrinfo :
         log.info("Binding socket for %s", res)
         af, socktype, proto, canonname, sockaddr = res
         sock = socket.socket(af, socktype, proto)
@@ -223,15 +211,15 @@ def bind_sockets( port, address, family, backlog ):
             # Python 2.x on windows doesn't have IPPROTO_IPV6.
             if hasattr(socket, "IPPROTO_IPV6"):
                 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-        log.debug("Set server socket to non-blocking mode ...")
-        sock.setblocking(0)
+        log.debug( "Set server socket to non-blocking mode ..." )
+        sock.setblocking(0) # Set to non-blocking.
         sock.bind(sockaddr)
-        log.debug("Server listening with a backlog of %s", backlog)
+        log.debug( "Server listening with a backlog of %s", backlog )
         sock.listen(backlog)
         sockets.append(sock)
     return sockets
 
-def add_accept_handler(sock, callback, ioloop):
+def add_accept_handler( sock, callback, ioloop ):
     """Adds an ``HTTPIOLoop`` event handler to accept new connections on 
     ``sock``.
 
@@ -241,7 +229,7 @@ def add_accept_handler(sock, callback, ioloop):
     is different from the ``callback(fd, events)`` signature used for
     ``HTTPIOLoop`` handlers.
     """
-    def accept_handler(fd, events):
+    def accept_handler( fd, events ):
         while True:
             try:
                 connection, address = sock.accept()
@@ -250,5 +238,5 @@ def add_accept_handler(sock, callback, ioloop):
                     return
                 raise
             log.info( "Accepting new connection from %s", address )
-            callback(connection, address)
+            callback( connection, address )
     ioloop.add_handler( sock.fileno(), accept_handler, HTTPIOLoop.READ )

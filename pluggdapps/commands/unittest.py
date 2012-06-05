@@ -4,13 +4,13 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-from   optparse              import OptionParser
 import logging
 
-from   pluggdapps.plugin     import Plugin, implements, query_plugins, \
-                                    pluginname
-from   pluggdapps.interfaces import ICommand, IUnitTest
-from   pluggdapps.unittest   import UnitTestBase
+from pluggdapps.const import ROOTAPP
+from pluggdapps.core import implements, pluginname
+from pluggdapps.plugin import Plugin, query_plugins
+from pluggdapps.interfaces import ICommand, IUnitTest
+from pluggdapps.unittest import UnitTestBase
 
 log = logging.getLogger(__name__)
 
@@ -18,38 +18,31 @@ class UnitTest( Plugin ):
     implements( ICommand )
 
     description = "Run one or more unittest."
-    usage = "usage: pa [options] unittest [test_options] <module>"
 
-    def __init__( self, platform, argv=[] ):
-        self.platform = platform
-        parser = self._parse( UnitTest.usage )
-        self.options, self.args = parser.parse_args( argv )
+    def subparser( self, parser, subparsers ):
+        name = pluginname( self )
+        self.subparser = subparsers.add_parser( 
+                                name, description=self.description )
+        self.subparser.set_defaults( handler=self.handle )
+        self._arguments( self.subparser )
 
-    def argparse( self, argv ):
-        parser = self._parse( UnitTest.usage )
-        self.options, self.args = parser.parse_args( argv )
-        return self.options, self.args
-
-    def run( self, options=None, args=[] ):
-        from pluggdapps import ROOTAPP
+    def handle( self, args ):
         for case in query_plugins( ROOTAPP, IUnitTest ) :
             if case.__class__ == UnitTestBase :
                 continue
-            if self.args :
-                if self.args[0].lower() == pluginname(case) :
-                    self._run_testcase( case )
-                    break;
-            else :
+            if args.testname == '' :
                 self._run_testcase( case )
+            elif args.testname.lower() == pluginname(case) :
+                self._run_testcase( case )
+                break;
+
+    def _arguments( self, parser ):
+        parser.add_argument( 'testname', nargs='?', default='' )
+        return parser
 
     def _run_testcase( self, case ):
         log.info( "---- %s ----", pluginname(case) )
-        case.setup( self.platform )
+        case.setup()
         case.test()
         case.teardown()
 
-    def _parse( self, usage ):
-        return self._options( OptionParser( usage=usage ))
-
-    def _options( self, parser ):
-        return parser

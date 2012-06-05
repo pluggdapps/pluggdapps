@@ -6,11 +6,13 @@
 
 import socket, logging
 
-from   pluggdapps.plugin import Interface, Attribute, ISettings, IApplication
+from pluggdapps.core import Interface, Attribute
+from pluggdapps.plugin import ISettings, IApplication
 
-__all__ = [ 
-    'ICommand', 'IServer', 'IRequest', 'IApplication', 'IRouter',
-    'IResponse',
+__all__ = [
+    'ICommand', 'IServer', 'IRouter', 'IResource', 'ICookie', 'IRequest',
+    'IController', 'IErrorPage', 'IRenderer', 'IResponse', 
+    'IResponseTransformer', 'IUnitTest',
 ]
 
 log = logging.getLogger(__name__)
@@ -27,37 +29,24 @@ class ICommand( Interface ):
         "The string describing the program usage"
     )
 
-    def __init__( argv=[] ):
-        """Parse command line arguments using argv list and return a tuple of
-        (options, args).
-
-        ``argv``,
-            A list of command line arguments that comes after the sub-command.
-            This can be overridden by calling :method:`ICommand.argparse` API.
+    def subparser( parser, subparsers ):
+        """Use ``subparsers`` to create a sub-command parser. The `subparsers`
+        object would have been created using ArgumentParser object ``parser``.
         """
 
-    def options():
-        pass
+    def handle( args ):
+        """While :meth:`subparser` is invoked, the sub-command plugin can 
+        use set_default() method on subparser to set `handler` attribute to
+        this method.
 
-    def argparse( argv ):
-        """Parse command line arguments using argv list and return a tuple of
-        (options, args). Also overwrite self's `options` and `args` attributes
-        initialized during instantiation.
+        So that this handler will automatically be invoked if the sub-command
+        is used on the command line."""
 
-        ``argv``
-            A list of arguments to be interpreted as command line arguments
-            for this sub-command.
-        """
-
-    def run( options=None, args=[] ):
-        """Run this sub-command using parsed ``options`` and ``args``, if
-        passed as arguments, otherwise use options and args already parsed via
-        __init__() or argparse().
-        """
 
 
 class IServer( Interface ):
-    """Interface to bind, listen, accept HTTP server."""
+    """Interface to bind, listen, accept HTTP connections. This interface is
+    still evolving."""
 
     def __init__( *args, **kwargs ):
         """Initialize server."""
@@ -103,6 +92,15 @@ class IServer( Interface ):
         """To handle a new connection stream."""
 
 
+class IResource( Interface ):
+    """Interface specification for resource or model plugins."""
+
+    def __call__( request, c ):
+        """For ``request``, populate :class:`Context` dictionary ``c``. The
+        same context object will be passed down to view callables and 
+        view-templates."""
+
+
 class IRouter( Interface ):
     """Every `IRouter` plugin must treat a request's url as a chain of 
     resource and resolve them based on the next path segment which are
@@ -110,15 +108,30 @@ class IRouter( Interface ):
     of which, the plugin must match request's url against mapping rules.
     
     To avoid repeated initialization, the root-router instance will be
-    rememebered by the application during :meth:`IApplication.onboot`. 
-    Chained routers can either be remembered or queried every time. It is left
-    as implementation choice."""
+    rememebered by the application during :meth:`IApplication.onboot`.
+    Similarly chained routers will be remembered in :attr:`traversals` where
+    each element in a plugin implementing :class:`IRouter`, whose name is that
+    of the path segment it matches."""
 
-    resource = Attribute(
-        "Plugin name implementing :class:`IResource` interface that accepts "
-        "an :class:`IRequest` instance and :class:`Context` dictionary as "
-        "its arguments. It can freely update the context dictionary. This "
-        "dictionary will be made available to the view system."
+    segment = Attribute(
+        "If defined for a plugin, must match with first segment-name in "
+        "request url-path. Only then it can be selected for traversal"
+    )
+    defaultview = Attribute(
+        "If defined for a plugin, must be a view-callable. When there are no "
+        "more traversal to be done and no more `views` left to be matched. "
+        "Then this attribute is the last resort to return back a "
+        "view-callable."
+    )
+    traversals = Attribute(
+        "Dictionary of path-segment name to IRouter plugins that can be "
+        "subscribed during onboot() time.If this attribute is left empty, "
+        "then it normally means url will be matched with route-pattern "
+        "definitions."
+    )
+    views = Attribute(
+        "Dictionary of view names and view predicates added via `add_view()` "
+        "method."
     )
 
     def onboot( settings ):
@@ -126,33 +139,59 @@ class IRouter( Interface ):
         should chain the onboot() call further down.
 
         Typically, path-segment resolution and url route-mapping is constructed
-        here."""
+        here using :metho:`add_view`.
 
-    def router( request, c ):
-        """If routing involves pluggable resolution based on ``interface`` and
-        path segments from :attr:`IRequest.resolve_url` then this method will 
-        resolve to next router instance. If :attr:`IRouter.resource` plugin
-        is defined, it will be called with ``request`` and context dictionary
-        ``c``.
+        Initialization of :attr:`traversals` attribute with a list of IRouter 
+        instances for this path segment."""
 
-        Like :meth:`IRouter.onboot` method, this method will also be chained
-        down the line. As the call propogates down the line,
-        :attr:`IRequest.resolve_path` will be consumed. If resolve_path is
-        fully consumed then a callable object must be returned to the
-        application, via the root router. Otherwise, the router instance at
-        the tail-end of the chain must return itself which will then be used
-        by application to match() the remaining resolve_path."""
+    def route( request, c ):
+        """Resolve request url based on traversals. If there is a matching
+        path-segment with one of its traversals, then use the matching router
+        and invoke its router() method. This call be chained until all the
+        path-segments are resolved, in which case it should return a
+        view-callable, or until one of the path segment fail to match.
+        
+        Along the way, the context object ``c`` will be passed to 
+        :class:`IResource` object configured for IRouter instances. So that
+        the context object can be updated by the resource logic before they
+        are passed to view callable.
 
-    def match( request, c ):
-        """If route() method should return None, then match must succeed in 
-        resolving the `request` url based on mapping urls."""
+        If one of the path segment fails to match along the chained router()
+        call, then it is expected that the last router instance at the end of
+        the chain will match the remaining resolve_path using url-pattern
+        matching.
 
-    def add_route( name, resource=None,
-                   # Predicate arguments
-                   pattern=None, xhr=None, method=None, arguments=None,
-                   header=None, accept=None, path_info=None,
-                   # View controler
-                   view=None, attr=None, permission=None ):
+        What ever be the case, the chained call to router() must eventually 
+        return back a view callable to the application."""
+
+    def genpath( request, name, *traverse, **matchdict ):
+        """Generate path, including query and fragment (aka anchor) using this
+        request and using,
+
+        ``name``,
+            Name of the view to generate a routable path for.
+
+        ``traverse``,
+            Valid list of path segment names to be prefixed in the final path.
+
+        ``matchdict``,
+            Dictionary of name, value strings, where names represent the
+            variable components in the route. Following keys are treated
+            special,
+                _remains
+            The semantics for these values are same as defined for method
+            :meth:`IApplication.pathfor`.
+
+            Note that among the special keys _query and _anchor is expected to
+            be pruned off before reaching this method.
+        """
+
+    def add_view( name, resource=None,
+                  # Predicate arguments
+                  pattern=None, xhr=None, method=None, arguments=None,
+                  header=None, accept=None, path_info=None,
+                  # View controler
+                  view_callable=None, attr=None, permission=None ):
         """Add a router mapping rule for this router object which will be used
         by match() method.
         
@@ -190,13 +229,13 @@ class IRouter( Interface ):
             If this predicate returns False, route matching continues.
             Note that path_info is matched after ``pattern``.
 
-        ``arguments``,
+        ``params``,
             A dictionary of key,value pairs, when specified, ensures that the 
             associated route will match only when the request has a key in the 
-            :attr:`IRequest.arguments` dictionary with the supplied value. If
+            :attr:`IRequest.params` dictionary with the supplied value. If
             the supplied value is None, then the predicate will return True
-            if supplied key is present in the request arguments.
-            If this predicate returns False, route matching continues.
+            if supplied key is present in the request params.  If this
+            predicate returns False, route matching continues.
 
         ``headers``,
             A dictionary of key,value pairs, when specified, ensures that the
@@ -220,7 +259,7 @@ class IRouter( Interface ):
             predicate will be True. If this predicate returns False, route
             matching continues.
 
-        ``view``,
+        ``view_callable``,
             Plugin name implementing :class:`IController` interface
             specification.
 
@@ -231,38 +270,6 @@ class IRouter( Interface ):
             The permission name required to invoke the view associated with
             this route. 
         """
-
-    def add_static_view( name, path, **kwargs ):
-        """Register directory paths to provide static assets like CSS files
-        and images.
-
-        ``name``,
-            A string representing an application-relative local URL prefix.
-            It may alternately be a full URL.
-        ``path``,
-            is the path on disk where the static files reside. This can be
-            an absolute path, a package-relative path, or a asset 
-            specification.
-
-        Key word arguments can be specified as,
-
-        ``cache_max_age``,
-            Used to set the `Expires` and `Cache-Control` headers for static
-            assets served. By default, this argument is None, meaning that no
-            particular Expires or Cache-Control headers are set in the 
-            response.
-
-        ``permission``,
-            Used to specify the permission required by a user to execute the 
-            static view. By default, no permission is required.
-        """
-
-
-class IResource( Interface ):
-    """Interface specification for resource or model plugins."""
-
-    def __call__( request, c ):
-        """For ``request``, populate :class:`Context` dictionary ``c``."""
 
 
 class ICookie( Interface ):
@@ -302,17 +309,31 @@ class IRequest( Interface ):
     """Request object, the only parameter that will be passed to
     :class:`IRquestHandler`."""
 
+    # ---- Socket Attributes
     connection = Attribute(
         "An HTTP request is attached to a single HTTP connection, which can "
         "be accessed through the 'connection' attribute. Since connections "
-        "are typically kept open in HTTP/1.1, multiple requests can be handled "
-        "sequentially on a single connection."
+        "are typically kept open in HTTP/1.1, multiple requests can be "
+        "handled sequentially on a single connection."
     )
+
+    # ---- HTTP Attributes
     method = Attribute(
         "HTTP request method, e.g. 'GET' or 'POST'"
     )
     uri = Attribute(
         "HTTP Request URI"
+    )
+    uriparts = Attribute(
+        "UserDict object of uri parts in decoded, parsed and unquoted form. "
+        "`scheme`, `netloc`, `path`, `query`, `fragment`, `username`, "
+        "`password`, `hostname`, `port`, `script`, keys are available. "
+        "Except query, which is a dictionary of query arguments, all other "
+        "values are in string."
+    )
+    baseurl = Attribute(
+        "Computed base url for the request under application request.app. "
+        "This attribute can also be used as application url."
     )
     version = Attribute(
         "HTTP protocol version specified in request, e.g. 'HTTP/1.1'"
@@ -324,87 +345,98 @@ class IRequest( Interface ):
     body = Attribute(
        "Request body, if present, as a byte string."
     )
-    host = Attribute(
-        "The requested hostname, usually taken from the ``Host`` header, else "
-        "by parsing the url field."
+    address = Attribute(
+       "Client's IP address and port number. "
+       "If running behind a load-balancer or a proxy, the real IP address "
+       "provided by a load balancer will be passed in the ``X-Real-Ip`` "
+       "header."
     )
-    port = Attribute(
-        "The requested port number, usually taken from the ``Host`` header, "
-        "else by parsing the url field. If port is left empty, it assumes the "
-        "default port number based on the ``scheme`` field."
+    cookies = Attribute(
+        "A dictionary of http.cookies.Morsel objects representing request "
+        "cookies from client"
     )
-    path = Attribute(
-        "Path portion of HTTP request URI"
+    getparams = Attribute(
+        "GET arguments are available in the params property, which "
+        "maps parameter names to lists of values (to support multiple values "
+        "for individual names). Names and values are are of type `str`."
     )
-    query = Attribute(
-        "Query portion of HTTP request URI"
+    postparams = Attribute(
+        "POST arguments are available in the params property, which "
+        "maps parameter names to lists of values (to support multiple values "
+        "for individual names). Names and values are of type `str`."
     )
-    scheme = Attribute(
-        "The scheme used, either 'http' or 'https'.  If running behind a "
-        "load-balancer or a proxy, the real scheme will be passed along via "
-        "via an `X-Scheme` header."
-    )
-    resolve_path = Attribute(
-        "Remaining portion of uri after removing the `baseurl` part that can "
-        "be used to url routing. As and when a segment is consumed for "
-        "routing it is removed from resolve_path and the remaining portion "
-        "is eventually matched with route mapping."
-    )
-    remote_ip = Attribute(
-       "Client's IP address as a string. If running behind a load-balancer "
-       "or a proxy, the real IP address provided by a load balancer will be "
-       "passed in the ``X-Real-Ip`` header."
+
+    #---- Processed attributes
+    params = Attribute(
+        "Combined arguments of GET/POST, which maps parameter names to lists "
+        "of values (to support multiple values for individual names). Names "
+        "and values are are of type `str`. "
     )
     files = Attribute(
         "File uploads are available in the files property, which maps file "
         "names to lists of :class:`HTTPFile`."
-    )
-    arguments = Attribute(
-        "GET/POST arguments are available in the arguments property, which "
-        "maps arguments names to lists of values (to support multiple values "
-        "for individual names). Names are of type `str`, while arguments "
-        "are byte strings. Note that this is different from "
-        ":method:`IRequest.get_argument`, which returns argument values as "
-        "unicode strings."
-    )
-    cookies = Attribute(
-        "A dictionary of Cookie.Morsel objects representing request cookies "
-        "from client"
-    )
-    settings = Attribute(
-        "A copy of application settings dictionary. Settings are organised "
-        "into sections, special section `DEFAULT` provides global "
-        "settings for all application sectionw. Other sections are "
-        "application specific settings for modules and plugins."
-    )
-    receivedat = Attribute(
-        "Timestamp when request was recieved"
-    )
-    finishedat = Attribute(
-        "Timestamp when the request was finished."
-    )
-    elapsedtime = Attribute(
-        "Amount of time, in floating seconds, elapsed since the request was "
-        "received."
     )
     response = Attribute(
         "Response object corresponding to this request. The object is an "
         "instance of plugin implementing :class:`IResponse` interface."
     )
 
-    def __init__( connection, address, startline, headers, body ):
+    #---- Framework attributes
+    session = Attribute(
+        "If a session factory has been configured, this attribute will "
+        "represent the current user's session object."
+    )
+
+    #---- Routing attributes
+    resolve_path = Attribute(
+        "Remaining portion of uri after removing the `baseurl` part that can "
+        "be used to url routing. As and when a segment is consumed for "
+        "routing it is removed from resolve_path and the remaining portion "
+        "is eventually matched with route mapping."
+    )
+    traversed = Attribute(
+        "A list of IRouter plugins each for a matching segment during path "
+        "traversal."
+    )
+    matchrouter = Attribute(
+        "Final route, :class:`IRoute` instance, that matches the path "
+        "remaining after traversal."
+    )
+    matchdict = Attribute(
+        "If remaining path after traversal has matched during this request's "
+        "url-routing, matched values by the URL pattern will be available as "
+        "matchdict dictionary."
+    )
+    view_name = Attribute(
+        "Name of the view that matched this request's url."
+    )
+
+    #---- Others
+    receivedat = Attribute(
+        "Timestamp when request was recieved"
+    )
+    finishedat = Attribute(
+        "Timestamp when the request was finished."
+    )
+
+    def __init__( conn, address, method, uriparts, version, headers, body ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
         :method:`IRequest.handle` is called complete request is available
         and partially parsed.
 
-        ``connection``,
+        ``conn``,
             HTTP socket returned as a result of accepting the connection.
-        ``address``
-            Remote client-ip address initiating the connection.
-        ``startline``,
-            HTTP request startline.
+        ``address``,
+            A tupel of remote client-ip address and its port number.
+        ``method``,
+            HTTP request method. 
+        ``uriparts``,
+            Parsed uri from request start line. A UserDict object as returned
+            by :func:`parse_url()` function.
+        ``version``,
+            HTTP version string freom request start line.
         ``headers``,
             HTTP request headers that comes after start_line and before an
             optional body.
@@ -426,77 +458,24 @@ class IRequest( Interface ):
         the standard library for more details.
         http://docs.python.org/library/ssl.html#sslsocket-objects."""
 
-    def get_argument( name, default=None, strip=True ):
-        """Returns the value of the argument with the given name.
-
-        If default is not provided, the argument is considered to be
-        required, and we throw an exception if it is missing.
-
-        If the argument appears in the url more than once, we return the
-        last value.
-
-        The returned value is always unicode.
-        """
-
-    def get_arguments( name, default=[], strip=True ):
-        """Returns a list of the arguments with the given name.
-
-        If the argument is not present, returns an empty list.
-
-        The returned values are always unicode.
-        """
-
-    def decode_argument( value, name=None ):
-        """Decodes an argument from the request.
-
-        The argument has been percent-decoded and is now a byte string.
-        By default, this method decodes the argument as utf-8 and returns
-        a unicode string.
-
-        This method is used as a filter for both get_argument() and for
-        values extracted from the url and passed to get()/post()/etc.
-
-        The name of the argument is provided if known, but may be None
-        (e.g. for unnamed groups in the url regex).
-        """
-
     def get_cookie( name, default=None ):
         """Gets the value of the cookie with the given name, else default."""
 
     def get_secure_cookie( name, value=None ):
         """Returns the given signed cookie if it validates, or None."""
 
-    def baseurl():
-        """Base url for this application. Use scheme, host, port and appscript
-        to generate this base url."""
-
     def onfinish():
         """Callback for asyncrhonous finish()."""
 
-    def application_url( scheme=None, host=None, port=None ):
-        """Construct the URL defined by request.application_url, replacing any
-        of the default scheme, host, or port portions with user-supplied
-        variants.
+    def urlfor( name, *traverse, **matchdict ) :
+        """Use request.app.urlfor to generate the url."""
 
-        If ``scheme`` is passed as ``https``, and the ``port`` is *not*
-        passed, the ``port`` value is assumed to ``443``.  Likewise, if
-        ``scheme`` is passed as ``http`` and ``port`` is not passed, the
-        ``port`` value is assumed to be ``80``.
-        """
+    def pathfor( name, *traverse, **matchdict ) :
+        """Use request.app.pathfor to generate the url."""
 
-    def url( *args, **kwargs ) :
-        """Generate url for same application handling the current request."""
-
-    def path( *args, **kwargs ) :
-        """Generate url-path for same application handling the current 
-        request."""
-
-    def appurl( appname, *args, **kwargs ) :
-        """Generate url for different application other than the one handling 
-        the current request."""
-
-    def path( appname, *args, **kwargs ) :
-        """Generate url-path for the same application handling this request."""
+    def appurl( appname, name, *traverse, **matchdict ) :
+        """Generate url for different application identified by ``appname``.
+        Use request.app.urlfor to generate the url."""
 
     def query_plugins( interface, *args, **kwargs ):
         """Query plugins in the request's context. Since every request is
@@ -509,6 +488,79 @@ class IRequest( Interface ):
         actual query. Will be using `IRequest.appname` attribute"""
 
 
+class IController( Interface ):
+
+    methods = Attribute(
+        "Request handler can override this attribute to provide a sequence of "
+        "HTTP Methods supported by the plugin. "
+    )
+
+    def __call__( request ):
+        """In the absence of method specific attributes or if the resolver
+        cannot find an instance attribute to apply the handler call back, the
+        object will simply be called.
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        """
+
+    def head( request, c ):
+        """Callback method for HEAD request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
+        """
+
+    def get( request, c ):
+        """Callback method for GET request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
+        """
+
+    def post( request, c ):
+        """Callback method for POST request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
+        """
+
+    def delete( request, c ):
+        """Callback method for DELETE request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
+        """
+
+    def put( request, c ):
+        """Callback method for PUT request. 
+        
+        ``request``,
+            Object instance implementing :class:`IRequest` interface.
+        ``c``,
+            Dictionary like context object. Refers to ``request.context`` and
+            available inside HTML templates.
+        """
+
+    def onfinish():
+        """Called after the end of a request, after the response has been sent
+        to the client. Note that this is not the same as close callback, which
+        is called when the connection get closed. In this case the connection
+        may or may not remain open. Refer to HTTP/1.1 spec."""
+
+
 class IResponse( Interface ):
     """Response object to send reponse status, headers and body."""
 
@@ -518,6 +570,10 @@ class IResponse( Interface ):
     )
     request = Attribute(
         "Plugin instance implementing :class:`IRequest` interface."
+    )
+    context = Attribute(
+        "A dictionary like object that will be passed to resource objects and "
+        "view callables, and eventually to template code."
     )
 
     def __init__( request ):
@@ -690,6 +746,28 @@ class IResponseTransformer( Interface ):
         of response body."""
 
 
+class IRenderer( Interface ):
+    """Attributes and methods to render a page using a supplied context."""
+
+    def render( templatefile, request, c ):
+        """Render ``templatefile`` under ``context`` to generate response body
+        for http ``request``.
+
+        The render call writes the response body using 
+        :method:`IResponse.write`
+
+        ``templatefile``,
+            File path for html template in asset-specification format.
+        ``request``,
+            Plugin instance implementing :class:`IRequest` interface. Same as
+            the one passed to :class:`IController` methods.
+        ``c``,
+            Dictionary like context object. Typically populated by
+            :class:`IController` methods and made availabe inside HTML
+            templates.
+        """
+
+
 class IErrorPage( Interface ):
 
     def render( request, status_code, c ):
@@ -704,101 +782,8 @@ class IErrorPage( Interface ):
         exception rendering happens only when application's `debug` settings is
         `True`.
 
-        The render call writes the response body using :method:`IResponse.write`
-        """
-
-
-class IController( Interface ):
-
-    methods = Attribute(
-        "Request handler can override this attribute to provide a sequence of "
-        "HTTP Methods supported by the plugin. "
-    )
-
-    def __call__( request ):
-        """In the absence of method specific attributes or if the resolver
-        cannot find an instance attribute to apply the handler call back, the
-        object will simply be called.
-        
-        ``request``,
-            Object instance implementing :class:`IRequest` interface.
-        """
-
-    def head( request, c ):
-        """Callback method for HEAD request. 
-        
-        ``request``,
-            Object instance implementing :class:`IRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
-        """
-
-    def get( request, c ):
-        """Callback method for GET request. 
-        
-        ``request``,
-            Object instance implementing :class:`IRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
-        """
-
-    def post( request, c ):
-        """Callback method for POST request. 
-        
-        ``request``,
-            Object instance implementing :class:`IRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
-        """
-
-    def delete( request, c ):
-        """Callback method for DELETE request. 
-        
-        ``request``,
-            Object instance implementing :class:`IRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
-        """
-
-    def put( request, c ):
-        """Callback method for PUT request. 
-        
-        ``request``,
-            Object instance implementing :class:`IRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
-        """
-
-    def onfinish():
-        """Called after the end of a request, after the response has been sent
-        to the client. Note that this is not the same as close callback, which
-        is called when the connection get closed. In this case the connection
-        may or may not remain open. Refer to HTTP/1.1 spec."""
-
-
-class IRenderer( Interface ):
-    """Attributes and methods to render a page using a supplied context."""
-
-    def render( templatefile, request, c ):
-        """Render ``templatefile`` under ``context`` to generate response body
-        for http ``request``.
-
-        The render call writes the response body using :method:`IResponse.write`
-
-        ``templatefile``,
-            File path for html template in asset-specification format.
-        ``request``,
-            Plugin instance implementing :class:`IRequest` interface. Same as
-            the one passed to :class:`IController` methods.
-        ``c``,
-            Dictionary like context object. Typically populated by
-            :class:`IController` methods and made availabe inside HTML
-            templates.
+        The render call writes the response body using 
+        :method:`IResponse.write`
         """
 
 class IUnitTest( Interface ):

@@ -28,3 +28,4 @@ clean :
 	rm -rf dist;
 	rm -rf pluggdapps.egg-info;
 	rm -rf pluggdapps.egg-info/;
+	rm -rf apps.log

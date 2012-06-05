@@ -5,15 +5,16 @@
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
 import logging
-import http.client, calendar, email, time, base64, hmac, hashlib, itertools
+import http.client, itertools
 import datetime as dt
 
 from   pluggdapps.config        import ConfigDict
-from   pluggdapps.plugin        import Plugin, implements, query_plugin
+from   pluggdapps.core          import implements
+from   pluggdapps.plugin        import Plugin, query_plugin
 from   pluggdapps.interfaces    import IResponse, IResponseTransformer, \
                                        ICookie, IErrorPage
+import pluggdapps.utils.stack_context as sc
 import pluggdapps.utils         as h
-import pluggdapps.stack_context as sc
 
 # TODO :
 #   1. user locale (server side).
@@ -50,6 +51,9 @@ _default_settings['IErrorPage']     = {
 class HTTPResponse( Plugin ):
     implements( IResponse )
 
+    _status_code = 200
+    """HTTP response status code."""
+
     def __init__( self, request ):
         # Attributes from request
         self.app = request.app
@@ -65,10 +69,18 @@ class HTTPResponse( Plugin ):
         self._auto_finish = True
         # Cookies
         self.cookies = Cookie.SimpleCookie()
-        self.docookie = request.query_plugin(
+        self.cookie_plugin = request.query_plugin(
                 ICookie, self['ICookie'] or self.app['ICookie'] )
         # Start from a clean slate
         self.clear()
+        self.context = h.Context()
+
+        self.default_headers()
+
+    def default_headers( self ) :
+        """Generate default headers for this response. This can be overriden
+        by view callable attributes."""
+        self.set_header( 'Date', h.http_fromdate( dt.datetime.now() ))
 
     def clear( self ):
         """Resets all headers and content for this response."""
@@ -124,7 +136,8 @@ class HTTPResponse( Plugin ):
         See http://docs.python.org/library/cookie.html#morsel-objects
         for available attributes.
         """
-        return self.docookie.set_cookie( self.cookies, name, value, **kwargs )
+        return self.cookie_plugin.set_cookie( 
+                                self.cookies, name, value, **kwargs )
 
     def set_secure_cookie( self, name, value, expires_days=30, **kwargs ):
         """Signs and timestamps a cookie so it cannot be forged.
@@ -139,14 +152,14 @@ class HTTPResponse( Plugin ):
         cookie in the browser, but is independent of the ``max_age_days``
         parameter to `get_secure_cookie`.
         """
-        value = self.docookie.create_signed_value(name, value)
-        return self.docookie.set_cookie( 
+        value = self.cookie_plugin.create_signed_value(name, value)
+        return self.cookie_plugin.set_cookie( 
             self.cookies, name, value, expires_days=expires_days, **kwargs )
 
     def clear_cookie( self, name, path="/", domain=None ):
         """Deletes the cookie with the given name."""
         expires = dt.datetime.utcnow() - dt.timedelta(days=365)
-        self.docookie.set_cookie( 
+        self.cookie_plugin.set_cookie( 
             self.cookies, name, "", path=path, expires=expires, domain=domain )
 
     def clear_all_cookies(self):
@@ -185,7 +198,7 @@ class HTTPResponse( Plugin ):
             chunk = h.json_encode(chunk)
             self.set_header( 
                     "Content-Type", "application/json; charset=UTF-8" )
-        self._write_buffer.append( h.utf8(chunk) )
+        self._write_buffer.append( chunk.encode('utf-8') )
 
     def flush( self, finishing=False, callback=None ):
         """Flushes the current output buffer to the network.
@@ -298,9 +311,9 @@ class HTTPResponse( Plugin ):
             assert isinstance(status, int) and 300 <= status <= 399
         self.set_status( status )
         # Remove whitespace
-        url = re.sub(b(r"[\x00-\x20]+"), "", h.utf8(url))
+        url = re.sub(b(r"[\x00-\x20]+"), "", url.encode('utf-8') )
         self.set_header( 
-                "Location", urlparse.urljoin( h.utf8(self.request.uri), url) )
+          "Location", urlparse.urljoin( self.request.uri.encode('utf-8'), url))
 
     def render( self, templatefile, c ):
         """Generate HTML content for request and write them using
@@ -317,18 +330,37 @@ class HTTPResponse( Plugin ):
                 self.set_header( "Connection", "Keep-Alive" )
 
     def _generate_headers( self ):
-        lines = [ h.utf8( ' '.join([
-                            self.request.version, 
-                            str(self._status_code), 
-                            http.client.responses[self._status_code] ])
-                        )]
-        headers = itertools.chain(
-                    list(self._headers.items()), self._list_headers )
-        lines.extend([ h.utf8(n) + b": " + h.utf8(v) for n, v in headers ])
-        [ lines.append( h.utf8("Set-Cookie: " + cookie.OutputString(None)) )
-          for cookie in list(self.cookies.values()) ]
+
+        # TODO : 3 header field types are specifically prohibited from appearing as a
+        # trailer field: Transfer-Encoding, Content-Length and Trailer.
+
+        code = str( self._status_code )
+        reason = http.client.responses[ self._status_code ]
+        response_line = [ self.request.version, code, reason ]
+        lines = [ ' '.join( response_line ).encode('utf-8') ]
+
+        headers = itertools.chain( self._headers.items(), self._list_headers )
+        lines.extend(
+            n.encode('utf-8') + b": " + v.encode('utf-8') for n, v in headers )
+
+        [ lines.append(
+            "Set-Cookie: ".encode('utf-8') + cookie.OutputString(None) 
+          ) for cookie in list(self.cookies.values()) ]
         return b"\r\n".join(lines) + b"\r\n\r\n"
 
     def _dowrite( self, chunk, callback=None ):
         assert isinstance(chunk, bytes)
         self.connection.write( chunk, callback=callback )
+
+
+    #---- ISettings interface methods
+
+    @classmethod
+    def default_settings( cls ):
+        return _default_settings
+
+    @classmethod
+    def normalize_settings( cls, settings ):
+        sett = super().normalize_settings( settings )
+        return sett
+

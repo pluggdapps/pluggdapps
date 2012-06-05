@@ -13,3 +13,8 @@
 * Follow through
     http://rhettinger.wordpress.com/2011/05/26/super-considered-super/
   and work out method-resolution-order using super().
+
+
+* Access - log,
+    * Option for logging request line's http method, url, version. Especially
+      we want to detect HTTP/1.0 requests.

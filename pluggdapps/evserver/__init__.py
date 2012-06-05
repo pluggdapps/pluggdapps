@@ -4,6 +4,6 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-from . import httpioloop
-from . import httpiostream
-from . import httpserver
+from pluggdapps.evserver import httpioloop
+from pluggdapps.evserver import httpiostream
+from pluggdapps.evserver import httpserver

@@ -73,7 +73,7 @@ a hierarchy of configuration sources and its priority.
 import configparser, collections
 from   copy import deepcopy
 
-from   pluggdapps.const import ROOTAPP
+from   pluggdapps.const import ROOTAPP, DEBUG, DEFAULT_ENCODING
 from   pluggdapps.plugin import plugin_info, query_plugin, IApplication, \
                                 applications, default_settings
 import pluggdapps.utils as h
@@ -97,6 +97,11 @@ def loadsettings( inifile ):
                 plugincls.normalize_settings( appsettings[appname][p] )
     return appsettings
 
+
+def global_appdefaults() :
+    return { 'debug' : DEBUG, 'encoding' : DEFAULT_ENCODING }
+
+
 def default_appsettings():
     """Compose `appsettings` from plugin's default settings."""
     # Default settings for applications and plugins.
@@ -109,6 +114,7 @@ def default_appsettings():
         sett = dict( sett.items() )
         if p in appnames :
             appdefaults[ p ] = sett
+            appdefaults[ p ].update( global_appdefaults() )
         else :
             plugindefaults[ plugin2sec(p) ] = sett
     # Compose `appsettings`
@@ -221,10 +227,18 @@ class ConfigDict( dict ):
         value = value if isinstance(value, ConfigItem) else ConfigItem(value)
         self._spec[name] = value
         val = value['default']
-        return super().__setitem( name, val )
+        return super().__setitem__( name, val )
 
     def specifications( self ):
         return self._spec
+
+    def merge( self, *settings ):
+        settings = list( settings )
+        settings.reverse()
+        for sett in settings :
+            for k in sett.keys() :
+                if k in self : continue
+                self[k] = sett[k]
 
 
 class ConfigItem( dict ):

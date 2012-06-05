@@ -9,19 +9,13 @@
 
 import pkg_resources as pkg
 
+# Import pluggdapps core
+import pluggdapps.core
 import pluggdapps.plugin
 import pluggdapps.interfaces
-import pluggdapps.platform
-import pluggdapps.commands
-import pluggdapps.evserver
-import pluggdapps.request
-import pluggdapps.response
-import pluggdapps.application
-import pluggdapps.rootapp
 
-from   pluggdapps.const  import *
-import pluggdapps.utils  as h
 from   pluggdapps.plugin import plugin_init
+import pluggdapps.utils  as h
 
 __version__ = '0.1dev'
 
@@ -44,5 +38,20 @@ for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
     __import__( pkgname )
     packages.append( pkgname )
 
+# Load modules
+import pluggdapps.platform
+import pluggdapps.cookie
+import pluggdapps.request
+import pluggdapps.response
+import pluggdapps.application
+import pluggdapps.rootapp
+import pluggdapps.errorpage
+import pluggdapps.router
+import pluggdapps.unittest
+# Load packages
+import pluggdapps.evserver
+import pluggdapps.commands
+
 # Initialize plugin data structures
 plugin_init()
+

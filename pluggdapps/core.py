@@ -50,6 +50,8 @@ __all__ = [
     'Interface', 'Attribute', 
 ]
 
+core_classes = [ 'Interface', 'PluginBase', 'Singleton', ]
+
 class PluginMeta( type ):
     """Plugin component manager."""
 
@@ -65,8 +67,6 @@ class PluginMeta( type ):
     """A map from interface class object to a map of plugin names and its 
     class. If a plugin sub-class derives from Singleton then query_* methods
     and functions will return the same object all the time."""
-
-    core_classes = [ 'Interface', 'PluginBase', 'Singleton' ]
 
     # Error messages
     err1 = 'Class `%s` derives both Interface and Plugin'
@@ -84,16 +84,18 @@ class PluginMeta( type ):
 
         if Interface in mro_bases :
             # Interface's information dictionary
-            _interfmap[name] = PluginMeta._interf( new_class, name, bases, d )
+            PluginMeta._interfmap[name] = \
+                    PluginMeta._interf( new_class, name, bases, d )
 
         elif PluginBase in mro_bases :
             nm = pluginname(name)
             # Plugin's information dictionary
-            _pluginmap[nm] = PluginMeta._plugin( new_class, nm, bases, d )
+            PluginMeta._pluginmap[nm] = \
+                    PluginMeta._plugin( new_class, nm, bases, d )
             # Register deriving plugin for interfaces implemented by its base
             # classes
             for b in mro_bases :
-                for i, pmap in list( _implementers.items() ) :
+                for i, pmap in list( PluginMeta._implementers.items() ) :
                     if pluginname(b) in pmap :
                         pmap.setdefault( nm, '-na-' )
             # Hook masterinit() for __init__ call
@@ -111,9 +113,12 @@ class PluginMeta( type ):
                 Consumes ``app`` argument and initialized the plugin with
                 *args and **kwargs parameters. It also handles the special
                 case of instantiating IApplication plugins."""
-                from pluggdapps.plugin import IApplication
+                from pluggdapps.plugin import IApplication, query_plugin
 
                 # TODO : make `self.settings` into a read only copy
+
+                # Check for instantiated singleton, if so return.
+                if hasattr( self, 'settings' ): return
 
                 self._settngx = {}
                 pluginnm = pluginname(self)
@@ -122,7 +127,7 @@ class PluginMeta( type ):
                     self.appname, self.app = pluginnm, self
                     self.settings = deepcopy( args[0][pluginnm] )
                     self._settngx.update( self.settings['DEFAULT'] )
-                elif :
+                else :
                     if isinstance(app, str) :
                         self.appname = app
                         self.app = query_plugin( app, IApplication, app )
@@ -148,7 +153,7 @@ class PluginMeta( type ):
         if Interface in bases :
             if PluginBase in bases :
                 raise Exception( err1 % name )
-            interf = _interfmap.get( pluginname(name), None )
+            interf = PluginMeta._interfmap.get( pluginname(name), None )
             if interf :
                 raise Exception( err2 % (name, interf['file']) )
 
@@ -222,16 +227,18 @@ class PluginBase( object, metaclass=PluginMeta ):
     """A map of plugin name and its singleton instance."""
 
     def __new__( cls, *args, **kwargs ):
+        from pluggdapps.plugin import Singleton
         if issubclass( cls, Singleton ):
             name = pluginname(cls)
-            singleton = _singletons.get( name, None )
+            singleton = PluginBase._singletons.get( name, None )
             if singleton == None :
                 self = super().__new__( cls, *args, **kwargs )
-                return _singletons.setdefault( name, self )
+                return PluginBase._singletons.setdefault( name, self )
             else :
                 return singleton
         else :
-            return super().__new__( cls, *args, **kwargs )
+            self = super().__new__( cls, *args, **kwargs )
+            return self
 
 
 class Interface( object, metaclass=PluginMeta ):
@@ -265,19 +272,19 @@ def implements( *interfaces ):
         PluginMeta._implementers.setdefault( i, {} ).setdefault( nm, '-na-' )
 
 
+
 # Unit-test
 from pluggdapps.unittest import UnitTestBase
 from pluggdapps.interfaces import IUnitTest
 from random import choice
 
-class UnitTest_Plugin( UnitTestBase, Singleton ):
+class UnitTest_Plugin( UnitTestBase ):
 
     def setup( self ):
         super().setup()
 
     def test( self ):
         self.test_whichmodule()
-        self.test_pluginmeta()
         super().test()
 
     def teardown( self ):
@@ -290,44 +297,3 @@ class UnitTest_Plugin( UnitTestBase, Singleton ):
         assert whichmodule(UnitTest_Plugin).__name__ == 'pluggdapps.plugin'
         assert whichmodule(self).__name__ == 'pluggdapps.plugin'
         assert whichmodule(whichmodule).__name__ == 'pluggdapps.plugin'
-
-    def test_pluginmeta( self ):
-        self.log.info("Testing plugin-meta() ...")
-        # Test plugins
-        assert sorted( PluginMeta._pluginmap.keys() ) == sorted( plugins() )
-        nm = choice( list( PluginMeta._pluginmap.keys() ))
-        info = PluginMeta._pluginmap[nm]
-        assert info['name'] == pluginname( info['cls'] )
-
-        # Test Singleton, master_init
-        p = query_plugin( ROOTAPP, IUnitTest, 'unittest_plugin' )
-        assert p == self
-        assert p.__init__.__func__.__name__ == 'masterinit'
-        assert p.__init__._original.marker == 'UnitTestBase'
-
-
-class UnitTest_Plugin1( UnitTestBase ):
-
-    def __init__( self, *args, **kwargs ):
-        pass
-    __init__.marker = 'UnitTest_Plugin1'
-
-    def setup( self ):
-        super().setup()
-
-    def test( self ):
-        self.test_pluginmeta()
-        super().test()
-
-    def teardown( self ):
-        super().teardown()
-
-    #---- Test cases
-
-    def test_pluginmeta( self ):
-        self.log.info("Testing singleton and master_init ...")
-        p = query_plugin( ROOTAPP, IUnitTest, 'unittest_plugin1' )
-        assert p != self
-        assert p.__init__.__func__.__name__ == 'masterinit'
-        assert p.__init__._original.marker == 'UnitTest_Plugin1'
-
