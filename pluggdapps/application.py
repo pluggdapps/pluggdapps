@@ -9,9 +9,9 @@ from urllib.parse import urljoin
 
 from pluggdapps.core import implements
 from pluggdapps.config import ConfigDict
-from pluggdapps.plugin import Plugin, Singleton, IApplication, IRouter, \
+from pluggdapps.plugin import Plugin, Singleton, IApplication, \
                               query_plugin , isimplement
-from pluggdapps.interfaces import IController
+from pluggdapps.interfaces import IController, IRouter
 import pluggdapps.utils as h
 
 log = logging.getLogger(__name__)

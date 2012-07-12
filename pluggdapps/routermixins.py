@@ -4,7 +4,7 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 SKR Farms (P) LTD.
 
-import logging
+import logging, re
 
 from pluggdapps.const import URLSEP
 from pluggdapps.plugin import interface
@@ -99,7 +99,7 @@ class TraverseMixin( BaseMixin ):
 
         # There is a current segment available, check for matching traversals
         for router in self.traversals :
-            if router.segment = currseg :
+            if router.segment == currseg :
                 request.traversed.append( router )
                 request.resolve_path = URLSEP + remseg if remseg else ''
                 break

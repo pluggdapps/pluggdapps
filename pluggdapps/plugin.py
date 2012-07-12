@@ -149,7 +149,7 @@ class IApplication( Interface ):
         application's context. Plugin's implementing this method must call
         request.onfinish()."""
 
-    def urlfor( appname, request, name, *traverse, **matchdict, ):
+    def urlfor( appname, request, name, *traverse, **matchdict ):
         """Generate url (full url) identified by routing-name `name`. Use
         `pathfor` method to generate the relative url and join the result
         with the `base_url` for application.

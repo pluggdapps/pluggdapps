@@ -46,7 +46,7 @@ import pluggdapps.response
 import pluggdapps.application
 import pluggdapps.rootapp
 import pluggdapps.errorpage
-import pluggdapps.router
+import pluggdapps.routers
 import pluggdapps.unittest
 # Load packages
 import pluggdapps.evserver

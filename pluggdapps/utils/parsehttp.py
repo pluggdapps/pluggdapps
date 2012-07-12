@@ -9,13 +9,15 @@
 import logging, re, sys, calendar, email, hashlib, socket
 from collections import UserDict
 import datetime as dt
-from datetime.datetime import strptime, strftime
 import urllib.request, urllib.error
 from urllib.parse import urlsplit, unquote, parse_qs, urlunsplit, quote, \
                          urlencode, urljoin
 
 from pluggdapps.utils.exc import Error
 from pluggdapps.utils.lib import parsecsv
+
+strptime = dt.datetime.strptime
+strftime = dt.datetime.strftime
 
 __all__ = [
     'port_and_scheme', 'parse_startline', 'parse_url', 'make_url',
@@ -190,7 +192,7 @@ def http_fromdate( dtime ):
 
 
 def parse_fieldvalue( field, value ):
-
+    pass
 
 def convert_header_value( value ):
     """Transform `value` to marshal them as HTTP header value.

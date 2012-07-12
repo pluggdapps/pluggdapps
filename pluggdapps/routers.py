@@ -13,6 +13,7 @@ from pluggdapps.plugin import Plugin
 from pluggdapps.core import implements
 from pluggdapps.interfaces import IRouter, IResource
 from pluggdapps.views import HTTPNotFound
+from pluggdapps.routermixins import TraverseMixin, MatchMixin
 import pluggdapps.utils as h
 
 log = logging.getLogger( __name__ )
