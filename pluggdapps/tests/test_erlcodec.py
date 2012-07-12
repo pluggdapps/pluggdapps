@@ -1,7 +1,8 @@
 import unittest
 from   copy                 import deepcopy
+from   random               import choice
 
-from   pluggdapps.erlcodec  import assert_true, Atom, String, BitString, \
+from   pluggdapps.erlcodec  import assert_true, Atom, BitString, \
                                    encode, decode
 
 class TestERLCodec( unittest.TestCase ):
@@ -13,7 +14,6 @@ class TestERLCodec( unittest.TestCase ):
         except Exception :
             pass
 
-
     def test_atom( self ) :
         Atom("hello")
         try :
@@ -21,55 +21,74 @@ class TestERLCodec( unittest.TestCase ):
         except Exception :
             pass
 
+    nones = [ None ]
+    ints = [ 10, 1000, pow(19, 210), pow(19, 2100) ]
+    flts = [ 2.3, 10.222222222222222 ]
+    bools = [ True, False ]
+    atoms = [ Atom('atom'), Atom('at.-#$om') ]
+    strs = [ "hello world", "(汉语/漢語 Hànyǔ" ]
+    bins =  [ b'hello world' ]
+    bits = [ BitString( b'hello world', 4 ) ]
+    nils = [ [] ]
+    lsts = [ nones + ints + strs + flts + bools + atoms + bins + bits + nils ]
+    tups = [ 
+        tuple(nones + ints + strs + flts + bools + atoms + bins + bits + nils),
+        tuple( [1] * 300 ),
+        tuple(),
+    ]
+    mixedt = tups[0] + (lsts[0],)
+    mixedl = [ nones + ints + strs + flts + bools + atoms + bins + bits + nils ]
+    mixedl.append( mixedt )
 
-    def test_string( self ) :
-        s = String("hello world")
-        assert s == "hello world"
+    def dotest( self, x ):
+        level = choice( range(1,9) )
+        assert decode( encode( x, compressed=None )) == x
 
+    def test_none( self ):
+        list( map( self.dotest, self.nones ))   # None
 
-    def test_codec( self ) :
-        nones = [ None ]
-        ints = [ 10, 1000, pow(19, 210), pow(19, 2100) ]
-        strs = [ "hello world", "(汉语/漢語 Hànyǔ" ]
-        flts = [ 2.3, 10.222222222222222 ]
-        bools = [ True, False ]
-        atoms = [ 'atom', 'at.-#$om' ]
-        bins =  [ b'hello world' ]
-        bits = [ BitString( b'hello world', 4 ) ]
-        nils = [ [] ]
-        lsts = [ nones + ints + strs + flts + bools + atoms + bins + bits + nils ]
-        tups = [ 
-            tuple(nones + ints + strs + flts + bools + atoms + bins + bits + nils),
-            tuple( [1] * 300 ),
-        ]
+    def test_ints( self ):
+        list( map( self.dotest, self.ints ))    # Int
 
-        def test( x ) :
-            assert decode( encode( x )) == x
+    def test_flts( self ):
+        list( map( self.dotest, self.flts ))    # Floats
 
-        list( map( test, nones ))   # None
-        list( map( test, ints ))    # Int
-        list( map( test, strs ))    # String
-        list( map( test, flts ))    # Floats
-        list( map( test, bools ))   # Bools
-        list( map( test, atoms ))   # Atoms
-        list( map( test, bins ))    # Binary
-        list( map( test, bits ))    # Bit string
-        list( map( test, nils ))    # nils
-        list( map( test, lsts ))    # Lists
-        list( map( test, tups ))    # Lists
+    def test_bools( self ):
+        list( map( self.dotest, self.bools ))   # Bools
 
+    def test_atoms( self ):
+        list( map( self.dotest, self.atoms ))   # Atoms
 
+    def test_strs( self ):
+        list( map( self.dotest, self.strs ))    # String
+
+    def test_bins( self ):
+        list( map( self.dotest, self.bins ))    # Binary
+
+    def test_bits( self ):
+        list( map( self.dotest, self.bits ))    # Bit string
+
+    def test_bitstring( self ):
         # Bitstring
         x = BitString( b'hello world', 4 )
         y = decode( encode( x ))
         assert x == y
         assert x.bits == y.bits
 
-        tlist = tups[0] + (lsts[0],)
-        mixedl = deepcopy( lsts[0] )
-        mixedl.append( tlist )
-        assert decode( encode( mixedl )) == mixedl
-        assert decode( encode( tuple( mixedl ))) == tuple( mixedl )
+    def test_nils( self ):
+        list( map( self.dotest, self.nils ))    # nils
+
+    def test_lsts( self ):
+        list( map( self.dotest, self.lsts ))    # Lists
+
+    def test_tups( self ):
+        list( map( self.dotest, self.tups ))    # Lists
+
+    def test_compound( self ):
+        # Compound terms
+        assert decode( encode( self.mixedt )) == self.mixedt
+        assert decode( encode( self.mixedl )) == self.mixedl
+        assert decode( encode( tuple( self.mixedl ))) == tuple( self.mixedl )
 
 
 if __name__ == '__main__' :
