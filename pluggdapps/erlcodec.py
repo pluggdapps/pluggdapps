@@ -226,7 +226,7 @@ decoders = {
 
 #---- Encoder
 
-def encode( term, compressed=None ):
+def encode( term, compressed=False ):
     encoded_term = encode_term( term )
     # False and 0 do not attempt compression.
     if compressed:
