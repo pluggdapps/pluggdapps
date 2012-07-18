@@ -12,7 +12,6 @@ import builtins
 # TODO :
 #   * Unable to gather type of None.
 
-
 ordnil = ord( "j" )
 
 class ErrorERLCodec( Exception ):
@@ -45,10 +44,42 @@ class BitString( bytes ):
     def __new__( cls, s, bits ):
         obj = super().__new__( cls, s )
         obj.bits = bits
+        obj.s = s
         return obj
 
+    def to_binary( self ):
+        s, bits = self.s, self.bits
+        if s and bits == 0 :
+            return s[:-1]
+        elif s and bits == 8 :
+            return s
+        elif s and bits :
+            i = s[-1] & ( (pow(2,bits)-1) << (8-bits) )
+            return s[:-1] + i.to_bytes(1, 'big')
+        return s
+
+    def value( self ):
+        s, bits = self.s, self.bits
+        if s and bits == 0 :
+            return s[:-1]
+        elif s and bits == 8 :
+            return s
+        elif s and bits :
+            i = ( s[-1] & ( (pow(2,bits)-1) << (8-bits) )) >> (8-bits)
+            return s[:-1] + i.to_bytes(1, 'big')
+        return s
+
+    def __eq__( self, other ):
+        if isinstance( other, self.__class__ ):
+            return self.value() == other.value()
+        else :
+            return False
+
+    def __ne__( self, other ):
+        return not self.__eq__( other )
+
     def __repr__(self):
-        return "BitString(%s, %s)" % ( self.bits, super().__repr__() )
+        return "BitString(%s, %s)" % ( self.value(), super().__repr__() )
 
 
 #---- Decoder
@@ -96,9 +127,9 @@ def decode_newfloat( tail ):
 def decode_bitstring( tail ):
     assert_true( len(tail) >= 5 )
     length, bits = unpack(">IB", tail[:5])
-    tail1 = tail[5:]
-    assert_true( len(tail1) >= length )
-    return BitString(tail1[:length], bits), tail1[length:]
+    data = tail[5:]
+    assert_true( len(data) >= length )
+    return BitString( data[:length], bits ), data[length:]
 
 
 def decode_smallint( tail ):
@@ -111,7 +142,7 @@ def decode_int( tail ):
 
 
 def decode_float( tail ):
-        return float(tail[:31].split("\x00", 1)[0]), tail[31:]
+    return float( tail[:31].split(b"\x00", 1)[0] ), tail[31:]
 
 
 def decode_atom( tail ):
@@ -136,7 +167,16 @@ def decode_smalltuple( tail ):
         term, tail = decode_term(tail)
         lst.append(term)
         arity -= 1
-    return tuple(lst), tail
+    tup = tuple(lst)
+
+    # Since erlang does not have a notion of string, programs can represent
+    # strings to be passed to python world using special APIs like
+    # data_to_string/3, where by string data is marshalled as special tuple.
+    if len(tup) == 3 and tup[0] == ATOM_NSTR and isinstance(tup[2], bytes) :
+        s = tup[2].decode( tup[1] )
+        return s, tail
+    else :
+        return tup, tail
 
 
 def decode_largetuple( tail ):
@@ -155,10 +195,12 @@ def decode_nil( tail ):
 
 
 def decode_string( tail ):
+    """Actually not a string. Erlang's term_to_binary automatically interprets
+    lists (containing integers < 255) as string."""
     assert_true( len(tail) >= 2 )
     length, tail1 = unpack( ">H", tail[:2] )[0], tail[2:]
     assert_true( len(tail1) >= length )
-    return tail1[:length].decode('utf8'), tail1[length:]
+    return list( tail1[:length] ), tail1[length:]
 
 
 def decode_list( tail ):
@@ -293,12 +335,9 @@ def encode_atom( term ):
 
 def encode_string( term ):
     if not term :
-        return ordnil
-    utf8 = term.encode('utf8')
-    if len(utf8) < 65535 :
-        return pack( ">BH", 107, len(utf8) ) + utf8
-    else :
-        return encode_list( term )
+        return (ATOM_NSTR, ATOM_UTF8, ordnil)
+    ubytes = term.encode( 'utf8' )
+    return encode_tuple( (ATOM_NSTR, ATOM_UTF8, ubytes) )
 
 
 def encode_bytes( term ):
@@ -306,15 +345,17 @@ def encode_bytes( term ):
 
 
 def encode_bitstring( term ):
-    return pack( ">BIB", 77, len(term), term.bits ) + term
+    bn = term.to_binary()
+    return pack( ">BIB", 77, len(bn), term.bits ) + bn
 
 
 def encode_list( term ):
+    proptail = ordnil.to_bytes(1, 'big')
     if term :
-        elements = b''.join( map( encode_term, term + [ordnil] ))
-        return pack( ">BI", 108, len(term) ) + elements
+        elements = b''.join( map( encode_term, term ))
+        return pack( ">BI", 108, len(term) ) + elements + proptail
     else :
-        return ordnil.to_bytes(1, 'big')
+        return proptail
 
 
 def encode_tuple( term ):
@@ -324,14 +365,14 @@ def encode_tuple( term ):
     elif arity <= 4294967295:
         header = pack( ">BI", 105, arity )
     else:
-        raise "Invalid tuple arity"
+        raise ValueError( "Invalid tuple arity" )
     return header + b''.join( map( encode_term, term ))
 
 
 def encode_dict( term ):
     # encode dict as proplist, but will be orddict compatible if keys
     # are all of the same type.
-    return encode_term( sorted(term.iteritems()) )
+    return encode_term( sorted( list ( term.items() )))
 
 
 def encode_datetime( term ):
@@ -355,3 +396,20 @@ encoders = {
     datetime  : encode_datetime,  # Python Date-Time
 }
 
+ATOM_OK     = Atom('ok')
+ATOM_ERROR  = Atom('error')
+ATOM_RESP   = Atom('resp')
+ATOM_REQ    = Atom('req')
+ATOM_POST   = Atom('post')
+ATOM_NSTR   = Atom('nstr')
+ATOM_UTF8   = Atom('utf8')
+
+ATOM_LOGERROR = Atom('logerror')
+ATOM_LOGINFO  = Atom('loginfo')
+ATOM_LOGWARN  = Atom('logwarn')
+
+ATOM_LOOPBACK  = Atom('loopback')
+ATOM_APPY      = Atom('apply')
+ATOM_QUERY_PLUGIN     = Atom('query_plugin')
+ATOM_PLUGIN_ATTRIBUTE = Atom('plugin_attribute')
+ATOM_PLUGIN_METHOD    = Atom('plugin_method')

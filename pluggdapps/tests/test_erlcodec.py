@@ -1,6 +1,7 @@
 import unittest
 from   copy                 import deepcopy
 from   random               import choice
+from   array                import array
 
 from   pluggdapps.erlcodec  import assert_true, Atom, BitString, \
                                    encode, decode
