@@ -2,6 +2,7 @@
 
 import os, sys, errno, traceback, argparse, site, time
 from   struct   import pack, unpack
+from   array    import array
 from   os.path  import dirname, join, abspath
 
 # TODO : 
@@ -35,28 +36,20 @@ def run( port ):
                 resp = ( ATOM_ERROR, "request expected as tuple" )
             port.respond( resp )
         except EOFError:
-            print( "Python : Exiting !" )
             break
         except Exception as err :
-            raise
-            try :
-                port.respond( (ATOM_ERROR, err.args[0]) )
-            except EOFError:
-                print( "Python : Nested exception, Exiting !")
-                break
+            port.logerror( traceback.format_exc(), [] )
+            break
+    print( "Python : Exiting !" )
 
 
 def handle( port, request ):
     """Handle request from Erlang. Unlike the request made from pluggdapps,
     this is asynchronous."""
     method, args, kwargs = request
-    try :
-        handler = handlerd.get( method, handle_fail )
-        result = handler( port, method, *args, **dict(kwargs) )
-        return ( ATOM_OK, result )
-    except Exception as err :
-        raise
-        return ( ATOM_ERROR, err.args[0] )
+    handler = handlerd.get( method, handle_fail )
+    result = handler( port, method, *args, **dict(kwargs) )
+    return ( ATOM_OK, result )
 
 
 def handle_fail( port, method, *args, **kwargs ):
@@ -283,7 +276,7 @@ def optionparse() :
                          help='Use standard io 0 & 1 for port communication' )
     parser.add_argument( '--nouse_stdio', dest='nouse_stdio', 
                          action='store_true', default=False,
-                         help='Use file descriptors 3 & 4 for port communication' )
+                         help='Use file descr. 3 & 4 for port communication' )
     parser.add_argument( '--use_descrs', dest='use_descrs', 
                          default='',
                          help='Use CSV of descriptors for port communication' )
