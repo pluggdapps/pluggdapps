@@ -7,7 +7,7 @@
 import socket, logging
 
 from pluggdapps.core import Interface, Attribute
-from pluggdapps.plugin import ISettings, IApplication
+from pluggdapps.plugin import ISettings, IWebApp
 
 __all__ = [
     'ICommand', 'IServer', 'IRouter', 'IResource', 'ICookie', 'IRequest',
@@ -108,7 +108,7 @@ class IRouter( Interface ):
     of which, the plugin must match request's url against mapping rules.
     
     To avoid repeated initialization, the root-router instance will be
-    rememebered by the application during :meth:`IApplication.onboot`.
+    rememebered by the web-application during :meth:`IWebApp.onboot`.
     Similarly chained routers will be remembered in :attr:`traversals` where
     each element in a plugin implementing :class:`IRouter`, whose name is that
     of the path segment it matches."""
@@ -135,7 +135,7 @@ class IRouter( Interface ):
     )
 
     def onboot( settings ):
-        """Chained call from :meth:`IApplication.onboot`. Implementation 
+        """Chained call from :meth:`IWebApp.onboot`. Implementation 
         should chain the onboot() call further down.
 
         Typically, path-segment resolution and url route-mapping is constructed
@@ -162,7 +162,7 @@ class IRouter( Interface ):
         matching.
 
         What ever be the case, the chained call to router() must eventually 
-        return back a view callable to the application."""
+        return back a view callable to web-application."""
 
     def genpath( request, name, *traverse, **matchdict ):
         """Generate path, including query and fragment (aka anchor) using this
@@ -180,7 +180,7 @@ class IRouter( Interface ):
             special,
                 _remains
             The semantics for these values are same as defined for method
-            :meth:`IApplication.pathfor`.
+            :meth:`IWebApp.pathfor`.
 
             Note that among the special keys _query and _anchor is expected to
             be pruned off before reaching this method.
@@ -197,7 +197,7 @@ class IRouter( Interface ):
         
         ``name``,
             The name of the route. This attribute is required and it must be
-            unique among all defined routes in a given application.
+            unique among all defined routes in a given web-application.
 
         ``resource``,
             A plugin name implementing :class:`IResource` interface.
@@ -332,8 +332,8 @@ class IRequest( Interface ):
         "values are in string."
     )
     baseurl = Attribute(
-        "Computed base url for the request under application request.app. "
-        "This attribute can also be used as application url."
+        "Computed base url for the request under web-application request.app. "
+        "This attribute can also be used as web-application url."
     )
     version = Attribute(
         "HTTP protocol version specified in request, e.g. 'HTTP/1.1'"
@@ -474,17 +474,17 @@ class IRequest( Interface ):
         """Use request.app.pathfor to generate the url."""
 
     def appurl( appname, name, *traverse, **matchdict ) :
-        """Generate url for different application identified by ``appname``.
+        """Generate url for different web-application identified by ``appname``.
         Use request.app.urlfor to generate the url."""
 
     def query_plugins( interface, *args, **kwargs ):
         """Query plugins in the request's context. Since every request is
-        under the context of an application, appname will be used to make the
+        under the context of an web-application, appname will be used to make the
         actual query. Will be using `IRequest.appname` attribute"""
 
     def query_plugin( interface, name, *args, **kwargs ):
         """Query plugin in the request's context. Since every request is
-        under the context of an application, appname will be used to make the
+        under the context of an web-application, appname will be used to make the
         actual query. Will be using `IRequest.appname` attribute"""
 
 
@@ -621,7 +621,7 @@ class IResponse( Interface ):
     def set_secure_cookie( name, value, expires_days=30, **kwargs ):
         """Signs and timestamps a cookie so it cannot be forged.
 
-        You must specify the ``cookie_secret`` setting in your Application
+        You must specify the ``cookie_secret`` setting in your `class`:WebApp
         to use this method. It should be a long, random sequence of bytes
         to be used as the HMAC secret for the signature.
 

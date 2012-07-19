@@ -18,7 +18,7 @@ log = logging.getLogger( __name__ )
 
 __all__ = [ 
     # Interfaces
-    'ISettings', 'IApplication',
+    'ISettings', 'IWebApp',
     # Classes
     'Plugin', 'Singleton',
     # API functions
@@ -43,14 +43,14 @@ class ISettings( Interface ):
     initialised by :class:`PluginMeta`.
     """
     appname = Attribute(
-        "Application name under whose context the plugin was instantiated. "
+        "Web-Application name under whose context the plugin was instantiated. "
         "Every plugin is instantiated under an application's context. If no "
         "application is involved (or resolved) then `ROOTAPP` is used as the "
         "plugin's application context."
     )
     app = Attribute(
-        "Application instance deriving from :class:`Plugin` implementing "
-        ":class:`IApplication` interface. The plugin implementing should be "
+        "Web-Application instance deriving from :class:`Plugin` implementing "
+        ":class:`IWebApp` interface. The plugin implementing should be "
         "correspondingly same to that of appname."
     )
     settings = Attribute(
@@ -93,15 +93,15 @@ class ISettings( Interface ):
         """
 
 
-class IApplication( Interface ):
-    """In pluggdapps, an application is a plugin, whereby, a plugin is a bunch
+class IWebApp( Interface ):
+    """In pluggdapps, Web-Application is a plugin, whereby, a plugin is a bunch
     of configuration parameters implementing one or more interface
     specification. Note that application plugins are singletons are the first
     ones to be instantiated along with platform singleton. Attributes,
         `platform`, `script`, `subdomain`
     are initialized by platform initialization code. 
 
-    There is a base class :class:`Application` which implements this interface
+    There is a base class :class:`WebApp` which implements this interface
     and provides necessary support functions for application creators.
     Therefore application plugins must derive from this base class.
     """
@@ -342,8 +342,8 @@ def default_settings():
 
 def applications():
     """Return a list of application names (which are actually plugins
-    implementing :class:`IApplication` interface."""
-    return PluginMeta._implementers[IApplication]
+    implementing :class:`IWebApp` interface."""
+    return PluginMeta._implementers[IWebApp]
 
 
 def plugins():

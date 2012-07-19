@@ -7,17 +7,17 @@
 import logging
 
 from   pluggdapps.config        import ConfigDict
-from   pluggdapps.application   import Application
+from   pluggdapps.webapp   import WebApp
 import pluggdapps.utils         as h
 
 log = logging.getLogger(__name__)
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for root application."""
+    "Configuration settings for root web-app."""
 
 
-class RootApp( Application ):
+class RootApp( WebApp ):
 
     def onboot( self, settings ):
         super().onboot( settings )

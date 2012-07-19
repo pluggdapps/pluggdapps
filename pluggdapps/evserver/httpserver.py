@@ -15,7 +15,7 @@ import ssl  # Python 2.6+
 from   pluggdapps.const import ROOTAPP
 from   pluggdapps.config import ConfigDict
 from   pluggdapps.plugin import Singleton, implements, query_plugin, \
-                                ISettings, IApplication
+                                ISettings, IWebApp
 from   pluggdapps.interfaces          import IServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
 from   pluggdapps.evserver.httpiostream import HTTPIOStream

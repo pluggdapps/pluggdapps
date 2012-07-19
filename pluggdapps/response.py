@@ -40,7 +40,7 @@ _default_settings['ICookie']  = {
     'help'    : "Plugin class implementing ICookie interface specification. "
                 "methods from this plugin will be used to process request "
                 "cookies. Overrides :class:`ICookie` if defined in "
-                "application plugin."
+                "`class`:WebApp plugin."
 }
 _default_settings['IErrorPage']     = {
     'default' : 'HTTPErrorPage',
@@ -142,7 +142,7 @@ class HTTPResponse( Plugin ):
     def set_secure_cookie( self, name, value, expires_days=30, **kwargs ):
         """Signs and timestamps a cookie so it cannot be forged.
 
-        You must specify the ``secret`` setting in your Application
+        You must specify the ``secret`` setting in your `class`:WebApp
         to use this method. It should be a long, random sequence of bytes
         to be used as the HMAC secret for the signature.
 

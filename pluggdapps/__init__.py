@@ -43,7 +43,7 @@ import pluggdapps.platform
 import pluggdapps.cookie
 import pluggdapps.request
 import pluggdapps.response
-import pluggdapps.application
+import pluggdapps.webapp
 import pluggdapps.rootapp
 import pluggdapps.errorpage
 import pluggdapps.routers

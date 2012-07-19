@@ -4,21 +4,18 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging
-from urllib.parse import urljoin
+from   urllib.parse import urljoin
 
-from pluggdapps.core import implements
-from pluggdapps.config import ConfigDict
-from pluggdapps.plugin import Plugin, Singleton, IApplication, \
-                              query_plugin , isimplement
-from pluggdapps.interfaces import IController, IRouter
+from   pluggdapps.core       import implements
+from   pluggdapps.config     import ConfigDict
+from   pluggdapps.plugin     import Singleton, IWebApp, query_plugin, isimplement
+from   pluggdapps.interfaces import IController, IRouter
 import pluggdapps.utils as h
-
-log = logging.getLogger(__name__)
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for Application base class for all applications."
+    "Configuration settings for WebApp base class inherited by all "
+    "pluggdapps web-applications."
 
 _default_settings['IRequest']  = {
     'default' : 'httprequest',
@@ -49,8 +46,8 @@ _default_settings['IRouter']  = {
                 "resolved and finally dispatched to it."
 }
 
-class Application( Singleton ):
-    implements( IApplication )
+class WebApp( Singleton ):
+    implements( IWebApp )
 
     def onboot( self, settings ):
         """Inheriting plugins should not forget to call its super() method."""

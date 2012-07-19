@@ -16,7 +16,7 @@ from   pluggdapps import packages
 from   pluggdapps.const import ROOTAPP
 from   pluggdapps.config import ConfigDict, settingsfor, loadsettings
 from   pluggdapps.plugin import Singleton, ISettings, applications, \
-                                query_plugin, query_plugins, IApplication
+                                query_plugin, query_plugins, IWebApp
 from   pluggdapps.interfaces import IRequest, IResponse
 import pluggdapps.utils as h
 import pluggdapps.log as logm
@@ -116,7 +116,7 @@ class Platform( Singleton ):
         cls.m_scripts.setdefault( '/', 'rootapp' )
 
         # Before instantiating any plugin, instantiate rootapp
-        rootapp = query_plugin( ROOTAPP, IApplication, ROOTAPP, appsettings )
+        rootapp = query_plugin( ROOTAPP, IWebApp, ROOTAPP, appsettings )
 
         # Instantiate the platform singleton
         platform = query_plugin( rootapp, ISettings, 'platform' )
@@ -124,8 +124,8 @@ class Platform( Singleton ):
         # Load applications
         # Note : All applications are expected to be singleton objects. And
         #   they are first instantiated here.
-        platform.apps = query_plugins( '', IApplication, appsettings )
-        platform.rootapp = query_plugin( ROOTAPP, IApplication, ROOTAPP )
+        platform.apps = query_plugins( '', IWebApp, appsettings )
+        platform.rootapp = query_plugin( ROOTAPP, IWebApp, ROOTAPP )
 
         # query_* calls can be made only after platform singletons and 
         # application singletons.
@@ -159,7 +159,7 @@ class Platform( Singleton ):
 
     def shutdown( self ):
         log.info( "Shutting down platform ..." )
-        for app in query_plugins( '', IApplication ) :
+        for app in query_plugins( '', IWebApp ) :
             log.debug( "Shutting down application %r ...", app.appname )
             app.shutdown( app.settings )
 
@@ -179,7 +179,7 @@ class Platform( Singleton ):
 
         # Resolve application
         (typ, key, appname) = self.appresolve( uriparts, headers, body )
-        app = query_plugin( appname, IApplication, appname )
+        app = query_plugin( appname, IWebApp, appname )
 
         # IRequest plugin
         request = query_plugin(
@@ -223,7 +223,7 @@ class Platform( Singleton ):
         Key word arguments can be used to override the computed valued."""
         app, uriparts = request.app, request.uriparts
         if appname != app.appname :     # base_url for a different app
-            app = query_plugin( appname, IApplication, appname )
+            app = query_plugin( appname, IWebApp, appname )
             if request.app.subdomain :  # strip off this app's subdomain
                 apphost = uriparts['hostname'][len(request.app.subdomain)+1:]
             else :                      # else, use the hostname as it is

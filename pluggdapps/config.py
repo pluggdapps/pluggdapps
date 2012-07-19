@@ -11,7 +11,7 @@ Dictionary of plugin configurations for each aplication. We describe here
 a hierarchy of configuration sources and its priority.
 
   * A dictionary of settings will be parsed and populated for every loaded
-    application. The settings will be organised under sections based on
+    web-app. The settings will be organised under sections based on
     plugins, modules etc... Typical structure of settings dictionary will be,
 
       { 'DEFAULT'    : { <option> : <value>, ... },
@@ -19,14 +19,14 @@ a hierarchy of configuration sources and its priority.
         ...
       }
 
-    'DEFAULT' signifies the global settings for the entire application.
+    'DEFAULT' signifies the global settings for the entire web-application.
 
-  * There is a root application defined by plugin :class:`RootApp`. DEFAULT
+  * There is a root web-app defined by plugin :class:`RootApp`. DEFAULT
     settings for `rootapp` are in general applicable to all applications.
     Sometimes they might even be applicable to platform related
     configurations.
 
-  * Since every application is also a plugin, their default settings, defined
+  * Since every web-app is also a plugin, their default settings, defined
     by :meth:`ISettings.default_settings` will be populated under ``DEFAULT``
     section of the settings dictionary.
 
@@ -35,13 +35,13 @@ a hierarchy of configuration sources and its priority.
 
   * Package default-settings can be overidden by configuring the one or more
     ini files. Pluggdapps platform is typically started using a master 
-    configuration file which can then refer to application configuration files
+    configuration file which can then refer to web-app configuration files
     and plugin configuration files.
 
   * DEFAULT section configuration from master ini file overrides
     :class:`RootApp` configuration.
 
-  * Application default-Settings can be overridden in the master ini 
+  * `class`:WebApp default-Settings can be overridden in the master ini 
     file by,
 
       [app:<appname>]
@@ -49,23 +49,23 @@ a hierarchy of configuration sources and its priority.
         ....
 
   * Master configuration file, also called platform configuration file, can 
-    specify separate configuration files for each loaded application like,
+    specify separate configuration files for each loaded web-app like,
 
      [app:<appname>]
         use = config:<app-ini-file>
     
     and all sections and its configuration inside <app-ini-file> will override
-    application's settings (including DEFAULT and plugin configurations).
+    web-application's settings (including DEFAULT and plugin configurations).
 
   * plugin section names in ini files should start with `plugin:`.
 
   * Similar to ini files, settings can also be read from web-admin's backend
     storage. If one is available, then the sections and configuration for a 
-    valid application found in the backend storage will override the
+    valid web-app found in the backend storage will override the
     applications settings parsed so far.
 
   * structure stored in web-admin's backend will be similar to this settings
-    dictionary for every valid application.
+    dictionary for every valid web-app.
 """
 
 # TODO : Write unit-test-cases.
@@ -74,7 +74,7 @@ import configparser, collections
 from   copy import deepcopy
 
 from   pluggdapps.const import ROOTAPP, DEBUG, DEFAULT_ENCODING
-from   pluggdapps.plugin import plugin_info, query_plugin, IApplication, \
+from   pluggdapps.plugin import plugin_info, query_plugin, IWebApp, \
                                 applications, default_settings
 import pluggdapps.utils as h
 
@@ -176,7 +176,7 @@ def nestedload( options ):
 
 def getsettings( app, sec=None, plugin=None, key=None ):
     if isinstance( app, str ):
-        app = query_plugin( app, IApplication, app )
+        app = query_plugin( app, IWebApp, app )
     appsett = app.settings
     sec = sec or ('plugin:'+plugin if plugin else None)
     if sec == None :

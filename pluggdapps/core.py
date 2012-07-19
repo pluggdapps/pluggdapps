@@ -112,8 +112,8 @@ class PluginMeta( type ):
                 """Component Init function hooked in by ComponentMeta.
                 Consumes ``app`` argument and initialized the plugin with
                 *args and **kwargs parameters. It also handles the special
-                case of instantiating IApplication plugins."""
-                from pluggdapps.plugin import IApplication, query_plugin
+                case of instantiating IWebApp plugins."""
+                from pluggdapps.plugin import IWebApp, query_plugin
 
                 # TODO : make `self.settings` into a read only copy
 
@@ -123,14 +123,14 @@ class PluginMeta( type ):
                 self._settngx = {}
                 pluginnm = pluginname(self)
 
-                if IApplication in type(self)._interfs : # IApplication plugin
+                if IWebApp in type(self)._interfs : # IWebApp plugin
                     self.appname, self.app = pluginnm, self
                     self.settings = deepcopy( args[0][pluginnm] )
                     self._settngx.update( self.settings['DEFAULT'] )
                 else :
                     if isinstance(app, str) :
                         self.appname = app
-                        self.app = query_plugin( app, IApplication, app )
+                        self.app = query_plugin( app, IWebApp, app )
                     else :
                         self.app = app
                         self.appname = app.appname
