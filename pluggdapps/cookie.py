@@ -2,7 +2,7 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 SKR Farms (P) LTD.
+#       Copyright (c) 2011 Netscale Computing
 
 """Cookie handling API. Basic cookie processing functions are available from
 its standard library http.cookies. This plugin implements :class:`ICookie`

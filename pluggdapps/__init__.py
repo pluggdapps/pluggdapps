@@ -2,7 +2,7 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 SKR Farms (P) LTD.
+#       Copyright (c) 2011 Netscale Computing
 
 # TODO :
 #  * Load all interface specifications and plugins defined by this package.

@@ -2,7 +2,7 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 SKR Farms (P) LTD.
+#       Copyright (c) 2011 Netscale Computing
 
 """Makes use of :mod:`pluggdapps.core` and provides a easy interface for rest
 of the source code to access plugin architecture."""
