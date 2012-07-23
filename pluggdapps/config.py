@@ -7,205 +7,104 @@
 """ 
 A note on how configuration becomes settings :
 
-Dictionary of plugin configurations for each aplication. We describe here
-a hierarchy of configuration sources and its priority.
+A dictionary of plugin (and module) configurations for each application
+instance are parsed and loaded. We describe here a hierarchy of configuration
+sources and its priority.
 
-  * A dictionary of settings will be parsed and populated for every loaded
-    web-app. The settings will be organised under sections based on
-    plugins, modules etc... Typical structure of settings dictionary will be,
+  base.ini                          *----------->mount.ini (per app instance)
+  --------                          |            ----------------------------
+                                    |      
+  [DEFAULT] ------------------------|-----* *--- [DEFAULT]
+  <option> = <value>                |     | |    <option> = <value>
+  ...                               |     | |    ...
+                                    |     | |
+  [pluggdapps]                      |     | | *- [plugin:<pluginname>]
+  <option> = <value>                |     | | |  <option> = <value>
+  ...                               |     | | |  ...
+                                    |     | | |
+  [webmounts]                       |     | | |  [plugin:...]
+  <appname> = (<type>, <value>)     |     | | |  ...
+  <appname> = (<type>, <value>, mountini) | | |
+  ...                                     | | |         Default Settings
+                                          | | |         ----------------
+  [webapp:<appname>] -------------------* **|-|---------- global_default = {
+  <option> = <value>                    | | | |           }
+  ...                                   | | | |          
+                                        | | | |       *---webapp_configdict = {
+  [webapp:...]                          | | | |       |   }
+  ...                                   | | | |       |   ...
+                                        | | | *       |   
+  [plugin:<pluginname>] ----------------|-|-|-*-----* | *-plugin_configdict = {
+  <option> = <value>                    | | |       | | | }
+  ...                                   | | |       | | | ...
+                                        | | |       | | |
+  [plugin:...]                          | | |       | | |
+  ...                                   | | |       | | |
+                                        | | |       | | |
+  Settings                              | | |       | | |
+  --------                              | | |       | | |
+   { 'DEFAULT'           : <instsett>,<-|-* |       | | |
+     ('webapp:<appname>',: <instsett>,  **--*       | | |
+      type, val, conf)                  |           | | |
+     ...                                |           | | |
+   }                                    *           | | |
+                                      *-*-----------|-* |
+                                      |             |   |
+                                      V             *--**
+             { 'DEFAULT'            : <settings>,       |
+               'plugin:<pluginname> : <settings>, <-----*
+               ...                                      
+             }                                           
+                                                         
 
-      { 'DEFAULT'    : { <option> : <value>, ... },
-        <pluginname> : { <option> : <value>, ... },
-        ...
-      }
+  Settings store
+  --------------
 
-    'DEFAULT' signifies the global settings for the entire web-application.
+   structure of settings is exactly the same as that of above `Settings`
+   except that, only overriden options are available in the key,value
+   dictionary.
 
-  * There is a root web-app defined by plugin :class:`RootApp`. DEFAULT
-    settings for `rootapp` are in general applicable to all applications.
-    Sometimes they might even be applicable to platform related
-    configurations.
-
-  * Since every web-app is also a plugin, their default settings, defined
-    by :meth:`ISettings.default_settings` will be populated under ``DEFAULT``
-    section of the settings dictionary.
-
-  * Similarly, every loaded plugin's default settings will be popluated
-    under the corresponding section of the settings dictionary.
-
-  * Package default-settings can be overidden by configuring the one or more
-    ini files. Pluggdapps platform is typically started using a master 
-    configuration file which can then refer to web-app configuration files
-    and plugin configuration files.
-
-  * DEFAULT section configuration from master ini file overrides
-    :class:`RootApp` configuration.
-
-  * `class`:WebApp default-Settings can be overridden in the master ini 
-    file by,
-
-      [app:<appname>]
-        key = value
-        ....
-
-  * Master configuration file, also called platform configuration file, can 
-    specify separate configuration files for each loaded web-app like,
-
-     [app:<appname>]
-        use = config:<app-ini-file>
-    
-    and all sections and its configuration inside <app-ini-file> will override
-    web-application's settings (including DEFAULT and plugin configurations).
-
-  * plugin section names in ini files should start with `plugin:`.
-
-  * Similar to ini files, settings can also be read from web-admin's backend
-    storage. If one is available, then the sections and configuration for a 
-    valid web-app found in the backend storage will override the
-    applications settings parsed so far.
-
-  * structure stored in web-admin's backend will be similar to this settings
-    dictionary for every valid web-app.
 """
-
-# TODO : Write unit-test-cases.
 
 import configparser, collections
 from   copy import deepcopy
 
-from   pluggdapps.const import ROOTAPP, DEBUG, DEFAULT_ENCODING
+from   pluggdapps.const  import MOUNT_TYPES
 from   pluggdapps.plugin import plugin_info, query_plugin, IWebApp, \
                                 applications, default_settings
 import pluggdapps.utils as h
 
+__all__ = [ 'loadsettings', 'ConfigDict', 'settingsfor', 'defaultsettings',
+            'app2sec', 'sec2app', 'plugin2sec', 'sec2plugin' ]
+
 def loadsettings( inifile ):
-    """Load root settings, application settings, and section-wise settings for
-    each application. Every plugin will have its own section."""
-    appsettings = default_appsettings()
+    """Load `inifile` and instance-wise ini files (for each web-app) and
+    return them as dictionary of app settings."""
+    # Load application non-application plugin's default settings.
+    appdefaults, plugindefaults = defaultsettings()
     # Override plugin defaults for each application with configuration from its
     # ini-file
-    inisettings = load_inisettings( inifile )
-    for appname, sections in list( inisettings.items() ) :
-        appsettings[appname]['DEFAULT'].update( sections['DEFAULT'] )
-        appcls = plugin_info( appname )['cls']
-        appcls.normalize_settings( appsettings[appname]['DEFAULT'] )
-        for p, sett in list( sections.items() ) :
-            sett = dict( list( sett.items() ))
-            appsettings[appname].setdefault(p, {}).update( sett )
-            if is_plugin_section(p) :
-                plugincls = plugin_info( sec2plugin(p) )['cls']
-                plugincls.normalize_settings( appsettings[appname][p] )
-    return appsettings
+    settings = with_inisettings( inifile, appdefaults, plugindefaults )
 
+    # Normalize special sections
+    settings['DEFAULT'] = normalize_global( settings['DEFAULT'] )
+    settings['pluggdapps'] = normalize_pluggdapps( settings['pluggdapps'] )
+    for instkey, sett in list( settings.items() ) :
+        if instkey in ['DEFAULT', 'pluggdapps'] : 
+            continue
+        appname,t,v,c = instkey
+        for key, values in list( sett.items() ) :
+            if key == 'DEFAULT' :   # Normalize application settings
+                cls = plugin_info( sec2app(appname) )['cls']
+            else :                  # Normalize plugin settings
+                cls = plugin_info( sec2plugin(key) )['cls']
 
-def global_appdefaults() :
-    return { 'debug' : DEBUG, 'encoding' : DEFAULT_ENCODING }
+            for b in reversed( cls.mro() ) :
+                if hasattr(b, 'normalize_settings') :
+                    values = b.normalize_settings( values )
+            sett[ key ] = values
+    return settings
 
-
-def default_appsettings():
-    """Compose `appsettings` from plugin's default settings."""
-    # Default settings for applications and plugins.
-    appdefaults = { ROOTAPP : {} }
-    plugindefaults = {}
-    appnames = applications()
-    # Fetch all the default-settings for loaded plugins using `ISettings`
-    # interface
-    for p, sett in default_settings().items() :
-        sett = dict( sett.items() )
-        if p in appnames :
-            appdefaults[ p ] = sett
-            appdefaults[ p ].update( global_appdefaults() )
-        else :
-            plugindefaults[ plugin2sec(p) ] = sett
-    # Compose `appsettings`
-    appsettings = { ROOTAPP : { 'DEFAULT' : {} } }
-    appsettings[ROOTAPP].update( deepcopy( plugindefaults ))
-    for appname in appnames :
-        sett = { 'DEFAULT' : {} }
-        sett['DEFAULT'].update( deepcopy( appdefaults[ appname ] ))
-        sett.update( deepcopy( plugindefaults ))
-        appsettings[ appname ] = sett
-    return appsettings
-
-def load_inisettings( inifile ):
-    """Parse master ini configuration file and its refered ini files to
-    construct a dictionary of settings for applications."""
-    inisettings, cp = {}, configparser.SafeConfigParser()
-    cp.read( inifile )
-    rootdefs = cp.defaults() 
-    rootsett = { 'DEFAULT' : rootdefs }
-    for secname in cp.sections() :
-        secname = secname.strip()
-        if is_app_section( secname ) :
-            appname = sec2app( secname )
-            inisettings[appname] = loadapp(rootdefs, dict( cp.items(secname)))
-        else :
-            rootsett[secname] = nestedload( dict( cp.items( secname )))
-    inisettings[ ROOTAPP ] = rootsett
-    for appname in list( inisettings.keys() ) :
-        if appname == ROOTAPP : continue
-    return inisettings
-         
-
-def loadapp( rootdefs, options ):
-    """Load application settings and section-wise settings for application
-    using `options` from master configuration file. `use` option if present
-    will be used to load application configuration."""
-    appsett = { 'DEFAULT' : deepcopy(rootdefs) }
-    appsett['DEFAULT'].update( options )
-    cp = configparser.SafeConfigParser()
-    useoption = options.get( 'use', '' )
-    if useoption.startswith( 'config:', '' ) :
-        inifile = useoption.split(':')[1].strip()
-        cp.read( inifile )
-        appsett['DEFAULT'].update( cp.defaults() )
-        appsett.update( { sec : nestedload( dict( cp.items(sec) )) }
-                        for sec in cp.sections() )
-    return appsett
-
-def nestedload( options ):
-    """Check for nested configuration file under `use` option in `options`,
-    if present parse their default section update this `options`."""
-    cp = configparser.SafeConfigParser()
-    useoption = options.get( 'use', '' )
-    if useoption.startswith( 'config:' ) :
-        inifile = useoption.split(':')[1].strip()
-        cp.read( inifile )
-        options.update( cp.defaults() )
-    return options
-
-def getsettings( app, sec=None, plugin=None, key=None ):
-    if isinstance( app, str ):
-        app = query_plugin( app, IWebApp, app )
-    appsett = app.settings
-    sec = sec or ('plugin:'+plugin if plugin else None)
-    if sec == None :
-        if key != None :
-            return appsett['DEFAULT'][key]
-        return appsett
-    elif key == None :
-        return appsett[sec]
-    else :
-        return appsett[sec][key]
-
-
-def app2sec( appname ):
-    return 'app:'+appname
-
-def plugin2sec( pluginname ):
-    return 'plugin:' + pluginname
-
-def sec2app( secname ):
-    return secname[4:]
-
-def sec2plugin( secname ):
-    return secname[7:]
-
-def is_plugin_section( secname ):
-    return secname.startswith('plugin:')
-
-def is_app_section( secname ):
-    return secname.startswith('app:')
 
 class ConfigDict( dict ):
     """A collection of configuration settings. When a fresh key, a.k.a 
@@ -283,9 +182,170 @@ class ConfigItem( dict ):
         opts = self.get( 'options', '' )
         return opts() if isinstance( opts, collections.Callable ) else opts
 
+
 def settingsfor( prefix, sett ):
     """Parse `settings` keys starting with `prefix` and return a dictionary of
     corresponding options."""
     l = len(prefix)
     return { k[l:] : sett[k] for k in sett if k.startswith(prefix) }
+
+
+#---- local functions
+
+def global_defaultsett():
+    """Global default settings that can be overriden by base configuration
+    file's 'DEFAULT' section."""
+    sett = ConfigDict()
+    sett.__doc__ = "Global configuration settings with system-wide scope."
+    sett['debug']  = {
+        'default'  : False,
+        'types'    : (bool,),
+        'help'     : "Boot and run pluggdapps system in debug mode."
+        'webconfig': False,
+    }
+
+
+def pluggdapps_defaultsett():
+    """Default settings for pluggdapps section in ini file."""
+    {}
+
+def normalize_global( sett ):
+    sett['debug'] = h.asbool( sett['debug'] )
+    return sett
+
+def normalize_pluggdapps( sett ):
+    return sett
+
+def defaultsettings():
+    """By now all interface specs and plugins would have been loaded. Collect
+    their default settings and return them as a dictionary.
+        { "plugin:<pluginname>" : default_settings,
+           ...
+        }
+    """
+    # Default settings for applications and plugins.
+    appdefaults, plugindefaults = {}, {}
+    appnames = applications()
+    # Fetch all the default-settings for loaded plugins using `ISettings`
+    # interface
+    for p, sett in default_settings().items() :
+        if p in appnames :
+            appdefaults[ app2sec(p) ] = sett
+        else :
+            plugindefaults[ plugin2sec(p) ] = sett
+    # Validation check
+    appnames_ = sorted( list( map( app2sec, appnames )))
+    if appnames_ != sorted( list( appdefaults.keys() )) :
+        raise Exception( "appnames and appdefaults do not match" )
+    return appdefaults, plugindefaults
+
+
+def with_inisettings( inifile, appdefaults, plugindefaults ):
+    """Parse master ini configuration file and its refered ini files to
+    construct a dictionary of settings for applications."""
+    cp = configparser.SafeConfigParser()
+    cp.read( inifile )
+    appnames = appdefaults.keys()
+    # Compute default settings for each application instance.
+    instdef = {}
+    instconfig = {}
+    for (name, val) in cp.items('webmounts') :
+        appname = app2sec( name )
+        if appname not in appnames : # Validate
+            raise Exception( "%r is not an application" % name )
+        # Parse values
+        y = [ x.strip() for x in val.split(',') ]
+        if len(y) == 2 :
+            (t,v,instconfig) = y + [None]
+        else :
+            (t,v,instconfig) = y
+        if t not in MOUNT_TYPES : # Validate
+            raise Exception("Type %r for %r not a valit mount type"%(t, name))
+        instkey = (appname,t,v) 
+        if instkey in instdef :
+            raise Exception("Application instance %r already defined"%instkey)
+        instdef[ instkey ] = appdefaults.pop( appname )
+        instconfig[ instkey ] = instconfig
+    # Compute default settings for unconfigured application instance.
+    for appname, sett in list( appdefaults.items() ) :
+        instkey = (appname, MOUNT_SCRIPT, "/"+appname)
+        if instkey in instdef :
+            raise Exception("Application instance %r already defined"%instkey)
+        instdef[ instkey ] = sett
+
+    # Parse the remaining master ini file and extract overriding configuration
+    # for 
+    #   global (DEFAULT), pluggdapps, webmounts, webapp and plugin
+    # sections
+    settings = { 'DEFAULT'    : global_defaultsett(),
+                 'pluggdapps' : pluggdapps_defaultsett(),
+               }
+    settings['DEFAULT'].update( dict( cp.defaults() ))
+    settings['pluggdapps'].update( dict( cp.items( 'pluggdapps' )))
+    settings['webmounts'].update( dict( cp.items( 'webmounts' )))
+
+    # Create instance-wise full settings dictionary.
+    settings = {}
+    for instkey, values in list( instdef.items() ):
+        settings[instkey] = { 'DEFAULT' : values }
+        settings.update( deepcopy( plugindefaults ))
+
+    # First load plugin configuration from master ini file to each instance
+    # settings.
+    pluginsecs = plugindefaults.keys()
+    for secname in cp.sections() :
+        if is_plugin_section( secname ) :
+            if secname not in pluginsecs :
+                raise Exception( "%r is not a valid plugin" % secname )
+            for instkey, values in list( settings.items() ) :
+                values.update( secname=dict(cp.items(secname)) )
+
+    # Load application configuration from master ini file and from instance
+    # configuration file.
+    for secname in cp.sections() :
+        if secname in [ 'pluggdapps', 'webmounts' ] : continue
+
+        if is_app_section( secname ) :
+            for (appname,t,v,c), values in list( settings.items() ) :
+                if appname == secname :
+                    s = loadinstance( values, dict(cp.items(secname)), c )
+                    settings[(appname,t,v,c)] = s
+                    break
+            else :
+                raise Exception("%r is not a valid application" % secname)
+    return settings
+
+
+def loadinstance( s, defaults, instanceini ):
+    """Load configuration settings for a web application's instance."""
+    cp = configparser.SafeConfigParser()
+    cp.read( instanceini )
+    s['DEFAULT'].update( defaults )
+    s['DEFAULT'].update( dict( cp.defaults ))
+    for secname in cp.sections() :
+        if not is_plugin_section(secname) :
+            raise Exception("%r is not a plugin" % secname)
+        if secname not in s :
+            raise Exception("plugin %r is not present" % secname)
+        s[secname].update( dict( cp.items( secname )))
+    return s
+
+
+def app2sec( appname ):
+    return 'webapp:' + appname
+
+def plugin2sec( pluginname ):
+    return 'plugin:' + pluginname
+
+def sec2app( secname ):
+    return secname[7:]
+
+def sec2plugin( secname ):
+    return secname[7:]
+
+def is_plugin_section( secname ):
+    return secname.startswith('plugin:')
+
+def is_app_section( secname ):
+    return secname.startswith('webapp:')
 

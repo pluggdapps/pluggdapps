@@ -7,29 +7,30 @@
 """Core module for pluggdapps plugin framework. It uses metaclassing to
 automagically load plugins into query-able classes. The basic idea is that
 developers can create plugin by deriving their class from :class:`Plugin`
-base class. A plugin is expected to implement one or more interfaces using the
-following declaration in the plugin class' scope.
+A plugin is expected to implement one or more interfaces using the following 
+declaration inside their plugin class' scope.
     implements( ISettings )
 
 The base class :class:`Plugin` itself is a plugin implementing
-:class:`ISettings` interface.
+:class:`ISettings` interface, thus all configuration related functions are
+auto-magically added to the plugin.
 
 There is also a :class:`Singleton` base class available for plugin authors to
 create singleton plugins. A singleton plugin is created only once for the
-entire life time of the python environment, when the plugin is queried for the
-first time. Subsequent queries will fetch the singleton instance of the
-plugin.
+entire life time of the python environment, the are instantiated when the 
+plugin is queried for the first time. Subsequent queries will fetch the 
+singleton instance of the plugin.
 
-Before any plugins can be queried, all the application singletons must be
-instantiated. This is done in the module :mod:`pluggdapps.platform`.
+Web-applications are plugins as well. Before any plugins can be queried, 
+all the application plugins must be instantiated. This is done during boot
+time. Note that there can be any number of instances for a single WebApp
+class.
 
-Every other plugins, including the platform singleton, must be instantiated in
-the context of an application.
+Every other plugins must be instantiated in the context of an application.
 
 Another interesting point to be noted is, all plugins are nothing but a bunch
 of configuration settings gathered from sources like package-defaults,
-ini-files and web-admin backend. Learn more refer :mod:`pluggdapps.config`
-module.
+ini-files and web-admin backend. Refer :mod:`pluggdapps.config` to learn more.
 
 While instantiating plugins via `query_plugin()` or `query_plugins()` method,
 passing a ``settings`` key-word argument will override plugin's settings
@@ -56,8 +57,8 @@ class PluginMeta( type ):
     """Plugin component manager."""
 
     _pluginmap = {}
-    """A map from plugin names (which is name of the class deriving Plugin base
-    class) to its information dictionary."""
+    """A map from plugin names (which is lower-cased name of the plugin class)
+    to its information dictionary."""
 
     _interfmap = {}
     """A map from interface names (which is name of the class deriving from
@@ -68,19 +69,15 @@ class PluginMeta( type ):
     class. If a plugin sub-class derives from Singleton then query_* methods
     and functions will return the same object all the time."""
 
-    # Error messages
-    err1 = 'Class `%s` derives both Interface and Plugin'
-    err2 = 'Interface %r defined multiple times in %s'
-
     def __new__( cls, name='', bases=(), d={} ):
-        new_class = type.__new__( cls, name, bases, d )
+        new_class = super().__new__( name, bases, d )
 
         if name in core_classes :
             return new_class
 
         new_class._interfs = []
-        PluginMeta._sanitizecls( name, bases, d )
         mro_bases = list( new_class.mro() )
+        PluginMeta._sanitizecls( name, mro_bases, d )
 
         if Interface in mro_bases :
             # Interface's information dictionary
@@ -109,7 +106,7 @@ class PluginMeta( type ):
                         break
 
             def masterinit( self, app, *args, **kwargs ) :
-                """Component Init function hooked in by ComponentMeta.
+                """Plugin Init function hooked in by PluginMeta.
                 Consumes ``app`` argument and initialized the plugin with
                 *args and **kwargs parameters. It also handles the special
                 case of instantiating IWebApp plugins."""
@@ -135,6 +132,7 @@ class PluginMeta( type ):
                         self.app = app
                         self.appname = app.appname
                     self.settings = deepcopy( self.app.settings )
+                    self.globalsett = 
                     self._settngx.update( self.settings['plugin:'+pluginnm] )
 
                 # Plugin settings
@@ -147,8 +145,12 @@ class PluginMeta( type ):
             new_class.__init__ = masterinit
         return new_class
 
-    @staticmethod
-    def _sanitizecls( name, bases, d ):
+    # Error messages
+    err1 = 'Class `%s` derives both Interface and Plugin'
+    err2 = 'Interface %r defined multiple times in %s'
+
+    @classmethod
+    def _sanitizecls( cls, name, bases, d ):
         """Perform sanitory checks on :class:`Plugin` derived classes."""
         if Interface in bases :
             if PluginBase in bases :
@@ -157,7 +159,7 @@ class PluginMeta( type ):
             if interf :
                 raise Exception( err2 % (name, interf['file']) )
 
-    @staticmethod
+    @classmethod
     def _interf( cls, name, bases, d ):
         """`cls` is class deriving from Interface baseclass and provides 
         specification for interface `name`."""
@@ -181,7 +183,7 @@ class PluginMeta( type ):
                 info['methods'][k] = v
         return info
 
-    @staticmethod
+    @classmethod
     def _plugin( cls, nm, bases, d ):
         """`cls` is class deriving from Plugin baseclass and implements
         interface specifications.

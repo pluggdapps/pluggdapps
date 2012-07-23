@@ -12,6 +12,12 @@ import builtins
 # TODO :
 #   * Unable to gather type of None.
 
+__all__ = [ 'ATOM_OK', 'ATOM_ERROR', 'ATOM_RESP', 'ATOM_REQ', 'ATOM_POST',
+            'ATOM_NSTR', 'ATOM_UTF8', 'ATOM_LOGERROR', 'ATOM_LOGINFO',
+            'ATOM_LOGWARN', 'ATOM_LOOPBACK', 'ATOM_APPY', 'ATOM_QUERY_PLUGIN',
+            'ATOM_PLUGIN_ATTRIBUTE', 'ATOM_PLUGIN_METHOD',
+            'Atom', 'BitString', 'decode', 'encode' ]
+
 ordnil = ord( "j" )
 
 class ErrorERLCodec( Exception ):

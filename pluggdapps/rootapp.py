@@ -19,27 +19,22 @@ _default_settings.__doc__ = \
 
 class RootApp( WebApp ):
 
-    def onboot( self, settings ):
-        super().onboot( settings )
+    def onboot( self ):
+        super().onboot()
 
-    def shutdown( self, settings ):
-        super().shutdown( settings )
+    def shutdown( self ):
+        super().shutdown()
 
     def start( self, request ):
         super().start( request )
 
     def onfinish( self, request ):
-        super().onfinish( request )
         request.onfinish()
+        super().onfinish( request )
 
     #---- ISettings interface methods
 
     @classmethod
     def default_settings( cls ):
-        _default_settings.merge( super().default_settings() )
         return _default_settings
 
-    @classmethod
-    def normalize_settings( cls, settings ):
-        settings = super().normalize_settings( settings )
-        return settings

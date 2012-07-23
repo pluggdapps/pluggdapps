@@ -62,13 +62,7 @@ class RouteAndMatch( Plugin, TraverseMixin, MatchMixin ):
 
     @classmethod
     def default_settings( cls ):
-        sett = deepcopy( _ram_settings )
-        return sett
-
-    @classmethod
-    def normalize_settings( cls, settings ):
-        sett = super().normalize_settings( settings )
-        return sett
+        return _ram_settings
 
 
 _routestatic_sett = ConfigDict()
@@ -124,11 +118,6 @@ class RouteStatic( Plugin ):
     @classmethod
     def default_settings( cls ):
         return _routestatic_sett
-
-    @classmethod
-    def normalize_settings( cls, settings ):
-        sett = super().normalize_settings( settings )
-        return sett
 
 
 #---- UnitTest

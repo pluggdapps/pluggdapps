@@ -16,7 +16,7 @@ import pluggdapps.utils as h
 # TODO :
 #   * Should we explicitly check for multi-process server and avoid reloading
 #   strategy ?
-#   * While restarting, should we also consider Platform.boot() method ?
+#   * While restarting, should we also consider pa.boot() method ?
 
 
 log = logging.getLogger( __name__ )
@@ -67,8 +67,8 @@ class Serve( Singleton ):
             self.serve( args )
 
     def serve( self, args ):
-        self.app.platform.serve()
-        self.app.platform.shutdown()
+        self.app.pa.serve()
+        self.app.pa.shutdown()
 
     def gemini( self, args ):
         """If reload is enabled, then create a thread to poll for changing
@@ -173,10 +173,9 @@ class Serve( Singleton ):
         return _default_settings
 
     @classmethod
-    def normalize_settings( cls, settings ):
-        settings['reload'] = h.asbool( settings['reload'] )
-        settings['reload.config'] = h.asbool( settings['reload.config'] )
-        settings['reload.poll_interval'] = \
-                h.asbool( settings['reload.poll_interval'] )
-        return settings
+    def normalize_settings( cls, sett ):
+        sett['reload'] = h.asbool( sett['reload'] )
+        sett['reload.config'] = h.asbool( sett['reload.config'] )
+        sett['reload.poll_interval'] = h.asbool( sett['reload.poll_interval'] )
+        return sett
 

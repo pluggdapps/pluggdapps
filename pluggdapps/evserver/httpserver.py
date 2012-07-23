@@ -2,11 +2,15 @@
 
 # Derived work from Facebook's tornado server.
 
+# IMPORTANT NOTE : This server is outdated after bolting pluggdapps with
+# netscale's erlang server. Someone clean it up and make this server as an
+# alternate option for pluggdapps.
+
 """A non-blocking, single-threaded HTTP server.
 
 Typical applications have little direct interaction with the `HTTPIOServer`
 class except to start a server at the beginning of the process
-(and even that is often done indirectly via `Platform.listen`).
+(and even that is often done indirectly via `Pluggdapps.listen`).
 """
 
 import logging, socket
@@ -195,31 +199,31 @@ class HTTPIOServer( TCPServer, Singleton ):
         return _default_settings
 
     @classmethod
-    def normalize_settings( cls, settings ):
-        settings['port']  = h.asint( 
-            settings['port'], _default_settings['port'] )
-        settings['multiprocess']  = h.asint( 
-            settings['multiprocess'], _default_settings['multiprocess'] )
-        settings['max_restart']  = h.asint( 
-            settings['max_restart'], _default_settings['max_restart'] )
-        settings['no_keep_alive'] = h.asbool(
-            settings['no_keep_alive'], _default_settings['no_keep_alive'] )
-        settings['backlog'] = h.asint(
-            settings['backlog'], _default_settings['backlog'] )
-        settings['xheaders']      = h.asbool(
-            settings['xheaders'], _default_settings['xheaders'] )
-        settings['ssloptions.cert_reqs']   = h.asint( 
-            settings['ssloptions.cert_reqs'],
+    def normalize_settings( cls, sett ):
+        sett['port']  = h.asint( 
+            sett['port'], _default_settings['port'] )
+        sett['multiprocess']  = h.asint( 
+            sett['multiprocess'], _default_settings['multiprocess'] )
+        sett['max_restart']  = h.asint( 
+            sett['max_restart'], _default_settings['max_restart'] )
+        sett['no_keep_alive'] = h.asbool(
+            sett['no_keep_alive'], _default_settings['no_keep_alive'] )
+        sett['backlog'] = h.asint(
+            sett['backlog'], _default_settings['backlog'] )
+        sett['xheaders']      = h.asbool(
+            sett['xheaders'], _default_settings['xheaders'] )
+        sett['ssloptions.cert_reqs']   = h.asint( 
+            sett['ssloptions.cert_reqs'],
             _default_settings['ssloptions.cert_reqs'] )
-        settings['poll_threshold'] = h.asint(
-            settings['poll_threshold'], _default_settings['poll_threshold'] )
-        settings['poll_timeout']   = h.asfloat( 
-            settings['poll_timeout'], _default_settings['poll_timeout'] )
-        settings['max_buffer_size'] = h.asint(
-            settings['max_buffer_size'], _default_settings['max_buffer_size'] )
-        settings['read_chunk_size'] = h.asint(
-            settings['read_chunk_size'], _default_settings['read_chunk_size'] )
-        return settings
+        sett['poll_threshold'] = h.asint(
+            sett['poll_threshold'], _default_settings['poll_threshold'] )
+        sett['poll_timeout']   = h.asfloat( 
+            sett['poll_timeout'], _default_settings['poll_timeout'] )
+        sett['max_buffer_size'] = h.asint(
+            sett['max_buffer_size'], _default_settings['max_buffer_size'] )
+        sett['read_chunk_size'] = h.asint(
+            sett['read_chunk_size'], _default_settings['read_chunk_size'] )
+        return sett
 
 
 class HTTPConnection(object):
@@ -233,7 +237,7 @@ class HTTPConnection(object):
             # Unix (or other) socket; fake the remote address
             address = ('0.0.0.0', 0)
         self.address = address
-        self.platform = query_plugin( ROOTAPP, ISettings, 'platform' )
+        self.pa = query_plugin( ROOTAPP, ISettings, 'pluggdapps' )
         self.settings = settings
         self.no_keep_alive = settings['no_keep_alive']
         self.xheaders = settings['xheaders']
@@ -280,7 +284,7 @@ class HTTPConnection(object):
         self.receiving = False
         self.responding = True
         # Resolve, compose and handle request.
-        request = self.platform.make_request( 
+        request = self.pa.makerequest( 
                 self, self.address, self.startline, self.headers, self.body )
         request.app.start( request )
         # Reset request attributes

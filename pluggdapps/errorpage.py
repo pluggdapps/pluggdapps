@@ -37,7 +37,7 @@ class HTTPErrorPage( Plugin ):
         exception may not be the "current" exception for purposes of
         methods like ``sys.exc_info()`` or ``traceback.format_exc``.
         """
-        debug = request.app.platform['debug']
+        debug = request.app.globalsett['debug']
         response = request.response
 
         if debug and "exc_info" in kwargs :
@@ -53,11 +53,6 @@ class HTTPErrorPage( Plugin ):
 
     @classmethod
     def default_settings( cls ):
-        super().default_settings()
         return _default_settings
 
-    @classmethod
-    def normalize_settings( cls, settings ):
-        sett = super().normalize_settings( settings )
-        return sett
 

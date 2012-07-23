@@ -29,17 +29,17 @@ class Mounts( Plugin ):
     def handle( self, args ):
         if args.subdomains :
             print( "Applications mounted on subdomain : \n" )
-            pprint( self.app.platform.on_subdomains )
+            pprint( self.app.pa.m_subdomains )
             print()
         elif args.scripts :
             print( "Applications mounted on script path : \n" )
-            pprint( self.app.platform.on_scripts )
+            pprint( self.app.pa.m_scripts )
             print()
         else :
             print( "Applications mounted on subdomain : \n" )
-            pprint( self.app.platform.on_subdomains )
+            pprint( self.app.pa.m_subdomains )
             print( "\nApplications mounted on script path : \n" )
-            pprint( self.app.platform.on_scripts )
+            pprint( self.app.pa.m_scripts )
             print()
 
     def _arguments( self, parser ):

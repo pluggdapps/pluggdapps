@@ -172,12 +172,10 @@ class HTTPCookie( Plugin ):
 
     @classmethod
     def default_settings( cls ):
-        super().default_settings()
         return _default_settings
 
     @classmethod
-    def normalize_settings( cls, settings ):
-        sett = super().normalize_settings( settings )
+    def normalize_settings( cls, sett ):
         sett['max_age_seconds'] = h.asint( sett['max_age_seconds'] )
         return sett
 

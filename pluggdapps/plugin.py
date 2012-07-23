@@ -98,7 +98,7 @@ class IWebApp( Interface ):
     of configuration parameters implementing one or more interface
     specification. Note that application plugins are singletons are the first
     ones to be instantiated along with platform singleton. Attributes,
-        `platform`, `script`, `subdomain`
+        `pa`, `script`, `subdomain`
     are initialized by platform initialization code. 
 
     There is a base class :class:`WebApp` which implements this interface
@@ -106,7 +106,7 @@ class IWebApp( Interface ):
     Therefore application plugins must derive from this base class.
     """
 
-    platform = Attribute(
+    pa = Attribute(
         "Platfrom plugin instance. It is a singleton object accessible to all "
         "plugins via its :attr:`ISettings.app` attribute."
     )
@@ -336,14 +336,19 @@ def pluginclass( interface, name ):
 
 def default_settings():
     """Return dictionary default settings for every loaded plugin."""
-    return { info['name'] : info['cls'].default_settings()
-             for info in PluginMeta._pluginmap.values() }
+    d = {}
+    for info in PluginMeta._pluginmap.values() :
+        for b in reversed( info['cls'].mro() ) :
+            if hasattr(b, 'default_settings') :
+                d.setdefault( info['name'], {} 
+                            ).update( dict( b.default_settings().items() ))
+    return d
 
 
 def applications():
     """Return a list of application names (which are actually plugins
     implementing :class:`IWebApp` interface."""
-    return PluginMeta._implementers[IWebApp]
+    return PluginMeta._implementers[ IWebApp ]
 
 
 def plugins():

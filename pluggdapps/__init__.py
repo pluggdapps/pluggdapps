@@ -4,9 +4,6 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-# TODO :
-#  * Load all interface specifications and plugins defined by this package.
-
 import pkg_resources as pkg
 
 # Import pluggdapps core
@@ -49,7 +46,6 @@ import pluggdapps.errorpage
 import pluggdapps.routers
 import pluggdapps.unittest
 # Load packages
-import pluggdapps.evserver
 import pluggdapps.commands
 
 # Initialize plugin data structures

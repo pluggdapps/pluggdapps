@@ -12,7 +12,7 @@ from   argparse import ArgumentParser
 import pluggdapps
 from   pluggdapps.const import ROOTAPP, DEFAULT_INI
 from   pluggdapps.core import pluginname
-from   pluggdapps.platform import Platform, platform_logs, mount_logs
+from   pluggdapps.platform import Pluggdapps, platform_logs, mount_logs
 from   pluggdapps.plugin import plugin_init, pluginnames, query_plugins, \
                                 ISettings
 from   pluggdapps.interfaces import ICommand
@@ -23,74 +23,14 @@ log = logging.getLogger(__name__)
 description = "Pluggdapps command line script."
 parser = ArgumentParser( description=description )
 
-def arguments( parser ):
-    parser.add_argument( '-c', '--config',
-                         dest='config', default=None,
-                         help="specify config file(s)" )
-    parser.add_argument( '-r', action="store_true", dest="reload",
-                         help="Restart server on file modifications" )
-    parser.add_argument( '-m', action="store_true", dest="monitor",
-                         help=( "Used by the reloader to create a monitor "
-                                "thread. Not to be used directly, use -r." ))
-    parser.add_argument( '-i', '--import', 
-                         action="append", dest='imports', default=[],
-                         help="specify modules to import")
-    parser.add_argument( '--pa', 
-                         action="append", dest='tostartpath', default=[],
-                         help="add given paths to the beginning of sys.path")
-    parser.add_argument( '--pz', 
-                         action="append", dest='toendpath', default=[],
-                         help="add given paths to the end of sys.path" )
-    return parser
-
-
-def quote_first_command_arg( arg ):
-    """There's a bug in Windows when running an executable that's located
-    inside a path with a space in it.  This method handles that case, or on
-    non-Windows systems or an executable with no spaces, it just leaves well
-    enough alone."""
-    if ( sys.platform != 'win32' or ' ' not in arg ) :
-        # Problem does not apply:
-        return arg
-    try:
-        import win32api
-    except ImportError:
-        raise ValueError(
-            "The executable %r contains a space, and in order to "
-            "handle this issue you must have the win32api module "
-            "installed" % arg )
-    arg = win32api.GetShortPathName(arg)
-    return arg
-
-def turn_sigterm_into_systemexit():
-    """Attempts to turn a SIGTERM exception into a SystemExit exception."""
-    def handle_term(signo, frame):
-        raise SystemExit
-    signal.signal(signal.SIGTERM, handle_term)
-    
-def handle_subcommand( platform, args ):
+def handle_subcommand( pa, args ):
     subcmd = pluginname( args.handler.__self__ )
     if subcmd == 'serve' and args.reload :
         handle_monitor( args )
-    platform_logs( platform )
-    mount_logs( platform )
-    platform.bootapps()
+    platform_logs( pa )
+    mount_logs( pa )
+    pa.bootapps()
     args.handler( args )
-
-def handle_monitor( args ):
-    while True : # Keep restarting !!
-        cmdargs = [ quote_first_command_arg(sys.executable) ] + sys.argv[:]
-        cmdargs[ cmdargs.index('-r') ] = '-m'   # Switch monitor
-        new_environ = os.environ.copy() 
-        try :
-            turn_sigterm_into_systemexit()
-            proc = subprocess.Popen( cmdargs, env=new_environ )
-            exit_code = proc.wait()
-            proc = None
-        finally :
-            if proc is not None :
-                os.kill( proc.pid, signal.SIGTERM )
-        log.info("Restarting gemini ...")
 
 def main():
     global parser
@@ -114,7 +54,7 @@ def main():
     else :
         loglevel = logging.ERROR
     # Load complete chain of configuration from one or more ini files.
-    platform = Platform.boot( inifile, loglevel=loglevel )
+    pa = Pluggdapps.boot( inifile, loglevel=loglevel )
 
     # setup main script arguments
     parser = arguments( parser )
@@ -136,7 +76,7 @@ def main():
     sys.path.insert( 0, '' )
     for i in args.imports : exec( "import %s" % i )
 
-    handle_subcommand( platform, args )
+    handle_subcommand( pa, args )
 
 if __name__ == '__main__' :
     main()

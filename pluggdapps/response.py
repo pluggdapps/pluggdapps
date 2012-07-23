@@ -359,8 +359,3 @@ class HTTPResponse( Plugin ):
     def default_settings( cls ):
         return _default_settings
 
-    @classmethod
-    def normalize_settings( cls, settings ):
-        sett = super().normalize_settings( settings )
-        return sett
-

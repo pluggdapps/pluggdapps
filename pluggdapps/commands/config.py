@@ -8,7 +8,7 @@ from pprint import pprint
 import logging
 
 from pluggdapps.const import ROOTAPP
-from pluggdapps.config import default_appsettings, load_inisettings
+from pluggdapps.config import defaultsettings, loadsettings
 from pluggdapps.plugin import Plugin, query_plugin, IWebApp
 from pluggdapps.core import implements, pluginname
 from pluggdapps.interfaces import ICommand
@@ -34,7 +34,7 @@ class Config( Plugin ):
         if args.defsett :
             appsett = default_appsettings()
         elif args.inisett :
-            appsett = load_inisettings( platform.inifile )
+            appsett = load_inisettings( pa.inifile )
         else :
             app = query_plugin( appname, IWebApp, appname )
             appsett = app.settings

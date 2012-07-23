@@ -55,7 +55,7 @@ class HTTPRequest( Plugin ):
         self.version = version
         self.headers = headers or h.HTTPHeaders()
         self.body = body or b""
-        self.baseurl = self.app.platform.baseurl( self )
+        self.baseurl = self.app.pa.baseurl( self )
         self.uri = h.make_url(
             self.baseurl, uriparts['path'], uriparts['query'],
             uriparts['fragment'] )
@@ -137,9 +137,4 @@ class HTTPRequest( Plugin ):
     @classmethod
     def default_settings( cls ):
         return _default_settings
-
-    @classmethod
-    def normalize_settings( cls, settings ):
-        sett = super().normalize_settings( settings )
-        return sett
 

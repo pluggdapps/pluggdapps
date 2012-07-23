@@ -14,7 +14,7 @@ import pluggdapps.utils as h
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for WebApp base class inherited by all "
+    "Configuration settings for WebApp base class inherited by all " \
     "pluggdapps web-applications."
 
 _default_settings['IRequest']  = {
@@ -49,12 +49,12 @@ _default_settings['IRouter']  = {
 class WebApp( Singleton ):
     implements( IWebApp )
 
-    def onboot( self, settings ):
+    def onboot( self ):
         """Inheriting plugins should not forget to call its super() method."""
         self.router = query_plugin( self, IRouter, self['IRouter'] )
-        self.router.onboot( settings )
+        self.router.onboot( self.settings )
 
-    def shutdown( self, settings ):
+    def shutdown( self ):
         pass
 
     def start( self, request ):
@@ -76,7 +76,7 @@ class WebApp( Singleton ):
 
     def urlfor( self, appname, request, name, *traverse, **matchdict ):
         if appname :
-            baseurl = self.platform.baseurl( request, appname=appname )
+            baseurl = self.pa.baseurl( request, appname=appname )
         else :
             baseurl = request.baseurl
         relurl = self.pathfor( request, name, *traverse, **matchdict )
@@ -94,7 +94,3 @@ class WebApp( Singleton ):
     def default_settings( cls ):
         return _default_settings
 
-    @classmethod
-    def normalize_settings( cls, settings ):
-        sett = super().normalize_settings( settings )
-        return sett
