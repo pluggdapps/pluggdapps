@@ -366,7 +366,6 @@ def query_plugins( appname, interface, *args, **kwargs ):
 
     Returns a list of plugin instance implementing `interface`
     """
-    appname = appname or ROOTAPP
     plugins = [ pcls( appname, *args, **kwargs )
                 for pcls in PluginMeta._implementers[interface].values() ]
     return plugins
@@ -382,7 +381,6 @@ def query_plugin( appname, interface, name, *args, **kwargs ):
 
     Return a single Plugin instance.
     """
-    appname = appname or ROOTAPP
     nm = pluginname(name)
     cls = PluginMeta._implementers[interface][nm]
     return cls( appname, *args, **kwargs )

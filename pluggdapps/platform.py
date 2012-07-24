@@ -54,10 +54,10 @@ class Pluggdapps( Singleton, Port ):
         system is booted via boot() call. Apps are booted only when an
         explicit call is made to this method."""
         appnames = []
-        for app in self.apps :
-            self.loginfo( "Booting application %r ..." % app.appname, [] )
-            app.onboot()
-            appnames.append( app.appname )
+        for appname in sorted( self.apps ) :
+            self.loginfo( "Booting application %r ..." % appname, [] )
+            self.apps[appname].onboot()
+            appnames.append( appname )
         return appnames
 
     def makerequest( self, conn, address, startline, headers, body ):
@@ -141,11 +141,11 @@ class Pluggdapps( Singleton, Port ):
         return url
 
     def shutdown( self ):
-        for app in self.apps :
-            self.loginfo( "Shutting down application %r ..."%app.appname, [] )
-            app.shutdown()
+        for appname in sorted( self.apps ) :
+            self.loginfo( "Shutting down application %r ..." % appname, [] )
+            self.apps[appname].shutdown()
 
-    apps = []
+    apps = {}
 
     @classmethod
     def boot( cls, inifile, *args, **kwargs ):
@@ -171,7 +171,7 @@ class Pluggdapps( Singleton, Port ):
             key, t, v, config = instkey
             appname = sec2app( key )
             app = query_plugin( appname, IWebApp, appname, appsett )
-            cls.apps.append( app )
+            cls.apps[ appname ] = app
             app.pa, app.subdomain, app.script = pa, None, None
             if t == MOUNT_SUBDOMAIN :
                 m_subdomains.setdefault( v, app )
@@ -198,8 +198,7 @@ def platform_logs( pa, levelstr='info' ) :
 
 
 def mount_logs( pa ):
-    for app in pa.apps :
-        appname = app.appname
+    for appname in sorted( pa.apps ) :
         mount = m_subdomains.get( appname, None )
         if mount :
             log.debug( "%r mounted on subdomain %r", appname, mount )

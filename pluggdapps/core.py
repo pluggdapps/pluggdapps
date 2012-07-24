@@ -5,10 +5,10 @@
 #       Copyright (c) 2011 Netscale Computing
 
 """Core module for pluggdapps plugin framework. It uses metaclassing to
-automagically load plugins into query-able classes. The basic idea is that
-developers can create plugin by deriving their class from :class:`Plugin`
-A plugin is expected to implement one or more interfaces using the following 
-declaration inside their plugin class' scope.
+automagically register and load plugins into query-able classes. The basic 
+idea is that developers can create plugin by deriving their class from 
+:class:`Plugin`. A plugin is expected to implement one or more interfaces 
+using the following declaration inside their plugin class' scope.
     implements( ISettings )
 
 The base class :class:`Plugin` itself is a plugin implementing
@@ -17,16 +17,16 @@ auto-magically added to the plugin.
 
 There is also a :class:`Singleton` base class available for plugin authors to
 create singleton plugins. A singleton plugin is created only once for the
-entire life time of the python environment, the are instantiated when the 
+entire life time of the python environment, they are instantiated when the 
 plugin is queried for the first time. Subsequent queries will fetch the 
 singleton instance of the plugin.
 
-Web-applications are plugins as well. Before any plugins can be queried, 
-all the application plugins must be instantiated. This is done during boot
+Web-applications are plugins as well. Before any plugin can be queried, 
+all application plugins must be instantiated. This is done during boot
 time. Note that there can be any number of instances for a single WebApp
 class.
 
-Every other plugins must be instantiated in the context of an application.
+Every other plugins must be instantiated in the context of an web-application.
 
 Another interesting point to be noted is, all plugins are nothing but a bunch
 of configuration settings gathered from sources like package-defaults,
@@ -35,9 +35,38 @@ ini-files and web-admin backend. Refer :mod:`pluggdapps.config` to learn more.
 While instantiating plugins via `query_plugin()` or `query_plugins()` method,
 passing a ``settings`` key-word argument will override plugin's settings
 defined by ini files and web-admin.
+
+Following data structures are preserved in memory (under the scope of
+class:`PluginMeta`),
+
+PluginMeta._interfmap =
+    { <name> : <information-dictionary>,
+      ...
+    }
+
+PluginMeta._pluginmap =
+    { <name> : <information-dictionary>,
+      ...
+    }
+
+PluginMeta._implementers =
+    { <interface-class> : { <plugin-name> : <plugin-class> ,
+                            ...
+                          },
+      ...
+    }
+
+    plugin-name is lower-cased plugin class name.
+
+Similarly to facilitate meth:`query_plugins`, interfaces implemented by a
+plugin class (and all of its base classes) are saved under the plugin class
+attribute :attr:`_interfs`,
+
+<plugin-cls>._interfs = [ <interface-class>, ... ]
+
 """
 
-import sys, inspect, logging
+import sys, inspect, io
 from   copy import deepcopy
 
 from   pluggdapps.const import ROOTAPP
@@ -57,15 +86,15 @@ class PluginMeta( type ):
     """Plugin component manager."""
 
     _pluginmap = {}
-    """A map from plugin names (which is lower-cased name of the plugin class)
+    """A map of plugin name (which is lower-cased name of the plugin class)
     to its information dictionary."""
 
     _interfmap = {}
-    """A map from interface names (which is name of the class deriving from
+    """A map of interface name (which is name of the class deriving from
     Interface base class) to its information dictionary."""
 
     _implementers = {}
-    """A map from interface class object to a map of plugin names and its 
+    """A map of interface class object to a map of plugin names and its 
     class. If a plugin sub-class derives from Singleton then query_* methods
     and functions will return the same object all the time."""
 
@@ -107,7 +136,7 @@ class PluginMeta( type ):
 
             def masterinit( self, app, *args, **kwargs ) :
                 """Plugin Init function hooked in by PluginMeta.
-                Consumes ``app`` argument and initialized the plugin with
+                Consumes ``app`` argument and initialize plugin with
                 *args and **kwargs parameters. It also handles the special
                 case of instantiating IWebApp plugins."""
                 from pluggdapps.plugin import IWebApp, query_plugin
@@ -143,6 +172,11 @@ class PluginMeta( type ):
 
             masterinit._original = init
             new_class.__init__ = masterinit
+
+        else :
+            raise Exception(
+                "Weird, class derives neither from Interface or PluginBase !!" )
+
         return new_class
 
     # Error messages
@@ -168,7 +202,6 @@ class PluginMeta( type ):
             'cls' : cls,
             'name' : name,
             'file' : clsmod.__file__ if clsmod else '',
-            'config' : {},      # Configuration dictionary for interface
             'attributes' : {},  # Map of attribute names and Attribute() object
             'methods' : {},     # Map of method names and method object
         }
@@ -193,7 +226,6 @@ class PluginMeta( type ):
             'cls'    : cls,
             'name'   : nm,
             'file'   : clsmod.__file__ if clsmod else '',
-            'config' : {}       # Configuration dictionary for plugin
         }
         return info
 
@@ -274,28 +306,44 @@ def implements( *interfaces ):
         PluginMeta._implementers.setdefault( i, {} ).setdefault( nm, '-na-' )
 
 
+def format_interfaces() :
+    """Return a list of formated 80 column output of interfaces."""
+    f = io.StringIO()
+    for name, info in PluginMeta._interfmap.items() :
+        format_interface( name, info, f )
+        f.write("\n")
+    return f.getvalue()
 
-# Unit-test
-from pluggdapps.unittest import UnitTestBase
-from pluggdapps.interfaces import IUnitTest
-from random import choice
+def format_interface( name, info, f ):
+    from  pprint import pprint
+    print( name, info['file'], file=f )
+    print( '  attributes :' )
+    pprint( info['attributes'], stream=f, indent=2 )
+    print( '  methods :' )
+    pprint( info['methods'], stream=f, indent=2 )
 
-class UnitTest_Plugin( UnitTestBase ):
+def format_plugins() :
+    """Return a list of formated 80 column output of plugins."""
+    f = io.StringIO()
+    for name, info in PluginMeta._pluginmap.items() :
+        format_plugin( name, info, f )
+        f.write("\n")
+    return f.getvalue()
 
-    def setup( self ):
-        super().setup()
 
-    def test( self ):
-        self.test_whichmodule()
-        super().test()
+def format_plugin( name, info, f ):
+    print( name, info['file'], file=f )
 
-    def teardown( self ):
-        super().teardown()
+def format_implementers():
+    """Return a list of formated 80 column output of plugin implementation
+    dictionary."""
+    f = io.StringIO()
+    for i, pmap in PluginMeta._implementers.items() :
+        format_implementer(i, pmap)
+        f.write('\n')
+    return f.getvalue()
 
-    #---- Test cases
+def format_implementer(i, pmap, f):
+    print( i.__class__.__name__, file=f )
+    pprint( pmap, stream=f, indent=2 )
 
-    def test_whichmodule( self ):
-        self.log.info("Testing whichmodule() ...")
-        assert whichmodule(UnitTest_Plugin).__name__ == 'pluggdapps.plugin'
-        assert whichmodule(self).__name__ == 'pluggdapps.plugin'
-        assert whichmodule(whichmodule).__name__ == 'pluggdapps.plugin'
