@@ -26,27 +26,22 @@ m_scripts
 
 from   configparser          import SafeConfigParser
 
-import pluggdapps
 from   pluggdapps.erlport    import Port
 from   pluggdapps.const      import ROOTAPP, MOUNT_SUBDOMAIN, MOUNT_SCRIPT
-from   pluggdapps.config     import loadsettings, sec2app
+from   pluggdapps.config     import loadsettings, sec2app, app2sec, ConfigDict
 from   pluggdapps.plugin     import Singleton, ISettings, applications, \
                                     query_plugin, query_plugins, IWebApp
 from   pluggdapps.interfaces import IRequest, IResponse
-import pluggdapps.utils as h
-
-_default_settings = ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for pluggdapps section, which has system wide "\
-    "scope."
+import pluggdapps.utils      as h
 
 settings      = {}    # Complete configuration settings
 m_subdomains  = {}    # Mapping url to application based on subdomain
 m_scripts     = {}    # Mapping url to application based on script
 
-class Pluggdapps( Singleton, Port ):
+class Pluggdapps( Port ):
 
     def __init__( self, *args, **kwargs ):
+        self.erlang = kwargs.pop( 'erlang', False )
         super().__init__( *args, **kwargs )
 
     def bootapps( self ):
@@ -54,9 +49,9 @@ class Pluggdapps( Singleton, Port ):
         system is booted via boot() call. Apps are booted only when an
         explicit call is made to this method."""
         appnames = []
-        for appname in sorted( self.apps ) :
+        for appname in sorted( self.webapps ) :
             self.loginfo( "Booting application %r ..." % appname, [] )
-            self.apps[appname].onboot()
+            self.webapps[appname].onboot()
             appnames.append( appname )
         return appnames
 
@@ -67,13 +62,13 @@ class Pluggdapps( Singleton, Port ):
 
         # Resolve application
         (typ, key, appname) = self.appresolve( uriparts, headers, body )
-        app = query_plugin( appname, IWebApp, appname )
+        webapp = self.webapps[ appname ]
 
         # IRequest plugin
         request = query_plugin(
-                        app, IRequest, app['IRequest'], conn, address, 
+                        webapp, IRequest, webapp['IRequest'], conn, address, 
                         method, uri, uriparts, version, headers, body )
-        response = query_plugin( app, IResponse, app['IResponse'], self )
+        response = query_plugin( webapp, IResponse, webapp['IResponse'], self )
         request.response = response
 
         return request
@@ -109,16 +104,16 @@ class Pluggdapps( Singleton, Port ):
         different from request's app, then base-url will be computed for the
         application `appname`.
         Key word arguments can be used to override the computed valued."""
-        app, uriparts = request.app, request.uriparts
-        if appname != app.appname :     # base_url for a different app
-            app = query_plugin( appname, IWebApp, appname )
-            if request.app.subdomain :  # strip off this app's subdomain
-                apphost = uriparts['hostname'][len(request.app.subdomain)+1:]
+        webapp, uriparts = request.webapp, request.uriparts
+        if appname != pluginname(webapp.appname): # base_url for a different app
+            webapp = self.webapps[ appname ]
+            if request.webapp.subdomain :   # strip off this app's subdomain
+                apphost = uriparts['hostname'][len(request.webapp.subdomain)+1:]
             else :                      # else, use the hostname as it is
                 apphost = uriparts['hostname']
-            if app.subdomain :
-                apphost = app.subdomain + '.' + apphost
-            app_script = app.appscript  # It might or might not be empty
+            if webapp.subdomain :
+                apphost = webapp.subdomain + '.' + apphost
+            app_script = webapp.appscript  # It might or might not be empty
         else :
             apphost, app_script = uriparts['hostname'], uriparts['script']
 
@@ -141,11 +136,12 @@ class Pluggdapps( Singleton, Port ):
         return url
 
     def shutdown( self ):
-        for appname in sorted( self.apps ) :
+        for appname in sorted( self.webapps ) :
             self.loginfo( "Shutting down application %r ..." % appname, [] )
-            self.apps[appname].shutdown()
+            self.webapps[appname].shutdown()
 
-    apps = {}
+
+    webapps = {}
 
     @classmethod
     def boot( cls, inifile, *args, **kwargs ):
@@ -162,23 +158,27 @@ class Pluggdapps( Singleton, Port ):
         settings = loadsettings( inifile )
 
         # Instiantiate `this` singleton !!
-        pa = query_plugin( ROOTAPP, ISettings, 'pluggdapps', *args, **kwargs )
+        pa = cls( *args, **kwargs )
 
         # Mount webapp instances for subdomains and scripts. ROOTAPP will not be
         # mounted.
-        for instkey, appsett in list( settings.items() ) :
-            if instkey in [ 'DEFAULT', app2sec(ROOTAPP) ] : continue
-            key, t, v, config = instkey
-            appname = sec2app( key )
-            app = query_plugin( appname, IWebApp, appname, appsett )
-            cls.apps[ appname ] = app
-            app.pa, app.subdomain, app.script = pa, None, None
+        for instkey, appsett in settings.items() :
+            if not isinstance( instkey, tuple ) : continue
+
+            appsec, t, v, config = instkey
+            if appsec == app2sec( ROOTAPP ) : continue
+
+            appname = sec2app( appsec )
+            webapp = query_plugin( instkey, IWebApp, appname )
+            cls.webapps[ appname ] = webapp
+            webapp.instkey, webapp.pa, webapp.subdomain, webapp.script = \
+                                            instkey,pa,None,None
             if t == MOUNT_SUBDOMAIN :
-                m_subdomains.setdefault( v, app )
-                app.subdomain = v
+                m_subdomains.setdefault( v, webapp )
+                webapp.subdomain = v
             elif t == MOUNT_SCRIPT :
-                m_scripts.setdefault( v, app )
-                app.script = v
+                m_scripts.setdefault( v, webapp )
+                webapp.script = v
         return pa
 
 
@@ -189,20 +189,52 @@ class Pluggdapps( Singleton, Port ):
         return _default_settings
 
 
-def platform_logs( pa, levelstr='info' ) :
-    fn = getattr( log, levelstr )
-    fn( "%s interfaces defined and %s plugins loaded",
-        len(PluginMeta._interfmap), len(PluginMeta._pluginmap) )
-    fn( "%s applications loaded", len(applications()) ) 
-    fn( "%s pluggdapps packages loaded", len(pluggdapps.packages) )
+    #---- platform logging
+
+    def logerror( self, formatstr, values ):
+        if self.erlang :
+            super( Port, self ).logerror( formatstr, values )
+        else :
+            formatstr = formatstr.replace( '~', '%' ) if values else formatstr
+            print( formatstr % values )
+
+    def logwarn( self, formatstr, values ):
+        if self.erlang :
+            super( Port, self ).logerror( formatstr, values )
+        else :
+            formatstr = formatstr.replace( '~', '%' ) if values else formatstr
+            print( formatstr % values )
+
+    def loginfo( self, formatstr, values ):
+        if self.erlang :
+            super( Port, self ).logerror( formatstr, values )
+        else :
+            formatstr = formatstr.replace( '~', '%' ) if values else formatstr
+            print( formatstr % values )
+
+    def logwarning( self, formatstr, values ):
+        if self.erlang :
+            super( Port, self ).logerror( formatstr, values )
+        else :
+            formatstr = formatstr.replace( '~', '%' ) if values else formatstr
+            print( formatstr % values )
 
 
-def mount_logs( pa ):
-    for appname in sorted( pa.apps ) :
+
+def platform_logs( pa, f ) :
+    msg = "%s interfaces defined and %s plugins loaded" % (
+           len(PluginMeta._interfmap), len(PluginMeta._pluginmap) )
+    print( msg, file=f )
+    print( "%s applications loaded" % len(applications()), file=f ) 
+    print( "%s pluggdapps packages loaded" % len(pluggdapps.packages), file=f )
+
+
+def mount_logs( pa, f ):
+    for appname in sorted( pa.webapps ) :
         mount = m_subdomains.get( appname, None )
         if mount :
-            log.debug( "%r mounted on subdomain %r", appname, mount )
+            print( "%r mounted on subdomain %r" % (appname, mount), file=f )
         else :
             mount = m_scripts.get( appname, None )
-            log.debug( "%r mounted on scripts %r", appname, mount )
+            print( "%r mounted on scripts %r" % (appname, mount), file=f )
 

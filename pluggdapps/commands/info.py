@@ -6,8 +6,7 @@
 
 import sys
 
-from   pluggdapps.core          import implements, pluginname
-from   pluggdapps.plugin        import Plugin
+from   pluggdapps.plugin        import implements, Plugin, pluginname
 from   pluggdapps.interfaces    import ICommand
 
 

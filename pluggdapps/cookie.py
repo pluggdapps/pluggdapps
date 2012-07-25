@@ -8,16 +8,14 @@
 its standard library http.cookies. This plugin implements :class:`ICookie`
 interface."""
 
-import logging, hmac, hashlib, base64
+import hmac, hashlib, base64
 from   http.cookies import CookieError, SimpleCookie
 
 from   pluggdapps.config        import ConfigDict
-from   pluggdapps.plugin        import Plugin
-from   pluggdapps.core          import implements
+from   pluggdapps.plugin        import implements, Plugin
 from   pluggdapps.interfaces    import ICookie
 import pluggdapps.utils         as h
 
-log = logging.getLogger( __name__ )
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
@@ -47,7 +45,8 @@ class HTTPCookie( Plugin ):
         try    : 
             cookies.load( headers.get('Cookie', '')  )
         except CookieError :
-            log.warning( "Unable to parse cookie : %s", headers['cookies'] )
+            self.webapp.pa.logwarn(
+                "Unable to parse cookie : %s" % headers['cookies'], [] )
         return cookies
 
     def set_cookie( self, cookies, name, value, **kwargs ) :
@@ -101,7 +100,7 @@ class HTTPCookie( Plugin ):
         Finally return a bytes value like,
             <value>|<timestamp>|<signature>
         """
-        encoding = self.app['encoding']
+        encoding = self.webapp['encoding']
         secret = self['secret'].encode( encoding )
         name = name.encode( encoding )
         value = base64.b64encode( value.encode( encoding ))
@@ -114,7 +113,7 @@ class HTTPCookie( Plugin ):
     def decode_signed_value( self, name, value ):
         if not value : return None
 
-        encoding = self.app['encoding']
+        encoding = self.webapp['encoding']
         secret = self['secret'].encode( encoding )
         name = name.encode( encoding )
         value = value.encode( encoding )
@@ -127,12 +126,12 @@ class HTTPCookie( Plugin ):
         signature = signature.encode( encoding )
 
         if not self._time_independent_equals( parts[2], signature ):
-            log.warning( "Invalid cookie signature %r", value )
+            self.webapp.pa.logwarn( "Invalid cookie signature %r" % value, [] )
             return None
 
         timestamp = int(parts[1])
         if timestamp < (time.time() - self['max_age_seconds']) :
-            log.warning( "Expired cookie %r", value )
+            self.webapp.pa.logwarn( "Expired cookie %r" % value, [] )
             return None
 
         if timestamp > (time.time() + self['max_age_seconds']) :
@@ -141,12 +140,12 @@ class HTTPCookie( Plugin ):
             # digits from the payload to the timestamp without altering the
             # signature.  For backwards compatibility, sanity-check timestamp
             # here instead of modifying _cookie_signature.
-            log.warning(
-                    "Cookie timestamp in future; possible tampering %r", value)
+            self.webapp.pa.logwarn(
+              "Cookie timestamp in future; possible tampering %r" % value, [] )
             return None
 
         if parts[1].startswith( b"0" ) :
-            log.warning("Tampered cookie %r", value)
+            self.webapp.pa.logwarn( "Tampered cookie %r" % value, [] )
         try:
             return base64.b64decode( parts[0] )
         except Exception:

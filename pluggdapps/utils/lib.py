@@ -148,96 +148,96 @@ def reseed_random():
 
 
 # Unit-test
-from pluggdapps.unittest import UnitTestBase
-from random              import choice
-
-class UnitTest_Util( UnitTestBase ):
-
-    def setup( self ):
-        super().setup()
-
-    def test( self ):
-        self.test_parsecsv()
-        self.test_parsecsvlines()
-        self.test_classof()
-        self.test_subclassof()
-        self.test_asbool()
-        self.test_asint()
-        self.test_asfloat()
-        self.test_call_entrypoint()
-        self.test_docstr()
-        self.test_timedelta_to_seconds()
-        super().test()
-
-    def teardown( self ):
-        super().teardown()
-
-    def test_parsecsv( self ):
-        self.log.info("Testing parsecsv() ...")
-        assert parsecsv('a,b,c') == ['a','b','c']
-        assert parsecsv(' a,,b,c') == ['a','b','c']
-        assert parsecsv(',a,b,c,') == ['a','b','c']
-        assert parsecsv(',,') == []
-        assert parsecsv('') == []
-
-    def test_parsecsvlines( self ):
-        self.log.info("Testing parsecsvlines() ...")
-        assert parsecsvlines('a,\nb\nc') == ['a','b','c']
-        assert parsecsvlines(' a,\n,b,c\n') == ['a','b','c']
-        assert parsecsvlines('\n,a,b,c,\n') == ['a','b','c']
-        assert parsecsvlines(',\n,') == []
-        assert parsecsvlines('\n') == []
-
-    def test_classof( self ):
-        self.log.info("Testing classof() ...")
-        assert classof( Context ) == Context
-        assert classof( Context() ) == Context
-
-    def test_subclassof( self ):
-        self.log.info("Testing subclassof() ...")
-        class Base : pass
-        class Derived( Base ) : pass
-        d = Derived()
-        assert subclassof( d, [Base] ) == Base
-        assert subclassof( d, [Base, UnitTestBase] ) == Base
-        assert subclassof( d, [UnitTestBase, Context] ) == None
-        assert subclassof( d, [] ) == None
-
-    def test_asbool( self ):
-        self.log.info("Testing asbool() ...")
-        assert asbool( 'true' ) == True
-        assert asbool( 'false' ) == False
-        assert asbool( 'True' ) == True
-        assert asbool( 'False' ) == False
-        assert asbool( True ) == True
-        assert asbool( False ) == False
-
-    def test_asint( self ):
-        self.log.info("Testing asint() ...")
-        assert asint( '10' ) == 10
-        assert asint( '10.1' ) == None
-        assert asint( '10.1', True ) == True
-
-    def test_asfloat( self ):
-        self.log.info("Testing asfloat() ...")
-        assert asfloat( '10' ) == 10.0
-        assert asfloat( 'hello' ) == None
-        assert asfloat( 'hello', 10 ) == 10
-
-    def test_timedelta_to_seconds( self ):
-        self.log.info("Testing timedelta_to_seconds() ...")
-        t1 = dt.datetime.utcnow()
-        time.sleep(2)
-        t2 = dt.datetime.utcnow()
-        assert int(timedelta_to_seconds(t2-t1)) == 2
-
-    def test_call_entrypoint( self ):
-        import pkg_resources as pkg
-        self.log.info("Testing call_entrypoint() ...")
-        dist = pkg.WorkingSet().by_key['pluggdapps']
-        info = call_entrypoint( dist, 'pluggdapps', 'package' )
-        assert info == {}
-
-    def test_docstr( self ):
-        self.log.info("Testing docstr() ...")
-        assert docstr(docstr) == "Return the doc-string for the object."
+#from pluggdapps.unittest import UnitTestBase
+#from random              import choice
+#
+#class UnitTest_Util( UnitTestBase ):
+#
+#    def setup( self ):
+#        super().setup()
+#
+#    def test( self ):
+#        self.test_parsecsv()
+#        self.test_parsecsvlines()
+#        self.test_classof()
+#        self.test_subclassof()
+#        self.test_asbool()
+#        self.test_asint()
+#        self.test_asfloat()
+#        self.test_call_entrypoint()
+#        self.test_docstr()
+#        self.test_timedelta_to_seconds()
+#        super().test()
+#
+#    def teardown( self ):
+#        super().teardown()
+#
+#    def test_parsecsv( self ):
+#        print( "Testing parsecsv() ...")
+#        assert parsecsv('a,b,c') == ['a','b','c']
+#        assert parsecsv(' a,,b,c') == ['a','b','c']
+#        assert parsecsv(',a,b,c,') == ['a','b','c']
+#        assert parsecsv(',,') == []
+#        assert parsecsv('') == []
+#
+#    def test_parsecsvlines( self ):
+#        print( "Testing parsecsvlines() ..." )
+#        assert parsecsvlines('a,\nb\nc') == ['a','b','c']
+#        assert parsecsvlines(' a,\n,b,c\n') == ['a','b','c']
+#        assert parsecsvlines('\n,a,b,c,\n') == ['a','b','c']
+#        assert parsecsvlines(',\n,') == []
+#        assert parsecsvlines('\n') == []
+#
+#    def test_classof( self ):
+#        print( "Testing classof() ..." )
+#        assert classof( Context ) == Context
+#        assert classof( Context() ) == Context
+#
+#    def test_subclassof( self ):
+#        print( "Testing subclassof() ..." )
+#        class Base : pass
+#        class Derived( Base ) : pass
+#        d = Derived()
+#        assert subclassof( d, [Base] ) == Base
+#        assert subclassof( d, [Base, UnitTestBase] ) == Base
+#        assert subclassof( d, [UnitTestBase, Context] ) == None
+#        assert subclassof( d, [] ) == None
+#
+#    def test_asbool( self ):
+#        print( "Testing asbool() ..." )
+#        assert asbool( 'true' ) == True
+#        assert asbool( 'false' ) == False
+#        assert asbool( 'True' ) == True
+#        assert asbool( 'False' ) == False
+#        assert asbool( True ) == True
+#        assert asbool( False ) == False
+#
+#    def test_asint( self ):
+#        print( "Testing asint() ..." )
+#        assert asint( '10' ) == 10
+#        assert asint( '10.1' ) == None
+#        assert asint( '10.1', True ) == True
+#
+#    def test_asfloat( self ):
+#        print( "Testing asfloat() ..." )
+#        assert asfloat( '10' ) == 10.0
+#        assert asfloat( 'hello' ) == None
+#        assert asfloat( 'hello', 10 ) == 10
+#
+#    def test_timedelta_to_seconds( self ):
+#        print( "Testing timedelta_to_seconds() ..." )
+#        t1 = dt.datetime.utcnow()
+#        time.sleep(2)
+#        t2 = dt.datetime.utcnow()
+#        assert int(timedelta_to_seconds(t2-t1)) == 2
+#
+#    def test_call_entrypoint( self ):
+#        import pkg_resources as pkg
+#        print( "Testing call_entrypoint() ..." )
+#        dist = pkg.WorkingSet().by_key['pluggdapps']
+#        info = call_entrypoint( dist, 'pluggdapps', 'package' )
+#        assert info == {}
+#
+#    def test_docstr( self ):
+#        print( "Testing docstr() ..." )
+#        assert docstr(docstr) == "Return the doc-string for the object."

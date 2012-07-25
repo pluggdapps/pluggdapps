@@ -4,15 +4,14 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging, re
+import re
 
-from pluggdapps.const import URLSEP
-from pluggdapps.plugin import interface
-from pluggdapps.interfaces import IRouter
-from pluggdapps.views import HTTPNotFound
-import pluggdapps.utils as h
-
-log = logging.getLogger( __name__ )
+from   pluggdapps.const      import URLSEP
+from   pluggdapps.config     import settingsfor
+from   pluggdapps.plugin     import interface
+from   pluggdapps.interfaces import IRouter
+from   pluggdapps.views      import HTTPNotFound
+import pluggdapps.utils      as h
 
 class BaseMixin( object ):
 
@@ -67,7 +66,7 @@ class TraverseMixin( BaseMixin ):
         traversewith, routers = self['traversewith'], []
         if traversewith :
             interf = interface( traversewith )
-            routers = query_plugins( self.app, interf )
+            routers = query_plugins( self.webapp, interf )
         for router in routers :
             if router.segment == None :
                 raise h.Error(
@@ -79,12 +78,12 @@ class TraverseMixin( BaseMixin ):
 
         # If a router is configured for every segment name, then query and
         # initialize them for the corresponding segment name.
-        segments = h.settingsfor( 'traverse.', self )
-        for segment, routername in segments :
-            router = query_plugin( self.app, IRouter, routername )
-            router.segment = segment
-            router.onboot( settings )
-            self.traversals[segment] = router
+        segments = settingsfor( 'traverse.', self )
+        #for segment, routername in segments :
+        #    router = query_plugin( self.webapp, IRouter, routername )
+        #    router.segment = segment
+        #    router.onboot( settings )
+        #    self.traversals[segment] = router
 
     def lookup_traversal( self, request, c ):
         try : # Probe for current segment and remaining segment
@@ -132,7 +131,7 @@ class MatchMixin( BaseMixin ):
             request.view_name = name
             cb = view['view_callable']
             if isinstance( cb, str ):
-                v = query_plugin( self.app, IController, cb )
+                v = query_plugin( self.webapp, IController, cb )
             elif callable(cb) :
                 v = cb
             else:

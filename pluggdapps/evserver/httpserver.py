@@ -13,7 +13,7 @@ class except to start a server at the beginning of the process
 (and even that is often done indirectly via `Pluggdapps.listen`).
 """
 
-import logging, socket
+import socket
 import ssl  # Python 2.6+
 
 from   pluggdapps.const import ROOTAPP
@@ -30,8 +30,6 @@ import pluggdapps.utils.stack_context as sc
 #   * All Internet-based HTTP/1.1 servers MUST respond with a 400 (Bad Request)
 #   status code to any HTTP/1.1 request message which lacks a Host header
 #   field.
-
-log = logging.getLogger( __name__ )
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
@@ -237,7 +235,7 @@ class HTTPConnection(object):
             # Unix (or other) socket; fake the remote address
             address = ('0.0.0.0', 0)
         self.address = address
-        self.pa = query_plugin( ROOTAPP, ISettings, 'pluggdapps' )
+        self.pa = query_plugin( None, ISettings, 'pluggdapps' )
         self.settings = settings
         self.no_keep_alive = settings['no_keep_alive']
         self.xheaders = settings['xheaders']
@@ -284,7 +282,7 @@ class HTTPConnection(object):
         self.receiving = False
         self.responding = True
         # Resolve, compose and handle request.
-        request = self.pa.makerequest( 
+        request = self.webapp.pa.makerequest( 
                 self, self.address, self.startline, self.headers, self.body )
         request.app.start( request )
         # Reset request attributes
@@ -358,7 +356,7 @@ class HTTPConnection(object):
             self.dispatch()
 
         except h.Error as e:
-            log.warn("Malformed HTTP request from %s: %s", self.address[0], e)
+            #log.warn("Malformed HTTP request from %s: %s", self.address[0], e)
             self.stream.close()
             self.receiving = False
             return

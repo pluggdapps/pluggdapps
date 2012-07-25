@@ -4,18 +4,15 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-from pprint import pprint
-import logging
+from   pprint import pprint
 
-from pluggdapps.const import ROOTAPP
-from pluggdapps.config import defaultsettings, loadsettings
-from pluggdapps.plugin import Plugin, query_plugin, IWebApp
-from pluggdapps.core import implements, pluginname
-from pluggdapps.interfaces import ICommand
-import pluggdapps.utils as h
+from   pluggdapps.config     import defaultsettings, loadsettings, app2sec, \
+                                    sec2app, plugin2sec, sec2plugin
+from   pluggdapps.plugin     import implements, IWebApp, Plugin, pluginname
+from   pluggdapps.platform   import Pluggdapps
+from   pluggdapps.interfaces import ICommand
+import pluggdapps.utils      as h
 
-
-log = logging.getLogger(__name__)
 
 class Config( Plugin ):
     implements( ICommand )
@@ -30,29 +27,65 @@ class Config( Plugin ):
         self._arguments( self.subparser )
 
     def handle( self, args ):
-        appname = args.appname or ROOTAPP
-        if args.defsett :
-            appsett = default_appsettings()
-        elif args.inisett :
-            appsett = load_inisettings( pa.inifile )
-        else :
-            app = query_plugin( appname, IWebApp, appname )
-            appsett = app.settings
+        from  pluggdapps.platform import Pluggdapps, settings
+        if args.modname :
+            print( "Settings for module %r" % args.modname )
+            pprint( settings.get( args.modname, None ))
+            return
 
-        plugin = args.plugin and ('plugin:' + args.plugin)
-        if plugin in appsett :
-            pprint( appsett[plugin] )
+        if args.defsett :
+            appdefaults, plugindefaults = defaultsettings()
+            if args.appname :
+                print( "Default settings for web-app %r" % args.appname )
+                pprint( appdefaults.get( app2sec(args.appname), None ))
+            if args.plugin :
+                print( "Default settings for plugin %r" % args.plugin )
+                pprint( plugindefaults.get( plugin2sec(args.plugin), None ))
+            if (args.plugin, args.appname) == (None, None) :
+               print( "Default settings for all web-apps" )
+               pprint( appdefaults )
+               print( "Default settings for all plugins" )
+               pprint( plugindefaults )
+
         else :
-            pprint( appsett )
+            if args.appname :
+                webapp = Pluggdapps.webapps.get( args.appname, None )
+                if webapp == None :
+                    raise Exception( "Web-app %r is not found" % args.appname )
+                instsett = settings.get( webapp.instkey, {} )
+
+            if args.appname and args.plugin :
+                s = instsett.get( plugin2sec(args.plugin), None )
+                print( "%r plugin settings for application %r" % (
+                       args.plugin, args.appname) )
+                pprint( s )
+
+            elif args.plugin :
+                s = settings.get( plugin2sec(args.plugin), None )
+                print( "%r plugin settings" % args.plugin )
+                pprint( s )
+
+            elif args.appname :
+                print( "Application settings for %r" % args.appname )
+                pprint( instsett )
+
+            else :
+                print( "Full settings" )
+                pprint( settings )
+
 
     def _arguments( self, parser ):
-        parser.add_argument( "-a", dest="appname", default=None,
+        parser.add_argument( "-a", 
+                             dest="appname", default=None,
                              help="application's settings" )
-        parser.add_argument( "-p", dest="plugin", default=None,
+        parser.add_argument( "-m", 
+                             dest="modname", default=None,
+                             help="module settings" )
+        parser.add_argument( "-p", 
+                             dest="plugin", default=None,
                              help="plugin's settings" )
-        parser.add_argument( "-d", action="store_true", dest="defsett",
+        parser.add_argument( "-d", action="store_true", 
+                             dest="defsett",
                              help="Show default settings" )
-        parser.add_argument( "-i", action="store_true", dest="inisett",
-                             help="Show Ini settings" )
         return parser
 

@@ -4,7 +4,7 @@
 
 """TCPServer using non-blocking evented polling loop."""
 
-import os, socket, errno, logging, stat
+import os, socket, errno, stat
 import ssl  # Python 2.6+
 
 from   pluggdapps.const import ROOTAPP
@@ -14,8 +14,6 @@ from   pluggdapps.evserver.httpioloop import HTTPIOLoop
 from   pluggdapps.evserver.httpiostream import HTTPIOStream, HTTPSSLIOStream
 import pluggdapps.utils as h
 
-
-log = logging.getLogger( __name__ )
 
 class TCPServer( object ):
     """A non-blocking, single-threaded "Mixin class" implementing TCP server.
@@ -105,10 +103,10 @@ class TCPServer( object ):
         sett = self.sett
 
         if sett['multiprocess'] <= 0:  # Single process
-            log.info("Starting server in single process mode ...")
+            #log.info("Starting server in single process mode ...")
             self.listen()
         else :                      # multi-process
-            log.info("Starting server in multi process mode ...")
+            #log.info("Starting server in multi process mode ...")
             sockets = bind_sockets( 
                         sett['port'], sett['host'], None, sett['backlog'] )
             process.fork_processes( sett['multiprocess'], sett['max_restart'] )
@@ -160,7 +158,8 @@ class TCPServer( object ):
                 stream = HTTPIOStream( conn, address, self.ioloop, self.sett ) 
             self.handle_stream( stream, address )
         except Exception:
-            log.error("Error in connection callback", exc_info=True)
+            #log.error("Error in connection callback", exc_info=True)
+            pass
 
 
 def bind_sockets( port, address, family, backlog ):
@@ -195,7 +194,7 @@ def bind_sockets( port, address, family, backlog ):
             socket.getaddrinfo(
                 address, port, family, socket.SOCK_STREAM, 0, flags))
     for res in addrinfo :
-        log.info("Binding socket for %s", res)
+        #log.info("Binding socket for %s", res)
         af, socktype, proto, canonname, sockaddr = res
         sock = socket.socket(af, socktype, proto)
         h.set_close_exec(sock.fileno())
@@ -211,10 +210,10 @@ def bind_sockets( port, address, family, backlog ):
             # Python 2.x on windows doesn't have IPPROTO_IPV6.
             if hasattr(socket, "IPPROTO_IPV6"):
                 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-        log.debug( "Set server socket to non-blocking mode ..." )
+        #log.debug( "Set server socket to non-blocking mode ..." )
         sock.setblocking(0) # Set to non-blocking.
         sock.bind(sockaddr)
-        log.debug( "Server listening with a backlog of %s", backlog )
+        #log.debug( "Server listening with a backlog of %s", backlog )
         sock.listen(backlog)
         sockets.append(sock)
     return sockets
@@ -237,6 +236,6 @@ def add_accept_handler( sock, callback, ioloop ):
                 if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                     return
                 raise
-            log.info( "Accepting new connection from %s", address )
+            #log.info( "Accepting new connection from %s", address )
             callback( connection, address )
     ioloop.add_handler( sock.fileno(), accept_handler, HTTPIOLoop.READ )

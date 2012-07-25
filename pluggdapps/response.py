@@ -4,13 +4,11 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging
 import http.client, itertools
 import datetime as dt
 
 from   pluggdapps.config        import ConfigDict
-from   pluggdapps.core          import implements
-from   pluggdapps.plugin        import Plugin, query_plugin
+from   pluggdapps.plugin        import implements, Plugin, query_plugin
 from   pluggdapps.interfaces    import IResponse, IResponseTransformer, \
                                        ICookie, IErrorPage
 import pluggdapps.utils.stack_context as sc
@@ -21,8 +19,6 @@ import pluggdapps.utils         as h
 #   2. Browser locale.
 #   3. clear_cookie() method doesn't seem to use expires field to remove the
 #      cookie from browser. Should we try that implementation instead ?
-
-log = logging.getLogger(__name__)
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
@@ -55,8 +51,6 @@ class HTTPResponse( Plugin ):
     """HTTP response status code."""
 
     def __init__( self, request ):
-        # Attributes from request
-        self.app = request.app
         # Book keeping
         self._status_code = 200
         self._headers = {}
@@ -70,7 +64,7 @@ class HTTPResponse( Plugin ):
         # Cookies
         self.cookies = Cookie.SimpleCookie()
         self.cookie_plugin = request.query_plugin(
-                ICookie, self['ICookie'] or self.app['ICookie'] )
+                ICookie, self['ICookie'] or self.webapp['ICookie'] )
         # Start from a clean slate
         self.clear()
         self.context = h.Context()
@@ -268,7 +262,7 @@ class HTTPResponse( Plugin ):
 
     def onfinish( self ):
         self._finished = True
-        self.app.onfinish( self.request )
+        self.webapp.onfinish( self.request )
     
     def httperror( self, status_code=500, **kwargs ):
         """Sends the given HTTP error code to the browser.
@@ -281,15 +275,13 @@ class HTTPResponse( Plugin ):
         It is the responsibility of the caller to finish the request by
         calling :method:`IResponse.finish`."""
         if self._headers_written :
-            log.error( "Cannot send error response after headers written" )
+            self.webapp.pa.logerror(
+                    "Cannot send error response after headers written" )
             return
         self.clear()
         self.set_status( status_code )
         errorpage = self.request.query_plugin( IErrorPage, 'httperrorpage' )
-        try:
-            return errorpage.render( self.request, status_code, **kwargs )
-        except Exception:
-            log.error( "Uncaught exception in write_error", exc_info=True )
+        return errorpage.render( self.request, status_code, **kwargs )
         return
 
     def redirect( self, url, permanent=False, status=None ):

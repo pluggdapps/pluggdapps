@@ -4,19 +4,15 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging
 from copy import deepcopy
 
-from pluggdapps.const import URLSEP
-from pluggdapps.config import ConfigDict
-from pluggdapps.plugin import Plugin
-from pluggdapps.core import implements
-from pluggdapps.interfaces import IRouter, IResource
-from pluggdapps.views import HTTPNotFound
-from pluggdapps.routermixins import TraverseMixin, MatchMixin
-import pluggdapps.utils as h
-
-log = logging.getLogger( __name__ )
+from   pluggdapps.const        import URLSEP
+from   pluggdapps.config       import ConfigDict
+from   pluggdapps.plugin       import implements, Plugin
+from   pluggdapps.interfaces   import IRouter, IResource
+from   pluggdapps.views        import HTTPNotFound
+from   pluggdapps.routermixins import TraverseMixin, MatchMixin
+import pluggdapps.utils        as h
 
 _ram_settings = ConfigDict()
 _ram_settings.__doc__ = \
@@ -52,7 +48,7 @@ class RouteAndMatch( Plugin, TraverseMixin, MatchMixin ):
         super().onboot( settings )
 
     def route( request, c ):
-        res = query_plugin( self.app, IResource, self['IResource'] )
+        res = query_plugin( self.webapp, IResource, self['IResource'] )
         res( request, c )
         view = self.fetchview( request, c )
         view = HTTPNotFound if view == None else view
@@ -93,7 +89,7 @@ class RouteStatic( Plugin ):
 
     def onboot( self, settings ):
         if 'docroot' not in self :
-            path = h.sourcepath( self.app )
+            path = h.sourcepath( self.webapp )
             paths = [ join( dirname(path), 'static' ),
                       join( dirname( dirname(path) ), 'static' )
                     ]
@@ -107,7 +103,7 @@ class RouteStatic( Plugin ):
             self['docroot'] = self['docroot'].rstrip( URLSEP )
 
     def route( request, c ):
-        res = query_plugin( self.app, IResource, self['IResource'] )
+        res = query_plugin( self.webapp, IResource, self['IResource'] )
         res( request, c )
         view = self.fetchview( request, c )
         return view

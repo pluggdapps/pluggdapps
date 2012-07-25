@@ -4,22 +4,18 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging, os, fcntl, signal, sys, time, threading, traceback
+import os, fcntl, signal, sys, time, threading, traceback
 
-from pluggdapps.const import ROOTAPP
-from pluggdapps.config import ConfigDict
-from pluggdapps.core import implements, pluginname
-from pluggdapps.plugin import Singleton, query_plugin, ISettings
-from pluggdapps.interfaces import ICommand
-import pluggdapps.utils as h
+from   pluggdapps.config     import ConfigDict
+from   pluggdapps.plugin     import implements, ISettings, Singleton, pluginname
+from   pluggdapps.interfaces import ICommand
+import pluggdapps.utils      as h
 
 # TODO :
 #   * Should we explicitly check for multi-process server and avoid reloading
 #   strategy ?
 #   * While restarting, should we also consider pa.boot() method ?
 
-
-log = logging.getLogger( __name__ )
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = (
@@ -67,8 +63,8 @@ class Serve( Singleton ):
             self.serve( args )
 
     def serve( self, args ):
-        self.app.pa.serve()
-        self.app.pa.shutdown()
+        self.webapp.pa.serve()
+        self.webapp.pa.shutdown()
 
     def gemini( self, args ):
         """If reload is enabled, then create a thread to poll for changing
@@ -83,7 +79,7 @@ class Serve( Singleton ):
         self.serve( args )
 
     def pollthread( self, args ):
-        log.info( "Periodic poll started" )
+        # log.info( "Periodic poll started" )
         while True:
             if self.pollthread_checkfiles( args ) == True :
                 # use os._exit() here and not sys.exit() since within a
@@ -119,7 +115,7 @@ class Serve( Singleton ):
             if filename not in self.module_mtimes :
                 self.module_mtimes[filename] = mtime
             elif self.module_mtimes[filename] < mtime:
-                log.info( "Detected a change in %r ..." % filename )
+                # log.info( "Detected a change in %r ..." % filename )
                 return True
         return False
 
@@ -146,7 +142,8 @@ class Serve( Singleton ):
                     sys.exit(status)
 
     def _watch_handler( signum, frame ):
-        log.info("file changed; reloading...")
+        # log.info("file changed; reloading...")
+
         # use os._exit() here and not sys.exit() since within a thread 
         # sys.exit() just closes the given thread and won't kill the process;
         # note os._exit does not call any atexit callbacks, nor does it do 

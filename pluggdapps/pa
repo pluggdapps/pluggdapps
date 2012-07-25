@@ -6,65 +6,62 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import sys, os, signal, subprocess, logging
-from   argparse import ArgumentParser
+import sys, os, signal, subprocess
+from   argparse     import ArgumentParser
+from   os.path      import dirname, join
 
 import pluggdapps
-from   pluggdapps.const import ROOTAPP, DEFAULT_INI
-from   pluggdapps.core import pluginname
-from   pluggdapps.platform import Pluggdapps, platform_logs, mount_logs
-from   pluggdapps.plugin import plugin_init, pluginnames, query_plugins, \
-                                ISettings
+from   pluggdapps.const      import ROOTAPP, DEFAULT_INI
+from   pluggdapps.platform   import Pluggdapps, platform_logs, mount_logs
+from   pluggdapps.plugin     import plugin_init, pluginnames, query_plugins,\
+                                    ISettings, pluginname
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
-log = logging.getLogger(__name__)
-
-description = "Pluggdapps command line script."
-parser = ArgumentParser( description=description )
-
-def handle_subcommand( pa, args ):
-    subcmd = pluginname( args.handler.__self__ )
-    if subcmd == 'serve' and args.reload :
-        handle_monitor( args )
-    platform_logs( pa )
-    mount_logs( pa )
-    pa.bootapps()
-    args.handler( args )
+DEFAULT_INI = join( dirname(__file__), 'tests', 'confs', 'develop.ini' )
 
 def main():
-    global parser
-    # Fetch ini file (configuration file) from sys.argv, if not supplied use
-    # the default ini-file.
-    argv = sys.argv[:]
-    try :
-        while argv :
-            arg = argv.pop(0)
-            if arg == '-c' :
-                inifile = argv.pop(0)
-                break
-        else :
-            inifile = DEFAULT_INI
-    except :
-        inifile = DEFAULT_INI
-
-    nolog_cmds = ['serve', 'unittest']
-    if any( c in sys.argv for c in nolog_cmds ) :
-        loglevel = None
-    else :
-        loglevel = logging.ERROR
-    # Load complete chain of configuration from one or more ini files.
-    pa = Pluggdapps.boot( inifile, loglevel=loglevel )
-
     # setup main script arguments
-    parser = arguments( parser )
-    subparsers = parser.add_subparsers( help="Sub-commands" )
+    description = "Pluggdapps command line script."
+    mainparser = ArgumentParser( description=description )
+    mainparser.add_argument( '-c',
+                             dest='config', default=DEFAULT_INI,
+                             help="specify config file(s)" )
+    mainparser.add_argument( '-r', 
+                             action="store_true", dest="reload",
+                             help="Restart server on file modifications" )
+    mainparser.add_argument( '-m',
+                             action="store_true", dest="monitor",
+                             help=( "Used by the reloader to create a monitor "
+                                    "thread. Not to be used directly, use -r." )
+                           )
+    mainparser.add_argument( '-i',
+                             action="append", dest='imports', default=[],
+                             help="specify modules to import" )
+    mainparser.add_argument( '--pa', 
+                             action="append", dest='tostartpath', default=[],
+                             help="add given paths to the beginning of sys.path"
+                           )
+    mainparser.add_argument( '--pz', 
+                             action="append", dest='toendpath', default=[],
+                             help="add given paths to the end of sys.path" )
+
+    subcommands = query_plugins( None, ICommand, 'commands' )
+
+    subcmdnames = list( map( pluginname, subcommands ))
+    cmdargs = []
+    for x in sys.argv[1:] :
+        if x in subcmdnames : break
+        cmdargs.append( x )
+    args = mainparser.parse_args( cmdargs )
+    pa = Pluggdapps.boot( args.config )
 
     # setup sub-command arguments
-    subcommands = query_plugins( ROOTAPP, ICommand, 'commands' )
-    [ subcmd.subparser( parser, subparsers ) for subcmd in subcommands ]
+    subcommands = query_plugins( None, ICommand, 'commands' )
+    subparsers = mainparser.add_subparsers( help="Sub-commands" )
+    [ subcmd.subparser( mainparser, subparsers ) for subcmd in subcommands ]
 
-    args = parser.parse_args()
+    args = mainparser.parse_args()
 
     # --pa option
     [ sys.path.insert(0, p) for p in args.tostartpath ]
@@ -76,7 +73,11 @@ def main():
     sys.path.insert( 0, '' )
     for i in args.imports : exec( "import %s" % i )
 
-    handle_subcommand( pa, args )
+    pa.bootapps()   # Boot applications
+
+    # Handle subcommand
+    args.handler( args )
+
 
 if __name__ == '__main__' :
     main()

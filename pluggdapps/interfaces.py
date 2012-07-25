@@ -4,18 +4,15 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import socket, logging
+import socket
 
-from pluggdapps.core import Interface, Attribute
-from pluggdapps.plugin import ISettings, IWebApp
+from pluggdapps.plugin import Interface, Attribute
 
 __all__ = [
     'ICommand', 'IServer', 'IRouter', 'IResource', 'ICookie', 'IRequest',
     'IController', 'IErrorPage', 'IRenderer', 'IResponse', 
     'IResponseTransformer', 'IUnitTest',
 ]
-
-log = logging.getLogger(__name__)
 
 class ICommand( Interface ):
     """Handle sub-commands issued from command line script. The general
@@ -332,8 +329,9 @@ class IRequest( Interface ):
         "values are in string."
     )
     baseurl = Attribute(
-        "Computed base url for the request under web-application request.app. "
-        "This attribute can also be used as web-application url."
+        "Computed base url for the request under web-application "
+        "request.webapp. This attribute can also be used as web-application "
+        "url."
     )
     version = Attribute(
         "HTTP protocol version specified in request, e.g. 'HTTP/1.1'"
@@ -468,14 +466,14 @@ class IRequest( Interface ):
         """Callback for asyncrhonous finish()."""
 
     def urlfor( name, *traverse, **matchdict ) :
-        """Use request.app.urlfor to generate the url."""
+        """Use request.webapp.urlfor to generate the url."""
 
     def pathfor( name, *traverse, **matchdict ) :
-        """Use request.app.pathfor to generate the url."""
+        """Use request.webapp.pathfor to generate the url."""
 
     def appurl( appname, name, *traverse, **matchdict ) :
         """Generate url for different web-application identified by ``appname``.
-        Use request.app.urlfor to generate the url."""
+        Use request.webapp.urlfor to generate the url."""
 
     def query_plugins( interface, *args, **kwargs ):
         """Query plugins in the request's context. Since every request is

@@ -7,12 +7,14 @@
 import pkg_resources as pkg
 
 # Import pluggdapps core
-import pluggdapps.core
+import pluggdapps.const
+import pluggdapps.utils       as h
+import pluggdapps.config
 import pluggdapps.plugin
+import pluggdapps.platform
 import pluggdapps.interfaces
 
-from   pluggdapps.plugin import plugin_init
-import pluggdapps.utils  as h
+from   pluggdapps.plugin      import plugin_init
 
 __version__ = '0.1dev'
 
@@ -36,15 +38,16 @@ for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
     packages.append( pkgname )
 
 # Load modules
-import pluggdapps.platform
 import pluggdapps.cookie
-import pluggdapps.request
-import pluggdapps.response
-import pluggdapps.webapp
-import pluggdapps.rootapp
 import pluggdapps.errorpage
+import pluggdapps.ncloud
+import pluggdapps.request
+import pluggdapps.resource
+import pluggdapps.response
+import pluggdapps.rootapp
 import pluggdapps.routers
-import pluggdapps.unittest
+import pluggdapps.views
+import pluggdapps.webapp
 # Load packages
 import pluggdapps.commands
 

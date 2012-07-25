@@ -4,12 +4,10 @@
 
 """A utility class to write to and read from a non-blocking socket."""
 
-import sys, os, re, collections, errno, logging, socket, ssl
+import sys, os, re, collections, errno, socket, ssl
 
 import pluggdapps.utils as h
 import pluggdapps.utils.stack_context as sc
-
-log = logging.getLogger( __name__ )
 
 class HTTPIOStream( object ):
     r"""A utility class to write to and read from a non-blocking socket.
@@ -73,8 +71,8 @@ class HTTPIOStream( object ):
             # localhost, so handle them the same way as an error
             # reported later in _handle_connect.
             if e.args[0] not in (errno.EINPROGRESS, errno.EWOULDBLOCK):
-                log.warning( 
-                    "Connect error on fd %d: %s", self.socket.fileno(), e )
+                #log.warning( 
+                #    "Connect error on fd %d: %s", self.socket.fileno(), e )
                 self.close()
                 return
         self._connect_callback = sc.wrap(callback)
@@ -150,7 +148,7 @@ class HTTPIOStream( object ):
 
     def close(self):
         """Close this stream."""
-        log.debug( "Closing the stream from %r ...", self.address )
+        #log.debug( "Closing the stream from %r ...", self.address )
         if self.socket is not None:
             if self._read_until_close:
                 callback = self._read_callback
@@ -188,7 +186,7 @@ class HTTPIOStream( object ):
 
     def _handle_events(self, fd, events):
         if not self.socket:
-            log.warning( "Got events for closed stream %d", fd )
+            #log.warning( "Got events for closed stream %d", fd )
             return
         try:
             if events & self.ioloop.READ:
@@ -220,7 +218,7 @@ class HTTPIOStream( object ):
                 self._state = state
                 self.ioloop.update_handler(self.socket.fileno(), self._state)
         except Exception:
-            log.error( "Uncaught exception, closing connection.", exc_info=True )
+            #log.error( "Uncaught exception, closing connection.", exc_info=True )
             self.close()
             raise
 
@@ -230,8 +228,8 @@ class HTTPIOStream( object ):
             try:
                 callback(*args)
             except Exception:
-                log.error(
-                    "Uncaught exception, closing connection.", exc_info=True )
+                #log.error(
+                #    "Uncaught exception, closing connection.", exc_info=True )
                 # Close the socket on an uncaught exception from a user 
                 # callback (It would eventually get closed when the socket 
                 # object is gc'd, but we don't want to rely on gc happening 
@@ -284,7 +282,7 @@ class HTTPIOStream( object ):
             finally:
                 self._pending_callbacks -= 1
         except Exception:
-            log.warning( "error on read", exc_info=True )
+            #log.warning( "error on read", exc_info=True )
             self.close()
             return
         if self._read_from_buffer():
@@ -345,7 +343,7 @@ class HTTPIOStream( object ):
             chunk = self._read_from_socket()
         except socket.error as e:
             # ssl.SSLError is a subclass of socket.error
-            log.warning( "Read error on %d: %s", self.socket.fileno(), e )
+            #log.warning( "Read error on %d: %s", self.socket.fileno(), e )
             self.close()
             raise
         if chunk is None:
@@ -353,7 +351,7 @@ class HTTPIOStream( object ):
         self._read_buffer.append(chunk)
         self._read_buffer_size += len(chunk)
         if self._read_buffer_size >= self.max_buffer_size :
-            log.error( "Reached maximum read buffer size" )
+            #log.error( "Reached maximum read buffer size" )
             self.close()
             raise IOError("Reached maximum read buffer size")
         return len(chunk)
@@ -425,9 +423,10 @@ class HTTPIOStream( object ):
             # an error state before the socket becomes writable, so
             # in that case a connection failure would be handled by the
             # error path in _handle_events instead of here.
-            log.warning( 
-                "Connect error on fd %d: %s", self.socket.fileno(), 
-                errno.errorcode[err] )
+
+            #log.warning( 
+            #    "Connect error on fd %d: %s", self.socket.fileno(), 
+            #    errno.errorcode[err] )
             self.close()
             return
         if self._connect_callback is not None:
@@ -466,8 +465,8 @@ class HTTPIOStream( object ):
                     self._write_buffer_frozen = True
                     break
                 else:
-                    log.warning(
-                            "Write error on %d: %s", self.socket.fileno(), e )
+                    #log.warning(
+                    #        "Write error on %d: %s", self.socket.fileno(), e )
                     self.close()
                     return
         if not self._write_buffer and self._write_callback:
@@ -573,7 +572,7 @@ class HTTPSSLIOStream( HTTPIOStream ):
                                  ssl.SSL_ERROR_ZERO_RETURN):
                 return self.close()
             elif err.args[0] == ssl.SSL_ERROR_SSL:
-                log.warning( "SSL Error on %d: %s", self.socket.fileno(), err )
+                #log.warning( "SSL Error on %d: %s", self.socket.fileno(), err )
                 return self.close()
             raise
         except socket.error as err:

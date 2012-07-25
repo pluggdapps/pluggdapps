@@ -4,16 +4,11 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging
-
-from   pluggdapps.const         import ROOTAPP
 from   pluggdapps.config        import ConfigDict
-from   pluggdapps.core          import implements, pluginname
-from   pluggdapps.plugin        import Plugin, query_plugins
+from   pluggdapps.plugin        import implements, Plugin, query_plugins,\
+                                       pluginname
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
-
-log = logging.getLogger(__name__)
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
@@ -42,7 +37,7 @@ class Commands( Plugin ):
         self.subparser.set_defaults( handler=self.handle )
 
     def handle( self, args ):
-        commands = query_plugins( ROOTAPP, ICommand )
+        commands = query_plugins( None, ICommand )
         commands = sorted( commands, key=lambda x : pluginname(x) )
         for command in commands :
             rows = self._formatdescr(pluginname(command), command.description)

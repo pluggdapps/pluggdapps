@@ -4,15 +4,9 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging
-
-from pluggdapps.const import ROOTAPP
-from pluggdapps.core import implements, pluginname
-from pluggdapps.plugin import Plugin, query_plugins
-from pluggdapps.interfaces import ICommand, IUnitTest
-from pluggdapps.unittest import UnitTestBase
-
-log = logging.getLogger(__name__)
+from pluggdapps.plugin      import implements, Plugin, query_plugins, pluginname
+from pluggdapps.platform    import Pluggdapps
+from pluggdapps.interfaces  import ICommand, IUnitTest
 
 class UnitTest( Plugin ):
     implements( ICommand )
@@ -27,9 +21,7 @@ class UnitTest( Plugin ):
         self._arguments( self.subparser )
 
     def handle( self, args ):
-        for case in query_plugins( ROOTAPP, IUnitTest ) :
-            if case.__class__ == UnitTestBase :
-                continue
+        for case in query_plugins( None, IUnitTest ) :
             if args.testname == '' :
                 self._run_testcase( case )
             elif args.testname.lower() == pluginname(case) :
@@ -41,7 +33,6 @@ class UnitTest( Plugin ):
         return parser
 
     def _run_testcase( self, case ):
-        log.info( "---- %s ----", pluginname(case) )
         case.setup()
         case.test()
         case.teardown()

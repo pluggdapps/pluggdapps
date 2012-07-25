@@ -22,7 +22,6 @@ Notes :
 import os, sys, traceback, argparse, site, time
 from   os.path  import dirname, join, abspath
 
-
 def run( port ):
     """Read loop, read and handle request methods, until the port is closed."""
     while True :
@@ -255,6 +254,7 @@ if __name__ == '__main__' :
     # Avoid ``[Errno 13] Permission denied: '/var/www/.python-eggs'`` messages
     os.environ['PYTHON_EGG_CACHE'] = join( pa_dir(), 'egg-cache' )
 
+    import pluggdapps
     from   pluggdapps.erlcodec import *
     from   pluggdapps.platform import Pluggdapps
 
@@ -265,6 +265,6 @@ if __name__ == '__main__' :
     else : 
         descrs = (0,1)
     port = Pluggdapps.boot( descrs=descrs, packet=int(args.packet), 
-                            compressed=args.compressed )
+                            compressed=args.compressed, erlang=True )
     run( port )
 

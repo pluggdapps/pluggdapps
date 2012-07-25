@@ -6,12 +6,12 @@
 
 """HTTP utility functions."""
 
-import logging, re, sys, calendar, email, hashlib, socket
-from collections import UserDict
-import datetime as dt
+import re, sys, calendar, email, hashlib, socket
+from   collections  import UserDict
+import datetime     as dt
+from   urllib.parse import urlsplit, unquote, parse_qs, urlunsplit, quote, \
+                           urlencode, urljoin
 import urllib.request, urllib.error
-from urllib.parse import urlsplit, unquote, parse_qs, urlunsplit, quote, \
-                         urlencode, urljoin
 
 from pluggdapps.utils.exc import Error
 from pluggdapps.utils.lib import parsecsv
@@ -25,8 +25,6 @@ __all__ = [
     'convert_header_value', 'compute_etag', 'HTTPFile', 
     'HTTPHeaders', 'url_concat', 'parse_multipart_form_data',
 ]
-
-log = logging.getLogger( __name__ )
 
 
 def _valid_ip( ip ):
@@ -61,10 +59,11 @@ def parse_startline( startline ):
     try :
         method, uri, version = [ x.strip(' \t') for x in startline.split(" ") ]
     except :
-        log.error("Malformed HTTP version in HTTP Request-Line %r", startline)
+        raise Exception(
+                "Malformed HTTP version in HTTP Request-Line %r" % startline )
         method = uri = version = None
     if not version.startswith("HTTP/") :
-        log.error( "Unknown HTTP Version %r", version )
+        raise Exception( "Unknown HTTP Version %r" % version )
     return method, uri, version
 
 def parse_url( uri, host=None, scheme=None ):
@@ -272,7 +271,8 @@ def parse_body( method, headers, body ):
                     files.update( files )
                     break
             else:
-                log.warning( "Invalid multipart/form-data" )
+                # log.warning( "Invalid multipart/form-data" )
+                pass
     return arguments, files
 
 
@@ -300,17 +300,17 @@ def parse_multipart_form_data( boundary, data ):
             continue
         eoh = part.find(b"\r\n\r\n")
         if eoh == -1:
-            log.warning( "multipart/form-data missing headers" )
+            # log.warning( "multipart/form-data missing headers" )
             continue
         headers = HTTPHeaders.parse( part[:eoh].decode("utf-8") )
         disp_header = headers.get( "Content-Disposition", "" )
         disposition, disp_params = _parse_header(disp_header)
         if disposition != "form-data" or not part.endswith(b"\r\n"):
-            log.warning( "Invalid multipart/form-data" )
+            # log.warning( "Invalid multipart/form-data" )
             continue
         value = part[eoh + 4:-2]
         if not disp_params.get("name"):
-            log.warning( "multipart/form-data value missing name" )
+            # log.warning( "multipart/form-data value missing name" )
             continue
         name = disp_params["name"]
         if disp_params.get("filename"):
@@ -406,7 +406,7 @@ class HTTPHeaders( dict ):
     def __init__( self, *args, **kwargs ):
         # Don't pass args or kwargs to dict.__init__, as it will bypass
         # our __setitem__
-        super().__init__()
+        super().__init__( *args, **kwargs )
         self._as_list = {}
         self._last_key = None
         if args and isinstance( args[0], HTTPHeaders ) :   # Copy constructor

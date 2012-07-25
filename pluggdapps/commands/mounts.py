@@ -5,14 +5,11 @@
 #       Copyright (c) 2011 Netscale Computing
 
 from   pprint     import pprint
-import logging
 
-from   pluggdapps.core          import implements, pluginname
-from   pluggdapps.plugin        import Plugin
+from   pluggdapps.plugin        import implements, Plugin, pluginname
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
-log = logging.getLogger( __name__ )
 
 class Mounts( Plugin ):
     implements( ICommand )
@@ -27,19 +24,20 @@ class Mounts( Plugin ):
         self._arguments( self.subparser )
 
     def handle( self, args ):
+        from  pluggdapps.platform import m_subdomains, m_scripts
         if args.subdomains :
-            print( "Applications mounted on subdomain : \n" )
-            pprint( self.app.pa.m_subdomains )
+            print( "Applications mounted on subdomain : " )
+            pprint( m_subdomains )
             print()
         elif args.scripts :
-            print( "Applications mounted on script path : \n" )
-            pprint( self.app.pa.m_scripts )
+            print( "Applications mounted on script path : " )
+            pprint( m_scripts )
             print()
         else :
-            print( "Applications mounted on subdomain : \n" )
-            pprint( self.app.pa.m_subdomains )
-            print( "\nApplications mounted on script path : \n" )
-            pprint( self.app.pa.m_scripts )
+            print( "Applications mounted on subdomain : " )
+            pprint( m_subdomains )
+            print( "\nApplications mounted on script path : " )
+            pprint( m_scripts )
             print()
 
     def _arguments( self, parser ):

@@ -12,13 +12,11 @@ events.  `HTTPIOLoop.add_timeout` is a non-blocking alternative to
 `time.sleep`.
 """
 
-import datetime, errno, heapq, logging, time
+import datetime, errno, heapq, time
 import os, select, _thread, threading, traceback, signal
 
 import pluggdapps.utils as h
 import pluggdapps.utils.stack_context as sc
-
-log = logging.getLogger( __name__ )
 
 class HTTPIOLoop( object ):
     """A level-triggered I/O loop using Linux epoll and requires python 3."""
@@ -67,7 +65,7 @@ class HTTPIOLoop( object ):
         """Create a pipe that we send bogus data to when we want to wake
         the I/O loop when it is idle."""
 
-        log.debug( "Adding poll-loop waker ..." )
+        # log.debug( "Adding poll-loop waker ..." )
         self.add_handler(
             self._waker.fileno(), lambda fd, events: self._waker.consume(),
             self.READ )
@@ -80,8 +78,9 @@ class HTTPIOLoop( object ):
         self._handlers[fd] = sc.wrap(handler)
         self._evpoll.register( fd, events | self.ERROR )
         if len(self._handlers) > self.poll_threshold :
-            log.warning( 
-              "Polled descriptors exceeded threshold %r", self.poll_threshold )
+            #log.warning( 
+            #  "Polled descriptors exceeded threshold %r", self.poll_threshold )
+            pass
 
     def update_handler( self, fd, events ):
         """Changes the events we listen for fd."""
@@ -94,7 +93,8 @@ class HTTPIOLoop( object ):
         try:
             self._evpoll.unregister(fd)
         except (OSError, IOError):
-            log.debug( "Error deleting fd from HTTPIOLoop", exc_info=True )
+            #log.debug( "Error deleting fd from HTTPIOLoop", exc_info=True )
+            pass
 
 
     #---- Manage timeout handlers on this epoll using heap queue.
@@ -168,7 +168,8 @@ class HTTPIOLoop( object ):
         The exception itself is not passed explicitly, but is available
         in sys.exc_info.
         """
-        log.error( "Exception in callback %r", callback, exc_info=True )
+        #log.error( "Exception in callback %r", callback, exc_info=True )
+        pass
 
     #---- Shutdown methods
 
@@ -197,7 +198,8 @@ class HTTPIOLoop( object ):
                 try:
                     os.close(fd)
                 except Exception:
-                    log.debug( "error closing fd %s", fd, exc_info=True )
+                    #log.debug( "error closing fd %s", fd, exc_info=True )
+                    pass
         self._waker.close()
         self._evpoll.close()
 
@@ -219,7 +221,7 @@ class HTTPIOLoop( object ):
         Note that even after `stop` has been called, the HTTPIOLoop is not
         completely stopped until `HTTPIOLoop.start` has also returned.
         """
-        log.debug("Stopping poll loop ...")
+        #log.debug("Stopping poll loop ...")
         self._running = False
         self._stopped = True
         self._waker.wake()  # Wake the ioloop
@@ -242,8 +244,8 @@ class HTTPIOLoop( object ):
         If action is None, the process will be killed if it is blocked for
         too long."""
         if not hasattr( signal, "setitimer"):
-            log.error( "set_blocking_signal_threshold requires a signal module "
-                       "with the setitimer method"  )
+            #log.error( "set_blocking_signal_threshold requires a signal module "
+            #            "with the setitimer method"  )
             return
         self._blocking_signal_threshold = seconds
         if seconds is not None:
@@ -261,9 +263,10 @@ class HTTPIOLoop( object ):
         """Signal handler to log the stack trace of the current thread.
 
         For use with set_blocking_signal_threshold."""
-        log.warning( 'HTTPIOLoop blocked for %f seconds in\n%s',
-                     self._blocking_signal_threshold, 
-                     ''.join(traceback.format_stack(frame)) )
+        #log.warning( 'HTTPIOLoop blocked for %f seconds in\n%s',
+        #              self._blocking_signal_threshold, 
+        #             ''.join(traceback.format_stack(frame)) )
+        pass
 
 
     #---- Perform evented polling.
@@ -350,11 +353,13 @@ class HTTPIOLoop( object ):
                         # Happens when the client closes the connection
                         pass
                     else:
-                        log.error( "Exception in I/O handler for fd %s",
-                                   fd, exc_info=True )
+                        #log.error( "Exception in I/O handler for fd %s",
+                        #           fd, exc_info=True )
+                        pass
                 except Exception:
-                    log.error( "Exception in I/O handler for fd %s",
-                               fd, exc_info=True )
+                    #log.error( "Exception in I/O handler for fd %s",
+                    #           fd, exc_info=True )
+                    pass
         # reset the stopped flag so another start/stop pair can be issued
         self._stopped = False
         if self._blocking_signal_threshold is not None:
@@ -421,7 +426,8 @@ class PeriodicCallback( object ):
         try:
             self.callback()
         except Exception:
-            log.error("Error in periodic callback", exc_info=True)
+            #log.error("Error in periodic callback", exc_info=True)
+            pass
         self._schedule_next()
 
     def _schedule_next( self ):
@@ -461,22 +467,3 @@ class Waker( object ):
         self.reader.close()
         self.writer.close()
 
-
-# Unit test cases
-
-from  pluggdapps.unittest import UnitTestBase
-
-class HTTPIOLoopUnitTest( UnitTestBase ):
-
-    def test( self ):
-        #ioloop = HTTPIOLoop()
-        #_waker = Wake()
-        #print _waker.fileno()
-        #assert _waker
-        #assert bool( _waker.fileno() )
-        #def consume( fd, events ):
-        #    print fd, events
-        #    print _waker.consume()
-        #ioloop.add_handler( self._waker.fileno(), consume, self.READ )
-        #assert _waker.wake()
-        pass

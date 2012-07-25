@@ -4,10 +4,6 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging
-
-log = logging.getLogger( __name__ )
-
 def HTTPNotFound( request, c ):
     res = request.response
     res.set_status( 404 )
@@ -18,7 +14,7 @@ def HTTPNotFound( request, c ):
 def HTTPServiceUnavailable( request, c ):
     res = request.response
     res.set_status( 503 )
-    res.set_header( request.app.pa['retry_after'] )
+    res.set_header( request.webapp.pa['retry_after'] )
     res.write()
     res.flush()
     res.finish()

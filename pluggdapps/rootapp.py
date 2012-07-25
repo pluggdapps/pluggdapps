@@ -4,13 +4,9 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import logging
-
-from   pluggdapps.config        import ConfigDict
+from   pluggdapps.config   import ConfigDict
 from   pluggdapps.webapp   import WebApp
-import pluggdapps.utils         as h
-
-log = logging.getLogger(__name__)
+import pluggdapps.utils    as h
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \

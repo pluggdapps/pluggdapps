@@ -4,17 +4,14 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import socket, time, logging, re
+import socket, time, re
 from   urllib.parse import urlunsplit
-from   copy import deepcopy
+from   copy         import deepcopy
 
-from pluggdapps.config import ConfigDict
-import pluggdapps.utils as h
-from pluggdapps.core import implements
-from pluggdapps.plugin import Plugin, query_plugin
-from pluggdapps.interfaces import IRequest, IResponse, ICookie
-
-log = logging.getLogger(__name__)
+from   pluggdapps.config     import ConfigDict
+import pluggdapps.utils      as h
+from   pluggdapps.plugin     import implements, Plugin, query_plugin
+from   pluggdapps.interfaces import IRequest, IResponse, ICookie
 
 _default_settings = ConfigDict()
 _default_settings.__doc__ = \
@@ -43,8 +40,8 @@ class HTTPRequest( Plugin ):
         self.finishedat = None
         xheaders = getattr( conn, 'xheaders', None ) if conn else None
 
-        self.cookie_plugin = \
-            self.query_plugin(ICookie, self['ICookie'] or self.app['ICookie'])
+        self.cookie_plugin = self.query_plugin(
+                                    self.webapp, ICookie, self['ICookie'] )
         
         # Socket attributes
         self.connection = conn
@@ -55,7 +52,7 @@ class HTTPRequest( Plugin ):
         self.version = version
         self.headers = headers or h.HTTPHeaders()
         self.body = body or b""
-        self.baseurl = self.app.pa.baseurl( self )
+        self.baseurl = self.webapp.pa.baseurl( self )
         self.uri = h.make_url(
             self.baseurl, uriparts['path'], uriparts['query'],
             uriparts['fragment'] )
@@ -111,19 +108,19 @@ class HTTPRequest( Plugin ):
         self.finishedat = time.time()
 
     def query_plugin( self, *args, **kwargs ):
-        return query_plugin( self.app, *args, **kwargs )
+        return query_plugin( self.webapp, *args, **kwargs )
 
     def query_plugins( self, *args, **kwargs ):
-        return query_plugin( self.app, *args, **kwargs )
+        return query_plugin( self.webapp, *args, **kwargs )
 
     def urlfor( name, *traverse, **matchdict ):
-        return self.app.urlfor( None, self, name, *traverse, **matchdict )
+        return self.webapp.urlfor( None, self, name, *traverse, **matchdict )
 
     def pathfor( name, *traverse, **matchdict ):
-        return self.app.pathfor( self, name, *traverse, **matchdict )
+        return self.webapp.pathfor( self, name, *traverse, **matchdict )
 
     def appurl( appname, name, *traverse, **matchdict ):
-        return self.app.urlfor( appname, self, name *traverse, **matchdict )
+        return self.webapp.urlfor( appname, self, name *traverse, **matchdict )
 
     def __repr__( self ):
         attrs = ( "uriparts", "address", "body" )

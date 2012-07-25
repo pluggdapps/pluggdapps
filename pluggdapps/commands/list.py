@@ -5,12 +5,11 @@
 #       Copyright (c) 2011 Netscale Computing
 
 from   pprint import pprint
+import os.path
 
-from   pluggdapps.core import PluginMeta, implements, pluginname
-from   pluggdapps.plugin import Plugin
+from   pluggdapps.plugin import PluginMeta, implements, Plugin, pluginname
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
-
 
 class List( Plugin ):
     implements( ICommand )
@@ -37,43 +36,43 @@ class List( Plugin ):
             self._listinterfs( args )
 
     def _arguments( self, parser ):
-        parser.add_argument( "-I", "--interfaces",
-                             action="store_true", dest="listinterfs",
+        parser.add_argument( "-I", action="store_true", 
+                             dest="listinterfs",
                              help="List interfaces defined" )
-        parser.add_argument( "-P", "--plugins",
-                             action="store_true", dest="listplugins",
+        parser.add_argument( "-P", action="store_true",
+                             dest="listplugins",
                              help="List plugins defined" )
-        parser.add_argument( "-i", dest="interface",
+        parser.add_argument( "-i",
+                             dest="interface",
                              help="List interface definition" )
-        parser.add_argument( "-p", dest="plugin",
+        parser.add_argument( "-p",
+                             dest="plugin",
                              help="List plugin definition" )
         return parser
 
     def _listinterfs( self, args ):
-        for iname, info in list( PluginMeta._interfmap.items() ) :
+        l = sorted( list( PluginMeta._interfmap.items() ))
+        for iname, info in l :
             print(( "%s in %r" % (iname, info['file']) ))
             for line in h.docstr( info['cls'] ).splitlines() :
-                print(( "    ", line.strip() ))
+                print( "    ", line.strip() )
             print()
 
     def _listplugins( self, args ):
-        for pname, info in list( PluginMeta._pluginmap.items() ) :
-            print(( "%-15s: defined as %r in %r" % (
-                        pname, info['name'], info['file']) ))
+        l = sorted( list( PluginMeta._pluginmap.items() ))
+        for pname, info in l :
+            print(( "%-15s: in %r" % ( pname, info['file']) ))
 
     def _listinterf( self, args ):
         nm = args.interface
         info = PluginMeta._interfmap.get( nm, None )
         if info == None :
-            print(( "Interface %r not defined" % nm ))
+            print( "Interface %r not defined" % nm )
         else :
-            print(( "%-15s: defined as %r in %r" % (
-                        nm, info['name'], info['file']) ))
-            print( "\nConfiguration dictionary" )
-            pprint( info['config'] )
-            print( "\nAttribute dictionary" )
+            print( "\n%-15s " % nm )
+            print( "\nAttribute dictionary : " )
             pprint( info['attributes'] )
-            print( "\nMethod dictionary" )
+            print( "\nMethod dictionary : " )
             pprint( info['methods'] )
 
     def _listplugin( self, args ):
@@ -84,6 +83,4 @@ class List( Plugin ):
         else :
             print(( "%-15s: defined as %r in %r" % (
                         nm, info['name'], info['file']) ))
-            print( "\nConfiguration dictionary" )
-            pprint( info['config'] )
 

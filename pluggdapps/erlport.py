@@ -16,7 +16,7 @@ formats = { 1: "B", 2: ">H", 4: ">I" }
 
 class Port( object ):
 
-    def __init__( self, descrs=True, packet=4, compressed=False ):
+    def __init__( self, descrs=(3,4), packet=4, compressed=False ):
         self._format = formats.get( packet, None )
         if self._format is None :
             raise Exception("Invalid packet size %r" % packet)
@@ -84,6 +84,9 @@ class Port( object ):
 
     def logerror( self, formatstr, values ):
         self.post( ATOM_LOGERROR, formatstr, values )
+
+    def logwarn( self, formatstr, values ):
+        self.post( ATOM_LOGINFO, formatstr, values )
 
     def loginfo( self, formatstr, values ):
         self.post( ATOM_LOGINFO, formatstr, values )

@@ -4,11 +4,9 @@
 
 """Utilities for working with multiple processes."""
 
-import os, sys, time, logging, errno
+import os, sys, time, errno
 
 import pluggdapps.utils as h
-
-log = logging.getLogger( __name__ )
 
 _task_id = None
 
@@ -43,7 +41,7 @@ def fork_processes( num_processes, max_restarts ):
     children = {}
 
     def start_child(i):
-        log.info( "Starting http connection process process, taskid %s", i )
+        #log.info( "Starting http connection process process, taskid %s", i )
         pid = os.fork()
         if pid == 0:
             # child process
@@ -75,13 +73,15 @@ def fork_processes( num_processes, max_restarts ):
 
         id = children.pop(pid)
         if os.WIFSIGNALED(status):
-            log.warning( "child %d (pid %d) killed by signal %d, restarting",
-                         id, pid, os.WTERMSIG(status) )
+            #log.warning( "child %d (pid %d) killed by signal %d, restarting",
+            #             id, pid, os.WTERMSIG(status) )
+            pass
         elif os.WEXITSTATUS(status) != 0:
-            log.warning( "child %d (pid %d) exited with status %d, restarting",
-                         id, pid, os.WEXITSTATUS(status) )
+            #log.warning( "child %d (pid %d) exited with status %d, restarting",
+            #             id, pid, os.WEXITSTATUS(status) )
+            pass
         else:
-            log.info( "child %d (pid %d) exited normally", id, pid )
+            #log.info( "child %d (pid %d) exited normally", id, pid )
             continue
 
         num_restarts += 1

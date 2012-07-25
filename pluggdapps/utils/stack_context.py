@@ -53,9 +53,7 @@ Here are a few rules of thumb for when it's necessary:
   block that references your `StackContext`.
 """
 
-import contextlib, functools, itertools, sys, threading, logging
-
-log = logging.getLogger( __name__ )
+import contextlib, functools, itertools, sys, threading
 
 class _State(threading.local):
     def __init__(self):

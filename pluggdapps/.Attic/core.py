@@ -67,9 +67,9 @@ attribute :attr:`_interfs`,
 """
 
 import sys, inspect, io
-from   copy import deepcopy
+from   pprint               import pprint
 
-from   pluggdapps.const import ROOTAPP
+from   pluggdapps.const     import ROOTAPP
 
 __all__ = [ 
     # Helper functions
@@ -99,7 +99,7 @@ class PluginMeta( type ):
     and functions will return the same object all the time."""
 
     def __new__( cls, name='', bases=(), d={} ):
-        new_class = super().__new__( name, bases, d )
+        new_class = super().__new__( cls, name, bases, d )
 
         if name in core_classes :
             return new_class
@@ -139,7 +139,10 @@ class PluginMeta( type ):
                 Consumes ``app`` argument and initialize plugin with
                 *args and **kwargs parameters. It also handles the special
                 case of instantiating IWebApp plugins."""
-                from pluggdapps.plugin import IWebApp, query_plugin
+                # TODO : Optimize the following imports
+                from pluggdapps.platform import settings, Pluggdapps
+                from pluggdapps.plugin   import IWebApp
+                from pluggdapps.config   import app2sec, plugin2sec
 
                 # TODO : make `self.settings` into a read only copy
 
@@ -150,19 +153,22 @@ class PluginMeta( type ):
                 pluginnm = pluginname(self)
 
                 if IWebApp in type(self)._interfs : # IWebApp plugin
-                    self.appname, self.app = pluginnm, self
-                    self.settings = deepcopy( args[0][pluginnm] )
+                    appname, self.webapp = pluginnm, self
+                    self.settings = settings[ app2sec(appname) ]
                     self._settngx.update( self.settings['DEFAULT'] )
                 else :
                     if isinstance(app, str) :
-                        self.appname = app
-                        self.app = query_plugin( app, IWebApp, app )
+                        self.webapp = Pluggdapps.webapp.get( app, None )
+                        self.settings = self.webapp.settings
+                    elif app :
+                        self.webapp = app
+                        self.settings = self.webapp.settings
                     else :
-                        self.app = app
-                        self.appname = app.appname
-                    self.settings = deepcopy( self.app.settings )
-                    self.globalsett = 
-                    self._settngx.update( self.settings['plugin:'+pluginnm] )
+                        self.webapp = None
+                        self.settings = {}
+                    self._settngx.update( 
+                            self.settings[ plugin2sec(pluginnm) ] )
+                self.globalsett = settings
 
                 # Plugin settings
                 self._settngx.update( kwargs.pop( 'settings', {} ))
@@ -194,12 +200,12 @@ class PluginMeta( type ):
                 raise Exception( err2 % (name, interf['file']) )
 
     @classmethod
-    def _interf( cls, name, bases, d ):
-        """`cls` is class deriving from Interface baseclass and provides 
+    def _interf( cls, newcls, name, bases, d ):
+        """`newcls` is class deriving from Interface baseclass and provides 
         specification for interface `name`."""
-        clsmod = whichmodule( cls )
+        clsmod = whichmodule( newcls )
         info = {
-            'cls' : cls,
+            'cls' : newcls,
             'name' : name,
             'file' : clsmod.__file__ if clsmod else '',
             'attributes' : {},  # Map of attribute names and Attribute() object
@@ -217,13 +223,13 @@ class PluginMeta( type ):
         return info
 
     @classmethod
-    def _plugin( cls, nm, bases, d ):
-        """`cls` is class deriving from Plugin baseclass and implements
+    def _plugin( cls, newcls, nm, bases, d ):
+        """`newcls` is class deriving from Plugin baseclass and implements
         interface specifications.
         """
-        clsmod = whichmodule( cls )
+        clsmod = whichmodule( newcls )
         info = {
-            'cls'    : cls,
+            'cls'    : newcls,
             'name'   : nm,
             'file'   : clsmod.__file__ if clsmod else '',
         }
@@ -266,12 +272,11 @@ class PluginBase( object, metaclass=PluginMeta ):
             name = pluginname(cls)
             singleton = PluginBase._singletons.get( name, None )
             if singleton == None :
-                self = super().__new__( cls, *args, **kwargs )
-                return PluginBase._singletons.setdefault( name, self )
-            else :
-                return singleton
+                self = super().__new__( *args, **kwargs )
+                singleton = PluginBase._singletons.setdefault( name, self )
+            return singleton
         else :
-            self = super().__new__( cls, *args, **kwargs )
+            self = super().__new__( *args, **kwargs )
             return self
 
 
@@ -284,7 +289,7 @@ class Interface( object, metaclass=PluginMeta ):
     to consume the plugin's functionality."""
 
     def __new__( cls, *args, **kwargs ):
-        return super().__new__( cls, *args, **kwargs )
+        return super().__new__( *args, **kwargs )
         
 
 class Attribute( object ):
@@ -315,7 +320,6 @@ def format_interfaces() :
     return f.getvalue()
 
 def format_interface( name, info, f ):
-    from  pprint import pprint
     print( name, info['file'], file=f )
     print( '  attributes :' )
     pprint( info['attributes'], stream=f, indent=2 )

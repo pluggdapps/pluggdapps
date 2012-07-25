@@ -6,9 +6,9 @@
 
 from   urllib.parse import urljoin
 
-from   pluggdapps.core       import implements
 from   pluggdapps.config     import ConfigDict
-from   pluggdapps.plugin     import Singleton, IWebApp, query_plugin, isimplement
+from   pluggdapps.plugin     import implements, Singleton, IWebApp, \
+                                    query_plugin, isimplement
 from   pluggdapps.interfaces import IController, IRouter
 import pluggdapps.utils as h
 
