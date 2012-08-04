@@ -25,22 +25,23 @@ _default_settings['command_width']  = {
     'help'    : "Maximum width of command name column."
 }
 
-class Commands( Plugin ):
+class CommandCommands( Plugin ):
     implements( ICommand )
 
     description = "list of script commands and their short description."
+    cmd = 'commands'
 
     def subparser( self, parser, subparsers ):
-        name = pluginname( self )
         self.subparser = subparsers.add_parser( 
-                                name, description=self.description )
+                                self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
 
     def handle( self, args ):
         commands = query_plugins( None, ICommand )
-        commands = sorted( commands, key=lambda x : pluginname(x) )
+        commands = sorted( commands, key=lambda x : pluginname(x)[7:] )
         for command in commands :
-            rows = self._formatdescr(pluginname(command), command.description)
+            rows = self._formatdescr( pluginname(command)[7:],
+                                      command.description )
             for r in rows : print(r)
 
     def _formatdescr( self, name, description ):

@@ -22,34 +22,36 @@ sources and its priority.
   <option> = <value>                |     | | |  <option> = <value>
   ...                               |     | | |  ...
                                     |     | | |
-  [webmounts]                       |     | | |  [plugin:...]
-  <appname> = (<type>, <value>)     |     | | |  ...
+  [webmounts] ---------------------*|     | | |  [plugin:...]
+  <appname> = (<type>, <value>)    ||     | | |  ...
   <appname> = (<type>, <value>, mountini) | | |
-  ...                                     | | |         Default Settings
-                                          | | |         ----------------
-  [webapp:<appname>] -------------------* **|-|---------- global_default = {
-  <option> = <value>                    | | | |           }
-  ...                                   | | | |          
-                                        | | | |       *---webapp_configdict = {
-  [webapp:...]                          | | | |       |   }
-  ...                                   | | | |       |   ...
-                                        | | | *       |   
-  [plugin:<pluginname>] ----------------|-|-|-*-----* | *-plugin_configdict = {
-  <option> = <value>                    | | |       | | | }
-  ...                                   | | |       | | | ...
-                                        | | |       | | |
-  [plugin:...]                          | | |       | | |
-  ...                                   | | |       | | |
-                                        | | |       | | |
-  Settings                              | | |       | | |
-  --------                              | | |       | | |
-   { 'pluggdapps'        : <instsett>,<-|-* |       | | |
-      ...                               |   |
-     ('webapp:<appname>',: <instsett>,  **--*       | | |
-      type, val, conf)                  |           | | |
-     ...                                |           | | |
-   }                                    *           | | |
-                                      *-*-----------|-* |
+  ...                              |      | | |         Default Settings
+                                   |      | | |         ----------------
+  [webapp:<appname>] ------------------*  **|-|---------- global_default = {
+  <option> = <value>               |   |  | | |           }
+  ...                              |   |  | | |          
+                                   |   |  | | |       *---webapp_configdict = {
+  [webapp:...]                     |   |  | | |       |   }
+  ...                              |   |  | | |       |   ...
+                                   |   |  | | *       |   
+  [plugin:<pluginname>] ---------------|--|-|-*-----* | *-plugin_configdict = {
+  <option> = <value>               |   |  | |       | | | }
+  ...                              |   |  | |       | | | ...
+                                   |   |  | |       | | |
+  [plugin:...]                     |   |  | |       | | |
+  ...                              |   |  | |       | | |
+                                   |   |  | |       | | |
+  Settings                         |   |  | |       | | |
+  --------                         |   |  | |       | | |
+   { 'pluggdapps'    :<sett>,  <---|---|--* |       | | |
+     'webmounts'     :<sett>,  <---*   |    |       | | |
+     'plugin:<name>' :<sett>,          |    |       | | |
+     ...                               |    |       | | |
+     ('webapp:<appname>',: <instsett>, **---*       | | |
+      type, val, conf)                 |            | | |
+     ...                               |            | | |
+   }                                   *            | | |
+                                      **------------|-* |
                                       |             |   |
                                       V             *--**
              { 'webapp:<appname>'   : <settings>,       |
@@ -70,12 +72,14 @@ sources and its priority.
 import configparser, collections
 from   copy         import deepcopy
 from   pprint       import pprint
+from   os.path      import dirname
 
 from   pluggdapps.const  import MOUNT_TYPES, MOUNT_SCRIPT
 import pluggdapps.utils as h
 
 __all__ = [ 'loadsettings', 'ConfigDict', 'settingsfor', 'defaultsettings',
-            'app2sec', 'sec2app', 'plugin2sec', 'sec2plugin' ]
+            'app2sec', 'sec2app', 'plugin2sec', 'sec2plugin', 'is_app_section',
+            'is_plugin_section' ]
 
 def loadsettings( inifile ):
     """Load `inifile` and instance-wise ini files (for each web-app) and
@@ -99,7 +103,7 @@ def loadsettings( inifile ):
     for instkey, instsett in settings.items() :
         if not isinstance( instkey, tuple ) :
             continue
-        appname,t,v,c = instkey
+        appname,t,mountname,c = instkey
         for key, values in instsett.items() :
             if is_app_section(key) :    # Normalize application settings
                 cls = plugin_info( sec2app(key) )['cls']
@@ -219,7 +223,8 @@ def pluggdapps_defaultsett():
     return sett
 
 def normalize_defaults( sett ):
-    sett['debug'] = h.asbool( sett['debug'] )
+    """Normalize also handles unconfigured default settings."""
+    sett['debug'] = h.asbool( sett.get('debug', False) )
     return sett
 
 def normalize_pluggdapps( sett ):
@@ -228,6 +233,13 @@ def normalize_pluggdapps( sett ):
 def defaultsettings():
     """By now all interface specs and plugins would have been loaded. Collect
     their default settings and return them as a dictionary.
+
+    appdefaults,
+        { "webapp:<appname>" : default_settings,
+           ...
+        }
+
+    plugindefaults
         { "plugin:<pluginname>" : default_settings,
            ...
         }
@@ -254,54 +266,63 @@ def with_inisettings( inifile, appdefaults, plugindefaults ):
     """Parse master ini configuration file and its refered ini files to
     construct a dictionary of settings for applications."""
     from pluggdapps.plugin import pluginnames, applications
+    _vars = { 'here' : dirname(inifile) }
     cp = configparser.SafeConfigParser()
     cp.read( inifile )
-    appnames = appdefaults.keys()
+    appsecs = appdefaults.keys()
+    appdefaults_ = deepcopy( appdefaults )
+
     # Compute default settings for each application instance.
     instdef = {}
-    instconfig = {}
-    webmounts = cp.items('webmounts') if cp.has_section('webmounts') else []
+    webmounts = cp.items( 'webmounts', vars=_vars ) \
+                        if cp.has_section('webmounts') else []
     for (name, val) in webmounts :
-        appname = app2sec( name )
-        if appname not in appnames : # Validate
-            raise Exception( "%r is not an application" % name )
+        appsec = app2sec( name )
+        if appsec not in appsecs : continue
+
         # Parse values
         y = [ x.strip() for x in val.split(',') ]
         if len(y) == 2 :
-            (t,v,instconfig) = y + [None]
+            (t,mountname,instconfig) = y + [None]
         else :
-            (t,v,instconfig) = y
+            (t,mountname,instconfig) = y
         if t not in MOUNT_TYPES : # Validate
-            raise Exception("Type %r for %r not a valit mount type"%(t, name))
-        instkey = (appname,t,v) 
+            raise Exception("Type %r for %r not a valid mount type"%(t, name))
+        instkey = (appsec,t,mountname,instconfig)
         if instkey in instdef :
-            raise Exception("Application instance %r already defined"%instkey)
-        instdef[ instkey ] = appdefaults.pop( appname )
-        instconfig[ instkey ] = instconfig
+            raise Exception(
+                        "Application instance %r already defined" % (instkey,))
+        instdef[ instkey ] = {}
+        instdef[ instkey ][ appsec ] = deepcopy( appdefaults.get( appsec ))
+        appdefaults_.pop( appsec, None )
+
     # Compute default settings for unconfigured application instance.
-    for appsec, sett in list( appdefaults.items() ) :
+    for appsec, sett in list( appdefaults_.items() ) :
         instkey = ( appsec, MOUNT_SCRIPT, "/"+sec2app(appsec), None )
         if instkey in instdef :
             raise Exception("Application instance %r already defined"%instkey)
-        instdef[ instkey ] = sett
+        instdef[ instkey ] = {}
+        instdef[ instkey ][ appsec ] = deepcopy( sett )
 
     # Initialize settings 
-    defaultsett = dict( DEFAULT().items() )
-    defaultsett.update( cp.defaults() )
+    defaultsett = dict( DEFAULT().items() ) # Global defaults
+    defaultsett.update( cp.defaults() )     # [DEFAULT] overriding global def.
     [ sett.update( defaultsett ) for key, sett in plugindefaults.items() ]
 
-    settings = { 'pluggdapps' : deepcopy( defaultsett ),
-                 'webmounts'  : deepcopy( defaultsett ),
+    settings = { 'pluggdapps' : dict( pluggdapps_defaultsett().items() ),
+                 'webmounts'  : dict( webmounts ),
                }
-    settings['pluggdapps'].update( dict( pluggdapps_defaultsett().items() ))
-    settings['pluggdapps'].update( dict( cp.items( 'pluggdapps' )))
-    settings['webmounts'].update( dict( webmounts ))
+    settings['pluggdapps'].update( defaultsett )
+    if cp.has_section('pluggdapps') :
+        settings['pluggdapps'].update(
+                    dict( cp.items( 'pluggdapps', vars=_vars )))
+    settings['webmounts'].update( defaultsett )
 
     # Create instance-wise full settings dictionary.
     for instkey, values in list( instdef.items() ):
-        appsec, t, v, config = instkey
+        appsec, t, mountname, config = instkey
         settings[instkey] = { appsec : deepcopy(defaultsett) }
-        settings[instkey][appsec].update( values )
+        settings[instkey][appsec].update( values[appsec] )
         settings[instkey].update( deepcopy( plugindefaults ))
     settings.update( deepcopy( plugindefaults ))
 
@@ -318,9 +339,10 @@ def with_inisettings( inifile, appdefaults, plugindefaults ):
     # settings
     for instkey, instsett in settings.items() :
         if not isinstance( instkey, tuple ) : continue
-        appsec, t, v, config = instkey
+        # Only application settings
+        appsec, t, mountname, config = instkey
         if cp.has_section( appsec ) :
-            instsett[instkey][appsec].update( dict( cp.items( appsec )))
+            instsett[appsec].update( dict( cp.items( appsec, vars=_vars )))
 
     # Load plugin section configuration in master ini file into app instance
     # settings
@@ -330,16 +352,16 @@ def with_inisettings( inifile, appdefaults, plugindefaults ):
         if secname not in pluginsecs :
             raise Exception( "%r is not a valid plugin" % secname )
 
-        settings[secname].update( dict( cp.items( secname )) )
-        for instkey, values in list( settings.items() ) :
+        settings[secname].update( dict( cp.items( secname, vars=_vars )) )
+        for instkey, values in settings.items() :
             if not isinstance( instkey, tuple ) : continue
-            values[secname].update( dict( cp.items( secname )) )
+            values[secname].update( dict( cp.items( secname, vars=_vars )) )
 
     # Load application configuration from master ini file and from instance
     # configuration file.
     for instkey, instsett in settings.items() :
         if not isinstance( instkey, tuple ) : continue
-        appsec, t, v, configini = instkey
+        appsec, t, mountname, configini = instkey
         if configini :
             s = loadinstance( appsec, instsett, configini )
             settings[instkey] = s
@@ -348,12 +370,13 @@ def with_inisettings( inifile, appdefaults, plugindefaults ):
 
 def loadinstance( appsec, instsett, instanceini ):
     """Load configuration settings for a web application's instance."""
+    _vars = { 'here' : dirname(instanceini) }
     cp = configparser.SafeConfigParser()
     cp.read( instanceini )
     defaultsett = dict( cp.defaults() )
     [ sett.update( defaultsett ) for key, sett in instsett.items() ]
     for secname in cp.sections() :
-        instsett[secname].update( dict( cp.items( secname )))
+        instsett[secname].update( dict( cp.items( secname, vars=_vars )))
     return instsett
 
 

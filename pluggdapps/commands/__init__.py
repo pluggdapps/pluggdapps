@@ -6,7 +6,7 @@
 
 from pluggdapps.commands import commands
 from pluggdapps.commands import config
-from pluggdapps.commands import list
+from pluggdapps.commands import ls
 from pluggdapps.commands import serve
 from pluggdapps.commands import unittest
 from pluggdapps.commands import mounts

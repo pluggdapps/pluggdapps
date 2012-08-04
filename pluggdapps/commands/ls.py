@@ -11,15 +11,15 @@ from   pluggdapps.plugin import PluginMeta, implements, Plugin, pluginname
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
-class List( Plugin ):
+class CommandLs( Plugin ):
     implements( ICommand )
 
     description = "list of plugins, interfaces."
+    cmd = 'ls'
 
     def subparser( self, parser, subparsers ):
-        name = pluginname( self )
         self.subparser = subparsers.add_parser( 
-                                name, description=self.description )
+                                self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
         self._arguments( self.subparser )
 
@@ -32,10 +32,15 @@ class List( Plugin ):
             self._listinterf( args )
         elif args.plugin :
             self._listplugin( args )
+        elif args.listall :
+            self._listall( args )
         else :
-            self._listinterfs( args )
+            self._listall( args )
 
     def _arguments( self, parser ):
+        parser.add_argument( "-l", action="store_true", 
+                             dest="listall",
+                             help="List interfaces defined" )
         parser.add_argument( "-I", action="store_true", 
                              dest="listinterfs",
                              help="List interfaces defined" )
@@ -50,18 +55,31 @@ class List( Plugin ):
                              help="List plugin definition" )
         return parser
 
+    def _listall( self, args ):
+        l = sorted( list( PluginMeta._interfmap.items() ))
+        print( "Interfaces specified" )
+        for iname, info in l :
+            print(( "  %s in %r" % (iname, info['file']) ))
+        print( "\nPlugins defined" )
+        l = sorted( list( PluginMeta._pluginmap.items() ))
+        for pname, info in l :
+            print(( "  %-15s in %r" % ( pname, info['file']) ))
+        print( "\nInterfaces and implementing plugins" )
+        for interf, d in PluginMeta._implementers.items() :
+            print( "  %-15s" % interf.__name__, end='' )
+            clss = [ cls for name, cls in sorted( list( d.items() )) ]
+            pprint( clss, indent=17 )
+            print("")
+
     def _listinterfs( self, args ):
         l = sorted( list( PluginMeta._interfmap.items() ))
         for iname, info in l :
-            print(( "%s in %r" % (iname, info['file']) ))
-            for line in h.docstr( info['cls'] ).splitlines() :
-                print( "    ", line.strip() )
-            print()
-
-    def _listplugins( self, args ):
-        l = sorted( list( PluginMeta._pluginmap.items() ))
-        for pname, info in l :
-            print(( "%-15s: in %r" % ( pname, info['file']) ))
+            print(( "  %s in %r" % (iname, info['file']) ))
+        #for iname, info in l :
+        #    print(( "%s in %r" % (iname, info['file']) ))
+        #    for line in h.docstr( info['cls'] ).splitlines() :
+        #        print( "    ", line.strip() )
+        #    print()
 
     def _listinterf( self, args ):
         nm = args.interface
@@ -71,9 +89,17 @@ class List( Plugin ):
         else :
             print( "\n%-15s " % nm )
             print( "\nAttribute dictionary : " )
-            pprint( info['attributes'] )
+            pprint( info['attributes'], indent=4 )
             print( "\nMethod dictionary : " )
-            pprint( info['methods'] )
+            pprint( info['methods'], indent=4 )
+            print( "\nPlugins implementing interface" )
+            plugins = PluginMeta._implementers.get( info['cls'], {} )
+            pprint( plugins, indent=4 )
+
+    def _listplugins( self, args ):
+        l = sorted( list( PluginMeta._pluginmap.items() ))
+        for pname, info in l :
+            print(( "  %-15s in %r" % ( pname, info['file']) ))
 
     def _listplugin( self, args ):
         nm = args.plugin

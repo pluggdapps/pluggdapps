@@ -7,8 +7,8 @@
 from   urllib.parse import urljoin
 
 from   pluggdapps.config     import ConfigDict
-from   pluggdapps.plugin     import implements, Singleton, IWebApp, \
-                                    query_plugin, isimplement
+from   pluggdapps.plugin     import implements, IWebApp, query_plugin, \
+                                    isimplement, Plugin
 from   pluggdapps.interfaces import IController, IRouter
 import pluggdapps.utils as h
 
@@ -17,20 +17,20 @@ _default_settings.__doc__ = \
     "Configuration settings for WebApp base class inherited by all " \
     "pluggdapps web-applications."
 
-_default_settings['IRequest']  = {
+_default_settings['irequest']  = {
     'default' : 'httprequest',
     'types'   : (str,),
     'help'    : "Plugin class whose instance will be the single argument "
                 "passed on to request handler callable.",
 }
-_default_settings['IResponse']  = {
+_default_settings['iresponse']  = {
     'default' : 'httpresponse',
     'types'   : (str,),
     'help'    : "Plugin class whose instance will be used to compose http "
                 "response corresponding to request generated via "
                 "`IRequest` parameter."
 }
-_default_settings['ICookie']  = {
+_default_settings['icookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
     'help'    : "Plugin class implementing ICookie interface specification. "
@@ -38,7 +38,7 @@ _default_settings['ICookie']  = {
                 "request cookies and response cookies. This can be overriden "
                 "at corresponding request / response plugin settings."
 }
-_default_settings['IRouter']  = {
+_default_settings['irouter']  = {
     'default' : 'routeandmatch',
     'types'   : (str,),
     'help'    : "Plugin name implement :class:`IRouter` interface. A request "
@@ -46,13 +46,13 @@ _default_settings['IRouter']  = {
                 "resolved and finally dispatched to it."
 }
 
-class WebApp( Singleton ):
+class WebApp( Plugin ):
     implements( IWebApp )
 
     def onboot( self ):
         """Inheriting plugins should not forget to call its super() method."""
-        self.router = query_plugin( self, IRouter, self['IRouter'] )
-        self.router.onboot( self.settings )
+        self.router = query_plugin( self, IRouter, self['irouter'] )
+        self.router.onboot()
 
     def shutdown( self ):
         pass

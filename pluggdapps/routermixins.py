@@ -21,8 +21,8 @@ class BaseMixin( object ):
         self.traversals = {}
         self.views = {}
 
-    def onboot( self, settings ):
-        return settings
+    def onboot( self ):
+        pass
 
     def genpath( self, request, name, *traverse, **matchdict ) :
         if traverse :
@@ -57,8 +57,8 @@ class BaseMixin( object ):
 class TraverseMixin( BaseMixin ):
     """Provide necessary method to handle url routing through traversal."""
 
-    def onboot( self, settings ):
-        super().onboot( settings )
+    def onboot( self ):
+        super().onboot()
 
         # If an interface is configured for this router, then fetch all the
         # plugins implementing them and query and initialize them for this 
@@ -73,7 +73,7 @@ class TraverseMixin( BaseMixin ):
                     ("Router %r for interface %r does not have "
                      "segment attribute") % (router, interf)
                 )
-            router.onboot( settings )
+            router.onboot()
             self.traversals[router.segment] = router
 
         # If a router is configured for every segment name, then query and
@@ -82,7 +82,7 @@ class TraverseMixin( BaseMixin ):
         #for segment, routername in segments :
         #    router = query_plugin( self.webapp, IRouter, routername )
         #    router.segment = segment
-        #    router.onboot( settings )
+        #    router.onboot()
         #    self.traversals[segment] = router
 
     def lookup_traversal( self, request, c ):
@@ -112,8 +112,8 @@ class TraverseMixin( BaseMixin ):
 class MatchMixin( BaseMixin ):
     """Provide necessary method to handle url routing pattern matching."""
 
-    def onboot( self, settings ):
-        super().onboot( settings )
+    def onboot( self ):
+        super().onboot()
 
     def lookup_view( self, request, c ):
         for name, view in self.views :

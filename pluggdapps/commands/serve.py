@@ -41,18 +41,18 @@ _default_settings['reload.poll_interval'] = {
                 "timestamp. When a file is modified server is restarted."
 }
 
-class Serve( Singleton ):
+class CommandServe( Singleton ):
     implements( ICommand )
 
     description = "Start http server."
+    cmd = 'serve'
 
     def __init__( self, *args, **kwargs ):
         self.module_mtimes = {}
 
     def subparser( self, parser, subparsers ):
-        name = pluginname( self )
         self.subparser = subparsers.add_parser( 
-                                name, description=self.description )
+                                self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
         self._arguments( self.subparser )
 

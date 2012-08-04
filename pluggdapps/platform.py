@@ -66,9 +66,9 @@ class Pluggdapps( Port ):
 
         # IRequest plugin
         request = query_plugin(
-                        webapp, IRequest, webapp['IRequest'], conn, address, 
+                        webapp, IRequest, webapp['irequest'], conn, address, 
                         method, uri, uriparts, version, headers, body )
-        response = query_plugin( webapp, IResponse, webapp['IResponse'], self )
+        response = query_plugin( webapp, IResponse, webapp['iresponse'], self )
         request.response = response
 
         return request

@@ -10,15 +10,15 @@ from   pluggdapps.plugin        import implements, Plugin, pluginname
 from   pluggdapps.interfaces    import ICommand
 
 
-class Info( Plugin ):
+class CommandInfo( Plugin ):
     implements( ICommand )
 
     description = "Platform's environment Information"
+    cmd = 'info'
 
     def subparser( self, parser, subparsers ):
-        name = pluginname( self )
         self.subparser = subparsers.add_parser( 
-                                name, description=self.description )
+                                self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
 
     def handle( self, args ):

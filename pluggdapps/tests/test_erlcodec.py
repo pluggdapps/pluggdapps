@@ -8,6 +8,10 @@ from   pluggdapps.erlcodec  import assert_true, Atom, BitString, \
 
 class TestERLCodec( unittest.TestCase ):
 
+    def dotest( self, x ):
+        level = choice( range(1,9) )
+        assert decode( encode( x, compressed=None )) == x
+
     def test_assert_true( self ) :
         assert_true( True, "Test exception" ) 
         try :
@@ -40,10 +44,6 @@ class TestERLCodec( unittest.TestCase ):
     mixedt = tups[0] + (lsts[0],)
     mixedl = [ nones + ints + strs + flts + bools + atoms + bins + bits + nils ]
     mixedl.append( mixedt )
-
-    def dotest( self, x ):
-        level = choice( range(1,9) )
-        assert decode( encode( x, compressed=None )) == x
 
     def test_none( self ):
         list( map( self.dotest, self.nones ))   # None

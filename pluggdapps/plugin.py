@@ -22,9 +22,9 @@ plugin is queried for the first time. Subsequent queries will fetch the
 singleton instance of the plugin.
 
 Web-applications are plugins as well. Before any plugin can be queried, 
-all application plugins must be instantiated. This is done during boot
-time. Note that there can be any number of instances for a single WebApp
-class.
+all application plugins must be instantiated and booted (which is done by the
+:mod:`platform`). Note that there can be any number of instances for a single
+WebApp derived class.
 
 Every other plugins must be instantiated in the context of an web-application.
 
@@ -71,16 +71,14 @@ About plugins
 A plugin is a bunch of configuration. In other words, every plugin is a
 dictionary of configuration settings pertaining to that plugin configurable
 via `plugin:<pluginname>` section of the ini file. In case of web-application
-plugin, it is configurable via `<webapp:<appname>` section of ini file and
-`DEFAULT` section of instance-wise ini file.
+plugin, it is configurable via `webapp:<appname>` section of ini file.
 
 Added to this,
 
-    `<plugin-inst>.settings` will provide the settings value for web-app
+    `<plugin-inst>.appsettings` will provide the settings value for web-app
 instance (and all of its plugins) under which <plugin-inst> is instantiated.
-    Similarly, `<plugin-inst>.globalsett` will provide the global settings
+    Similarly, `<plugin-inst>.settings` will provide the global settings
 comprising full configuration.
-
 """
 
 import sys, inspect, io
@@ -113,11 +111,11 @@ def isimplement( plugin, interface ):
 
 def interfaces():
     """Return a list of interfaces defined in this environment."""
-    return [ x['cls'] for x in PluginMeta.interfmap.values() ]
+    return [ x['cls'] for x in PluginMeta._interfmap.values() ]
 
 def interface( interf ):
     """Return the interface class specified by string ``interf``."""
-    c = PluginMeta.interfmap[interf]['cls'] if isinstance(i, str) else interf
+    c = PluginMeta._interfmap[interf]['cls'] if isinstance(i, str) else interf
     return c
 
 def plugin_info( *args ):
@@ -267,7 +265,7 @@ class PluginMeta( type ):
                 # TODO : Optimize the following imports
                 from pluggdapps.platform import settings, Pluggdapps
 
-                # TODO : make `self.settings` into a read only copy
+                # TODO : make `self.appsettings` into a read only copy
 
                 # Check for instantiated singleton, if so return.
                 if hasattr( self, 'settings' ): return
@@ -277,18 +275,18 @@ class PluginMeta( type ):
 
                 if isinstance( webapp, tuple ) :
                     appsec, t, v, configini = webapp
-                    self.settings = settings[ webapp ]
-                    self._settngx.update( self.settings[appsec] )
+                    self.appsettings = settings[ webapp ]
+                    self._settngx.update( self.appsettings[appsec] )
                 elif webapp :
                     self.webapp = webapp
-                    self.settings = self.webapp.settings
-                    self._settngx.update( self.settings[plugin2sec(pluginnm)] )
+                    self.appsettings = self.webapp.appsettings
+                    self._settngx.update( self.appsettings[plugin2sec(pluginnm)] )
                 else :
                     self.webapp = None
-                    self.settings = {}
+                    self.appsettings = {}
                     self._settngx.update( 
                             settings.get( plugin2sec(pluginnm), {} ))
-                self.globalsett = settings
+                self.settings = settings
 
                 # Plugin settings
                 self._settngx.update( kwargs.pop( 'settings', {} ))
@@ -363,7 +361,6 @@ class PluginBase( object, metaclass=PluginMeta ):
     """A map of plugin name and its singleton instance."""
 
     def __new__( cls, *args, **kwargs ):
-        from pluggdapps.plugin import Singleton
         if issubclass( cls, Singleton ):
             name = pluginname(cls)
             singleton = PluginBase._singletons.get( name, None )

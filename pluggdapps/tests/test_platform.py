@@ -6,15 +6,9 @@ from   pluggdapps.platform  import Pluggdapps
 
 class Test_Plugin( unittest.TestCase, Singleton ):
 
-    def setup( self ):
-        super().setup()
-
     def test( self ):
         self.test_pluginmeta()
         super().test()
-
-    def teardown( self ):
-        super().teardown()
 
     #---- Test cases
 

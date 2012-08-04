@@ -18,7 +18,7 @@ _ram_settings = ConfigDict()
 _ram_settings.__doc__ = \
     "Configuration settings for url Router RouteAndMatch."
 
-_ram_settings['IResource']  = {
+_ram_settings['iresource']  = {
     'default' : 'baseresource',
     'types'   : (str,),
     'help'    : "Plugin name implementing :class:`IResource` interface that "
@@ -44,11 +44,11 @@ _ram_settings['traversewith'] = {
 class RouteAndMatch( Plugin, TraverseMixin, MatchMixin ):
     implements( IRouter )
 
-    def onboot( self, settings ):
-        super().onboot( settings )
+    def onboot( self ):
+        super().onboot()
 
     def route( request, c ):
-        res = query_plugin( self.webapp, IResource, self['IResource'] )
+        res = query_plugin( self.webapp, IResource, self['iresource'] )
         res( request, c )
         view = self.fetchview( request, c )
         view = HTTPNotFound if view == None else view
@@ -65,7 +65,7 @@ _routestatic_sett = ConfigDict()
 _routestatic_sett.__doc__ = \
     "Configuration settings for url Router RouteMatch."
 
-_routestatic_sett['IResource']  = {
+_routestatic_sett['iresource']  = {
     'default' : 'staticresource',
     'types'   : (str,),
     'help'    : "Plugin name implementing :class:`IResource` interface that "
@@ -87,7 +87,7 @@ class RouteStatic( Plugin ):
     def __init__( self, *args, **kwargs ):
         self.traversals = []
 
-    def onboot( self, settings ):
+    def onboot( self ):
         if 'docroot' not in self :
             path = h.sourcepath( self.webapp )
             paths = [ join( dirname(path), 'static' ),
@@ -103,7 +103,7 @@ class RouteStatic( Plugin ):
             self['docroot'] = self['docroot'].rstrip( URLSEP )
 
     def route( request, c ):
-        res = query_plugin( self.webapp, IResource, self['IResource'] )
+        res = query_plugin( self.webapp, IResource, self['iresource'] )
         res( request, c )
         view = self.fetchview( request, c )
         return view
@@ -115,12 +115,3 @@ class RouteStatic( Plugin ):
     def default_settings( cls ):
         return _routestatic_sett
 
-
-#---- UnitTest
-
-cases = [
-    '/hello/world',
-    '/{hello}/{world}',
-    '/he{ll}o/{wo:.o}rld',
-    '/hel{lo}/world/{*remains:[a-z]{3,5}}',
-]

@@ -48,7 +48,7 @@ def main():
 
     subcommands = query_plugins( None, ICommand, 'commands' )
 
-    subcmdnames = list( map( pluginname, subcommands ))
+    subcmdnames = list( map( lambda x : pluginname(x)[7:], subcommands ))
     cmdargs = []
     for x in sys.argv[1:] :
         if x in subcmdnames : break

@@ -17,7 +17,7 @@ _default_settings = ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPRequest implementing IRequest interface."
 
-_default_settings['ICookie']  = {
+_default_settings['icookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
     'help'    : "Plugin class implementing ICookie interface specification. "
@@ -41,7 +41,7 @@ class HTTPRequest( Plugin ):
         xheaders = getattr( conn, 'xheaders', None ) if conn else None
 
         self.cookie_plugin = self.query_plugin(
-                                    self.webapp, ICookie, self['ICookie'] )
+                                    self.webapp, ICookie, self['icookie'] )
         
         # Socket attributes
         self.connection = conn

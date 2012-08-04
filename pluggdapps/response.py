@@ -30,7 +30,7 @@ _default_settings['transforms']     = {
     'help'    : "Comma separated transformation plugins to be applied on "
                 "response headers and body.",
 }
-_default_settings['ICookie']  = {
+_default_settings['icookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
     'help'    : "Plugin class implementing ICookie interface specification. "
@@ -38,7 +38,7 @@ _default_settings['ICookie']  = {
                 "cookies. Overrides :class:`ICookie` if defined in "
                 "`class`:WebApp plugin."
 }
-_default_settings['IErrorPage']     = {
+_default_settings['ierrorpage']     = {
     'default' : 'HTTPErrorPage',
     'types'   : (str,),
     'help'    : "",
@@ -64,7 +64,7 @@ class HTTPResponse( Plugin ):
         # Cookies
         self.cookies = Cookie.SimpleCookie()
         self.cookie_plugin = request.query_plugin(
-                ICookie, self['ICookie'] or self.webapp['ICookie'] )
+                ICookie, self['icookie'] or self.webapp['icookie'] )
         # Start from a clean slate
         self.clear()
         self.context = h.Context()

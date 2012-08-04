@@ -11,15 +11,15 @@ from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
 
-class Mounts( Plugin ):
+class CommandMounts( Plugin ):
     implements( ICommand )
 
     description = "Display application's configuration settings."
+    cmd = 'mounts'
 
     def subparser( self, parser, subparsers ):
-        name = pluginname( self )
         self.subparser = subparsers.add_parser( 
-                                name, description=self.description )
+                                self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
         self._arguments( self.subparser )
 

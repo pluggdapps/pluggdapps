@@ -11,7 +11,7 @@ from pluggdapps.plugin import Interface, Attribute
 __all__ = [
     'ICommand', 'IServer', 'IRouter', 'IResource', 'ICookie', 'IRequest',
     'IController', 'IErrorPage', 'IRenderer', 'IResponse', 
-    'IResponseTransformer', 'IUnitTest',
+    'IResponseTransformer',
 ]
 
 class ICommand( Interface ):
@@ -19,12 +19,9 @@ class ICommand( Interface ):
     purpose is to parse the command line string arguments into `options` and
     `arguments` and handle sub-commands as pluggable functions."""
 
-    description = Attribute(
-        "Text to display before the argument help."
-    )
-    usage = Attribute(
-        "The string describing the program usage"
-    )
+    description = Attribute( "Text to display before the argument help." )
+    usage = Attribute( "String describing the program usage" )
+    cmd = Attribute( "Name of the command" )
 
     def subparser( parser, subparsers ):
         """Use ``subparsers`` to create a sub-command parser. The `subparsers`
@@ -131,7 +128,7 @@ class IRouter( Interface ):
         "method."
     )
 
-    def onboot( settings ):
+    def onboot():
         """Chained call from :meth:`IWebApp.onboot`. Implementation 
         should chain the onboot() call further down.
 
@@ -783,16 +780,4 @@ class IErrorPage( Interface ):
         The render call writes the response body using 
         :method:`IResponse.write`
         """
-
-class IUnitTest( Interface ):
-    """Local interface to performing unit-testing on various modules."""
-
-    def setup():
-        """Setup fixtures before executing the test cases."""
-
-    def test():
-        """Start executing test bases."""
-
-    def teardown():
-        """Teardown fixtures after executing test cases."""
 
