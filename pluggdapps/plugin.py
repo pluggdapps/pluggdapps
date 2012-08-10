@@ -79,6 +79,31 @@ Added to this,
 instance (and all of its plugins) under which <plugin-inst> is instantiated.
     Similarly, `<plugin-inst>.settings` will provide the global settings
 comprising full configuration.
+
+Deriving a plugin from another plugin class
+-------------------------------------------
+
+It is also possible to create a plugin by deriving from another plugin class.
+Remember that a plugin class is any class that derives from the
+:class:`Plugin`. For example,
+
+class YourPlugin( Plugin ):
+    def __init__( self, arg2, arg3 ):
+        pass
+
+class MyPlugin( YourPlugin ):
+    def __init__( self, arg1, arg2, arg3 ):
+        self._super_init( __class__, arg2, arg3 )
+
+`YourPlugin` is a plugin class (since it derives from :class:`Plugin`) with
+accepts two constructor arguments.
+
+Another class `MyPlugin` wants to extend `YourPlugin`, hence can simply derive
+from `YourPlugin` class. And thus automatically becomes a plugin class. Note
+that MyPlugin class accepts 3 constructor arguments and to initialize the base
+class it uses a special method, _super_init() instead of using the builtin
+super(). 
+
 """
 
 import sys, inspect, io
@@ -88,6 +113,8 @@ from   pprint           import pprint
 from   pluggdapps.const     import ROOTAPP
 from   pluggdapps.config    import app2sec, plugin2sec
 
+# TODO :
+#   1. Unit test cases.
 
 __all__ = [ 
     # Plugin Classes
@@ -115,8 +142,10 @@ def interfaces():
 
 def interface( interf ):
     """Return the interface class specified by string ``interf``."""
-    c = PluginMeta._interfmap[interf]['cls'] if isinstance(i, str) else interf
-    return c
+    if isinstance(interf, str) :
+        return PluginMeta._interfmap[interf]['cls'] 
+    else :
+        return interf
 
 def plugin_info( *args ):
     """Return information dictionary gathered by :class:`PluginMeta` for 
@@ -125,12 +154,11 @@ def plugin_info( *args ):
     if a plugin by name `nm` is not found."""
     nm = args[0]
     if isinstance( nm, str ) :
-        return PluginMeta._pluginmap.get( *args )
-    elif issubclass( type(nm), PluginBase ) :
-        nm = pluginname(nm)
         return PluginMeta._pluginmap.get( nm, *args[1:] )
     else :
-        raise Exception( "Could not get plugin information for %r " % nm )
+        nm = pluginname(nm)
+        return PluginMeta._pluginmap.get( nm, *args[1:] )
+    raise Exception( "Could not get plugin information for %r " % nm )
 
 def interface_info( *args ):
     """Return information dictionary gathered by :class:`PluginMeta` for an
@@ -139,10 +167,10 @@ def interface_info( *args ):
     be returned if an interface by name `interf` is not found."""
     interf = args[0]
     if isinstance( interf, str ):
-        return PluginMeta._interfmap.get( *args )
+        return PluginMeta._interfmap.get( interf, *args[1:] )
     else :
         interf = interf.__name__
-        return PluginMeta._interfmap.get( *args )
+        return PluginMeta._interfmap.get( interf, *args[1:] )
 
 def pluginnames( interface=None ):
     """Return a list of plugin names implementing `interface`. If `interface`
@@ -201,7 +229,7 @@ def pluginname( o ):
 
 #---- Plugin meta framework
 
-core_classes = [ 'Interface', 'PluginBase', 'Singleton', ]
+core_classes = [ 'Interface', 'PluginBase', 'Singleton' ]
 
 class PluginMeta( type ):
     """Plugin component manager. Tracks interface specifications, plugin
@@ -263,7 +291,7 @@ class PluginMeta( type ):
                 *args and **kwargs parameters. It also handles the special
                 case of instantiating IWebApp plugins."""
                 # TODO : Optimize the following imports
-                from pluggdapps.platform import settings, Pluggdapps
+                from pluggdapps.platform import settings
 
                 # TODO : make `self.appsettings` into a read only copy
 
@@ -277,25 +305,47 @@ class PluginMeta( type ):
                     appsec, t, v, configini = webapp
                     self.appsettings = settings[ webapp ]
                     self._settngx.update( self.appsettings[appsec] )
-                elif webapp :
-                    self.webapp = webapp
-                    self.appsettings = self.webapp.appsettings
-                    self._settngx.update( self.appsettings[plugin2sec(pluginnm)] )
-                else :
                     self.webapp = None
+                elif webapp :
+                    self.appsettings = webapp.appsettings
+                    self._settngx.update( self.appsettings[plugin2sec(pluginnm)] )
+                    self.webapp = webapp
+                else :
                     self.appsettings = {}
                     self._settngx.update( 
                             settings.get( plugin2sec(pluginnm), {} ))
+                    self.webapp = None
                 self.settings = settings
 
                 # Plugin settings
                 self._settngx.update( kwargs.pop( 'settings', {} ))
-                # Call the original plugin's __init__
-                if init :
+
+                # Call the original plugin's __init__. Avoid calling the
+                # masterinit of the super class.
+                if init and hasattr( init, '_original' ) :
+                    _original( self, *args, **kwargs )
+                elif init :
                     init( self, *args, **kwargs )
+
+            def _super_init( self, cls, *args, **kwargs ):
+                """__init__ overloading is controlled by PluginMeta. So for 
+                plugin inheritance to call base classes method, instead of 
+                using,
+                    super().__init__( *args, **kwargs )
+                use,
+                    self._super_init( *args, **kwargs )
+
+                Other methods that are overloaded as called as is.
+                """
+                baseinit = getattr( cls.mro()[1], '__init__', None )
+                if baseinit and hasattr( baseinit, '_original' ) :
+                    baseinit._original( self, *args, **kwargs )
+                elif baseinit :
+                    baseinit( self, *args, **kwargs )
 
             masterinit._original = init
             new_class.__init__ = masterinit
+            new_class._super_init = _super_init
 
         else :
             raise Exception(
@@ -330,7 +380,7 @@ class PluginMeta( type ):
             'methods' : {},     # Map of method names and method object
         }
 
-        """Collect attributes and methods specified by `interface` class."""
+        # Collect attributes and methods specified by `interface` class.
         for k in vars(newcls) :
             v = getattr(newcls, k)
             if isinstance(v, Attribute) :
@@ -425,8 +475,11 @@ class ISettings( Interface ):
         "Optional web-Application instance deriving from :class:`Plugin` "
         "implementing :class:`IWebApp` interface."
     )
+    appsettings = Attribute(
+        "Read only copy of application's settings."
+    )
     settings = Attribute(
-        "Read only copy of application's settings"
+        "Read only copy of global settings."
     )
 
     def default_settings():

@@ -37,7 +37,7 @@ class TestConfig( unittest.TestCase ):
         assert 'plugin:baseresource' in plugindefaults
         assert 'plugin:commandcommands' in plugindefaults
         assert 'plugin:commandconfig' in plugindefaults
-        assert 'plugin:commandlist' in plugindefaults
+        assert 'plugin:commandls' in plugindefaults
         assert 'plugin:commandmounts' in plugindefaults
         assert 'plugin:commandserve' in plugindefaults
         assert 'plugin:commandunittest' in plugindefaults
@@ -53,7 +53,7 @@ class TestConfig( unittest.TestCase ):
         assert 'plugin:baseresource' in settings
         assert 'plugin:commandcommands' in settings
         assert 'plugin:commandconfig' in settings
-        assert 'plugin:commandlist' in settings
+        assert 'plugin:commandls' in settings
         assert 'plugin:commandmounts' in settings
         assert 'plugin:commandserve' in settings
         assert 'plugin:commandunittest' in settings

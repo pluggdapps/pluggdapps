@@ -30,7 +30,8 @@ from   pluggdapps.erlport    import Port
 from   pluggdapps.const      import ROOTAPP, MOUNT_SUBDOMAIN, MOUNT_SCRIPT
 from   pluggdapps.config     import loadsettings, sec2app, app2sec, ConfigDict
 from   pluggdapps.plugin     import Singleton, ISettings, applications, \
-                                    query_plugin, query_plugins, IWebApp
+                                    query_plugin, query_plugins, IWebApp, \
+                                    plugin_init
 from   pluggdapps.interfaces import IRequest, IResponse
 import pluggdapps.utils      as h
 
