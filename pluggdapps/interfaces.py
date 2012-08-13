@@ -268,29 +268,42 @@ class IRouter( Interface ):
 
 class ICookie( Interface ):
     """Necessary methods and plugins to be used to handle HTTP cookies. This
-    specification is compativle with IRequest and python's Cookie standard 
+    specification is compatible with IRequest and python's Cookie standard 
     library."""
 
     def parse_cookies( headers ):
-        """Use `headers`, to parse cookie name/value pairs, along with
-        its meta-information, into Cookie Morsels."""
+        """Use HTTP `headers` dictionary, to parse cookie name/value pairs, 
+        along with its meta-information, into Cookie Morsels.
+            
+            headers.get( 'Cookie', '' ) 
 
-    def set_cookie( cookies, name, value, **kwargs ) :
-        """Sets the given cookie name/value with the given options. Key-word
-        arguments typically contains,
+        should give the cookie string from `headers`.
+        
+        Return a SimpleCookie object from python's standard-library.
+        """
+
+    def set_cookie( cookies, name, morsel, **kwargs ) :
+        """Sets the given cookie name/morsel dictionary with the positional
+        arguments. Optional Key-word arguments typically contains,
+
           domain, expires_days, expires, path
+
         Additional keyword arguments are set on the Cookie.Morsel directly.
 
-        ``cookies`` is from Cookie module and updated inplace.
+        ``cookies`` is from Cookie module and updated inplace, which is again
+        returned back.
 
         See http://docs.python.org/library/cookie.html#morsel-objects
         for available attributes.
         """
 
     def create_signed_value( name, value ):
-        """To avoid cookie-forgery `value` is digitally signed binary of 
-        typically a cookie_secret, name, timestamp of current time and 
-        value."""
+        """To avoid cookie-forgery `value` is digitally signed binary of,
+        typically, a cookie_secret, name, timestamp of current time and 
+        value.
+        
+        `name` and `value` are expected to be in string.
+        """
 
     def decode_signed_value( name, value ):
         """`value` is digitally signed binary of typically a cookie_secret, 

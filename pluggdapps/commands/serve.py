@@ -62,9 +62,9 @@ class CommandServe( Singleton ):
         else :
             self.serve( args )
 
-    def serve( self, args ):
-        self.webapp.pa.serve()
-        self.webapp.pa.shutdown()
+    def serve( self, pa, args ):
+        pa.serve()
+        pa.shutdown()
 
     def gemini( self, args ):
         """If reload is enabled, then create a thread to poll for changing

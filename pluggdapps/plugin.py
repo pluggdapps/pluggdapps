@@ -426,12 +426,12 @@ class PluginBase( object, metaclass=PluginMeta ):
 #---- Plugin framework
 
 class Interface( object, metaclass=PluginMeta ):
-    """Base class for all interface specifications. All interface
-    specification classes are metaclassed by PluginMeta.
+    """Base class for all interface specifications. Interface specification
+    classes are metaclassed by PluginMeta.
 
-    Interface is specifying a bunch of attributes and methods that provides 
+    An `interface` specify a bunch of attributes and methods that provides 
     an agreement between the implementing plugins and the host that is going 
-    to consume the plugin's functionality."""
+    to consume the plugin's function."""
 
     def __new__( cls, *args, **kwargs ):
         return super().__new__( cls, *args, **kwargs )
@@ -460,19 +460,20 @@ def implements( *interfaces ):
 
 class ISettings( Interface ):
     """Every plugin is a dictionary of configuration. And its configuration
-    settings are implicitly implemented via :class:`Plugin` base class. The
-    base class provides default methods for configuration settings which can
-    later be overriden by deriving plugins.
+    settings are implicitly implemented via :class:`Plugin` base class, which
+    is the base class for all plugins, and provides default methods for 
+    configuration settings which can later be overriden by deriving plugins.
 
     While instantiating plugins via `query_plugin()` or `query_plugins()`
     method, passing a ``settings`` key-word argument will override plugin's
     settings defined by ini files and web-admin.
 
-    All the attributes specified in this interface will be automagically 
+    All the attributes specified in this interface will automagically be
     initialised by :class:`PluginMeta`.
     """
+
     webapp = Attribute(
-        "Optional web-Application instance deriving from :class:`Plugin` "
+        "Optional web-Application instance deriving from :class:`Plugin`, "
         "implementing :class:`IWebApp` interface."
     )
     appsettings = Attribute(
@@ -489,7 +490,11 @@ class ISettings( Interface ):
         like, default value, value type, help text, whether web configuration
         is allowed, optional values, etc ...
         
-        To be implemented by classes deriving :class:`Plugin`."""
+        To be implemented by classes deriving :class:`Plugin`.
+
+        Note that ConfigDict will be used to describe settings that are
+        understood by the plugin and publish configuration manuals for users.
+        """
 
     def normalize_settings( settings ):
         """Class method.
@@ -501,7 +506,7 @@ class ISettings( Interface ):
         Override this method to do any post processing on plugin's 
         configuration parameter and return the final form of configuration 
         parameters. Processed parameters in ``settings`` are updated 
-        in-pace."""
+        in-pace and returned."""
 
     def web_admin( settings ):
         """Class method. 

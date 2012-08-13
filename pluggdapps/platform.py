@@ -56,24 +56,6 @@ class Pluggdapps( Port ):
             appnames.append( appname )
         return appnames
 
-    def makerequest( self, conn, address, startline, headers, body ):
-        # Parse request start-line
-        method, uri, version = h.parse_startline( startline )
-        uriparts = h.parse_url( uri, headers.get('Host', None) )
-
-        # Resolve application
-        (typ, key, appname) = self.appresolve( uriparts, headers, body )
-        webapp = self.webapps[ appname ]
-
-        # IRequest plugin
-        request = query_plugin(
-                        webapp, IRequest, webapp['irequest'], conn, address, 
-                        method, uri, uriparts, version, headers, body )
-        response = query_plugin( webapp, IResponse, webapp['iresponse'], self )
-        request.response = response
-
-        return request
-
     def appresolve( self, uriparts, headers, body ):
         """Resolve application for `request`."""
         doms = uriparts['hostname'].split('.')
@@ -98,6 +80,24 @@ class Pluggdapps( Port ):
             else :
                 mountedat = ( 'script', '/', self.m_scripts['/'] )
         return mountedat
+
+    def makerequest( self, conn, address, startline, headers, body ):
+        # Parse request start-line
+        method, uri, version = h.parse_startline( startline )
+        uriparts = h.parse_url( uri, headers.get('Host', None) )
+
+        # Resolve application
+        (typ, key, appname) = self.appresolve( uriparts, headers, body )
+        webapp = self.webapps[ appname ]
+
+        # IRequest plugin
+        request = query_plugin(
+                        webapp, IRequest, webapp['irequest'], conn, address, 
+                        method, uri, uriparts, version, headers, body )
+        response = query_plugin( webapp, IResponse, webapp['iresponse'], self )
+        request.response = response
+
+        return request
 
     def baseurl( self, request, appname=None, scheme=None, auth=False,
                  hostname=None, port=None ):
@@ -129,7 +129,7 @@ class Pluggdapps( Port ):
         if port :
             url += ':' + str(port)
         elif uriparts['port'] :
-            app_port = h.port_and_scheme( scheme, uriparts['port'] )
+            app_port = h.port_for_scheme( scheme, uriparts['port'] )
             url += (':' + app_port) if app_port else ''
         # script
         uri += app_script
@@ -220,6 +220,15 @@ class Pluggdapps( Port ):
             formatstr = formatstr.replace( '~', '%' ) if values else formatstr
             print( formatstr % values )
 
+
+def appkey( appname ):
+    rc = []
+    for instkey, v in settings.items() :
+        if not isinstance( instkey, tuple ) : continue
+        appsec, t, v, config = instkey
+        if sec2app( appsec ) == appname :
+            rc.append( instkey )
+    return rc
 
 
 def platform_logs( pa, f ) :

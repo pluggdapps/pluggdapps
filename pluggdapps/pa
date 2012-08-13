@@ -19,6 +19,7 @@ from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
 DEFAULT_INI = join( dirname(__file__), 'tests', 'confs', 'develop.ini' )
+webapps = {}
 
 def main():
     # setup main script arguments
@@ -54,7 +55,7 @@ def main():
         if x in subcmdnames : break
         cmdargs.append( x )
     args = mainparser.parse_args( cmdargs )
-    pa = Pluggdapps.boot( args.config )
+    args.pa = pa = Pluggdapps.boot( args.config )
 
     # setup sub-command arguments
     subcommands = query_plugins( None, ICommand, 'commands' )

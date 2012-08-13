@@ -20,37 +20,23 @@ strptime = dt.datetime.strptime
 strftime = dt.datetime.strftime
 
 __all__ = [
-    'port_and_scheme', 'parse_startline', 'parse_url', 'make_url',
+    'port_for_scheme', 'parse_startline', 'parse_url', 'make_url',
     'parse_xscheme', 'parse_remoteip', 'parse_body',
     'convert_header_value', 'compute_etag', 'HTTPFile', 
     'HTTPHeaders', 'url_concat', 'parse_multipart_form_data',
 ]
 
-
-def _valid_ip( ip ):
-    try:
-        res = socket.getaddrinfo( ip, 0, socket.AF_UNSPEC,
-                                  socket.SOCK_STREAM,
-                                  0, socket.AI_NUMERICHOST )
-        return bool(res)
-    except socket.gaierror as e:
-        if e.args[0] == socket.EAI_NONAME:
-            return False
-        raise
-    return True
-
-def port_and_scheme( scheme, port='' ):
+def port_for_scheme( scheme, port='' ):
+    """Calculate port based on `scheme` name. If scheme and port matches, port
+    is left empty. Otherwise `port` is explicitly set to port number and
+    returned as a string."""
     if port :
-        if scheme == 'http' and str(port) == '80' :
-            port = ''
-        elif scheme == 'https' and str(port) == '443' :
-            port = ''
+        if scheme == 'http' and str(port) == '80'     : return ''
+        elif scheme == 'https' and str(port) == '443' : return ''
+        else : return str(port)
     else :
-        if scheme == 'http' :
-            port = '80'
-        elif scheme == 'https' : 
-            port = '443'
-    return str(port)
+        return ''
+
 
 def parse_startline( startline ):
     """Every HTTP request starts with a start line specifying method, uri and
@@ -62,9 +48,10 @@ def parse_startline( startline ):
         raise Exception(
                 "Malformed HTTP version in HTTP Request-Line %r" % startline )
         method = uri = version = None
-    if not version.startswith("HTTP/") :
+    if not version.startswith( "HTTP/" ) :
         raise Exception( "Unknown HTTP Version %r" % version )
     return method, uri, version
+
 
 def parse_url( uri, host=None, scheme=None ):
     """Parse uri using urlsplit() method into its component parts.

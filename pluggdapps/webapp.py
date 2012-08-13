@@ -17,6 +17,11 @@ _default_settings.__doc__ = \
     "Configuration settings for WebApp base class inherited by all " \
     "pluggdapps web-applications."
 
+_default_settings['encoding']  = {
+    'default' : 'utf8',
+    'types'   : (str,),
+    'help'    : "Unicode/String encoding to be used.",
+}
 _default_settings['irequest']  = {
     'default' : 'httprequest',
     'types'   : (str,),
