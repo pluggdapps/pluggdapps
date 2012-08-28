@@ -13,6 +13,7 @@ __all__ = [
     'DEFAULT_INI',      # Default configuration file to use
     'DEBUG',            # Whether to run platform in debug mode
     'DEFAULT_ENCODING', # Default encoding to convert between bytes and string
+    'DEFAULT_INI',      # Default config file to be used
 ]
 
 ROOTAPP     = 'rootapp'
@@ -24,3 +25,4 @@ ROUTE_PATH_SUFFIX = 'remains'
 MOUNT_SUBDOMAIN = 'subdomain'
 MOUNT_SCRIPT = 'script'
 MOUNT_TYPES = [ MOUNT_SUBDOMAIN, MOUNT_SCRIPT ]
+DEFAULT_INI = join( dirname(__file__), 'tests', 'confs', 'develop.ini' )

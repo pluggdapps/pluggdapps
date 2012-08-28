@@ -20,7 +20,8 @@ class UnitTest_Path( unittest.TestCase ):
         assert caller_module(4) == sys.modules['unittest.case']
 
     def test_caller_path( self ):
-        ref1 = '/home/pratap/dev/netscale/pluggdapps/pluggdapps/tests/path.py'
+        d = dirname( __file__ )
+        ref1 = join(d, 'path.py')
         ref2 = '/usr/lib/python3.2/unittest/path.py'
         ref3 = '/usr/lib/python3.2/unittest/unittest.py'
         ref4 = '/usr/lib/python3.2/unittest/unittest.py'

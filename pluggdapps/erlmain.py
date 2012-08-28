@@ -37,7 +37,6 @@ def run( port ):
         except Exception as err :
             port.logerror( traceback.format_exc(), [] )
             break
-    print( "Python : Exiting !" )
 
 
 def handle( port, request ):
@@ -214,6 +213,9 @@ def virtualenv( args ):
 
 def optionparse() :
     parser = argparse.ArgumentParser( description='Erlang port for pluggdapps' )
+    parser.add_argument( '--config-ini', dest='configini',
+                         default="",
+                         help='Use standard io 0 & 1 for port communication' )
     parser.add_argument( '--use_stdio', dest='use_stdio',
                          action='store_true', default=False,
                          help='Use standard io 0 & 1 for port communication' )
@@ -241,7 +243,7 @@ if __name__ == '__main__' :
     # Setup virtual environment
     papaths = virtualenv( args )
     prev_sys_path = list( sys.path ) # Remember previous path
-    site.addsitedir( papaths[0] )  # Add each new site-packages directory.
+    site.addsitedir( papaths[0] )    # Add each new site-packages directory.
 
     # Reorder sys.path so new directories at the front.
     new_sys_path = []
@@ -256,7 +258,10 @@ if __name__ == '__main__' :
 
     import pluggdapps
     from   pluggdapps.erlcodec import *
+    from   pluggdapps.const import *
     from   pluggdapps.platform import Pluggdapps
+
+    args.configini = args.configini or DEFAULT_INI
 
     if args.use_descrs :
         descrs = tuple( map( int, args.use_descrs.split(',') ))
@@ -264,7 +269,10 @@ if __name__ == '__main__' :
         descrs = (3,4)
     else : 
         descrs = (0,1)
-    port = Pluggdapps.boot( descrs=descrs, packet=int(args.packet), 
-                            compressed=args.compressed, erlang=True )
+    port = Pluggdapps.boot( args.configini,
+                            descrs=descrs, 
+                            packet=int(args.packet), 
+                            compressed=args.compressed,
+                            erlang=True )
     run( port )
 

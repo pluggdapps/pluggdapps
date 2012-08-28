@@ -138,7 +138,8 @@ class Pluggdapps( Port ):
 
     def shutdown( self ):
         for appname in sorted( self.webapps ) :
-            self.loginfo( "Shutting down application %r ..." % appname, [] )
+            infostr = "Shutting down application %r ..." % appname
+            self.loginfo( infostr, [] )
             self.webapps[appname].shutdown()
 
 
@@ -194,28 +195,28 @@ class Pluggdapps( Port ):
 
     def logerror( self, formatstr, values ):
         if self.erlang :
-            super( Port, self ).logerror( formatstr, values )
+            Port.logerror( self, formatstr, values )
         else :
             formatstr = formatstr.replace( '~', '%' ) if values else formatstr
             print( formatstr % values )
 
     def logwarn( self, formatstr, values ):
         if self.erlang :
-            super( Port, self ).logerror( formatstr, values )
+            Port.logerror( self, formatstr, values )
         else :
             formatstr = formatstr.replace( '~', '%' ) if values else formatstr
             print( formatstr % values )
 
     def loginfo( self, formatstr, values ):
         if self.erlang :
-            super( Port, self ).logerror( formatstr, values )
+            Port.logerror( self, formatstr, values )
         else :
             formatstr = formatstr.replace( '~', '%' ) if values else formatstr
             print( formatstr % values )
 
     def logwarning( self, formatstr, values ):
         if self.erlang :
-            super( Port, self ).logerror( formatstr, values )
+            Port.logerror( self, formatstr, values )
         else :
             formatstr = formatstr.replace( '~', '%' ) if values else formatstr
             print( formatstr % values )
