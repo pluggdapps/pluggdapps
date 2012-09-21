@@ -7,14 +7,15 @@ from   setuptools import setup, find_packages
 from   os.path    import abspath, dirname, join
 
 here = abspath( dirname(__file__) )
-README = open(join(here, 'README.rst')).read()
+LONG_DESCRIPTION = open( join( here, 'README.rst' )).read()
 
-v = open(join(dirname(__file__), 'pluggdapps', '__init__.py'))
-version = re.compile( r".*__version__[ ]*=[ ]*'(.*?)'", re.S
-                    ).match(v.read()).group(1)
-v.close()
+version = re.compile( 
+            r".*__version__[ ]*=[ ]*'(.*?)'",
+            re.S 
+          ).match( open( join( here, 'pluggdapps', '__init__.py' )).read()
+                 ).group(1)
 
-description='Web platform'
+description='A plugin / web platform'
 
 classifiers = [
 'Development Status :: 4 - Beta',
@@ -51,16 +52,16 @@ setup(
     requires='',
     obsoletes='',
 
-    author='Pratap R Chakravarthy',
+    author='R Pratap Chakravarthy',
     author_email='prataprc@gmail.com',
-    maintainer='Pratap R Chakravarthy',
+    maintainer='R Pratap Chakravarthy',
     maintainer_email='prataprc@gmail.com',
     url='http://pluggdapps.com',
     download_url='',
     license='General Public License',
     description=description,
-    long_description=README,
+    long_description=LONG_DESCRIPTION,
     platforms='',
     classifiers=classifiers,
-    keywords=[ 'web' ],
+    keywords=[ 'plugin', 'component', 'architecture', 'web' ],
 )

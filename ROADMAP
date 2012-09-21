@@ -1,0 +1,41 @@
+Netscale related :
+------------------
+
+* Figure out possible ways of exiting netscale platform (document them as well)
+  and handle them gracefully inside pluggdapps (which will be executing as a
+  separate port-process).
+
+
+
+Native Web Server :
+-------------------
+
+* Implement a native web server. Already there is an evented web-server using
+  linux epoll mechanism. But it is yet to be ironed out and tested.
+
+
+
+Maintenance :
+-------------
+
+* man sub-command for pa-script to show help text for interfaces and plugins.
+
+* config sub-command for pa-script should include options to display settings
+  help.
+
+
+Source code practise :
+----------------------
+
+* Follow through
+    http://rhettinger.wordpress.com/2011/05/26/super-considered-super/
+  and work out method-resolution-order using super().
+
+
+Release related :
+-----------------
+
+* -*- coding:utf-8 -*- 
+  should always be prefixed at the beginning of the file ?
+
+* Add appropriate classifiers.

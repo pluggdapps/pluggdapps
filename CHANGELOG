@@ -1,12 +1,2 @@
-{{ Toc( float='right' ) }}
-
-h3. 0.1dev
-
------
-
-{{{ Nested 
-# { 'font-size' : 'small', 'color' : 'gray' }
-Document edited using Vim <br>
-/* vim: set filetype=etx : */
-}}}
-
+0.1dev
+------
