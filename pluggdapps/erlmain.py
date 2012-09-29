@@ -1,8 +1,20 @@
 #! /usr/bin/env python3.2
 
+# This file is subject to the terms and conditions defined in
+# file 'LICENSE', which is part of this source code package.
+#       Copyright (c) 2011 R Pratap Chakravarthy
+
 # -*- coding: utf-8 -*-
 
 """
+Executable for netscale cloud platform to dispatch pluggdapps plugin requests.
+Pluggdapps instance is launched by executing this command.
+
+* Sets up virtual environment.
+* Boots Pluggdapps platform using command line arguments supplied by netscale.
+* Loops on IO pipe communicating with netscale platform, marshalling and
+  de-marshalling erlang terms, interpreting them.
+
 Notes :
     Request from erlang
       { req, Method, [Arg], [KWArg] }
@@ -169,10 +181,9 @@ handlerd = {
 #---- Applied methods,
 
 def loadconfig( port, *args, **kwargs ):
-    from pluggdapps.platform import settings, m_subdomains, m_scripts
-    msubdomains = dict([ (str(k), v.appname) for k,v in m_subdomains.items() ])
-    mscripts = dict([ (str(k), v.appname) for k,v in m_scripts.items() ])
-    return (ATOM_OK, (settings, msubdomains, mscripts))
+    msubdomains = { str(k) : v.appname for k,v in pa.m_subdomains.items() }
+    mscripts = { str(k) : v.appname for k,v in pa.m_scripts.items() }
+    return (ATOM_OK, (pa.settings, msubdomains, mscripts))
 
 
 def bootapps( port, *args, **kwargs ) :
@@ -203,37 +214,50 @@ def test_data() :
 #---- Command line 
 
 def pa_dir() :
+    """Return pluggdapps package directory."""
     return abspath( dirname( dirname( __file__ )))
 
 def virtualenv( args ):
+    """Netscale cloud can be launched with settings for pluggdapps' virtual
+    environment. Virtual environment configuration can be absolute or
+    relative. If relative, it is assumed to be relative to pa_dir().
+    """
     virtenv = args.virtenv
     virtenv = virtenv.replace('/', os.sep) if os.sep != '/' else virtenv
-    return [ join(pa_dir(), virtenv) ]
+    return [virtenv] if virtenv[0] == os.sep else [ join(pa_dir(), virtenv) ]
 
 
 def optionparse() :
     parser = argparse.ArgumentParser( description='Erlang port for pluggdapps' )
+
     parser.add_argument( '--config-ini', dest='configini',
                          default="",
-                         help='Use standard io 0 & 1 for port communication' )
+                         help='Absolute location of ini configuration file' )
+
     parser.add_argument( '--use_stdio', dest='use_stdio',
                          action='store_true', default=False,
                          help='Use standard io 0 & 1 for port communication' )
+
     parser.add_argument( '--nouse_stdio', dest='nouse_stdio', 
                          action='store_true', default=False,
                          help='Use file descr. 3 & 4 for port communication' )
+
     parser.add_argument( '--use_descrs', dest='use_descrs', 
                          default='',
                          help='Use CSV of descriptors for port communication' )
+
     parser.add_argument( '--packet', dest='packet',
                          default='4',
                          help='Message packet size' )
+
     parser.add_argument( '--virtenv', dest='virtenv',
                          default='pa-env/lib/python3.2/site-packages',
                          help='Virtual python environment for pluggdapps' )
+
     parser.add_argument( '--compressed', dest='compressed',
                          action='store_true', default=False,
-                         help='Message packet size' )
+                         help='Use compressed erlang terms' )
+
     return parser.parse_args()
 
 
@@ -256,6 +280,8 @@ if __name__ == '__main__' :
     # Avoid ``[Errno 13] Permission denied: '/var/www/.python-eggs'`` messages
     os.environ['PYTHON_EGG_CACHE'] = join( pa_dir(), 'egg-cache' )
 
+    # IMPORTANT : pluggdapps package can be imported only at this stage, after
+    # setting up the virtual environment.
     import pluggdapps
     from   pluggdapps.erlcodec import *
     from   pluggdapps.const import *
@@ -269,8 +295,9 @@ if __name__ == '__main__' :
         descrs = (3,4)
     else : 
         descrs = (0,1)
+
     port = Pluggdapps.boot( args.configini,
-                            descrs=descrs, 
+                            descrs=descrs,
                             packet=int(args.packet), 
                             compressed=args.compressed,
                             erlang=True )
