@@ -7,8 +7,6 @@
 import os, socket, errno, stat
 import ssl  # Python 2.6+
 
-from   pluggdapps.const import ROOTAPP
-from   pluggdapps.config import settingsfor
 from   pluggdapps.evserver import process
 from   pluggdapps.evserver.httpioloop import HTTPIOLoop
 from   pluggdapps.evserver.httpiostream import HTTPIOStream, HTTPSSLIOStream
@@ -131,7 +129,7 @@ class TCPServer( object ):
         raise NotImplementedError()
 
     def _handle_connection( self, conn, address ):
-        ssloptions = settingsfor( 'ssloptions.', self.sett )
+        ssloptions = h.settingsfor( 'ssloptions.', self.sett )
         is_ssl = ssloptions['keyfile'] and ssloptions['certfile']
         if is_ssl :
             try:

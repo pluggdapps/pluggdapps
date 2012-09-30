@@ -2,14 +2,30 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
+
+"""Pluggdapps package.
+
+When `pluggdapps` is loaded, package's init module will probe for other
+packages in the current environment's working set, and look up for 
+
+[pluggdapps]
+   package=<entry-point>
+
+entry point callable. Upon finding one, it will the corresponding package and 
+call the entry point, gathering a dictionary of information about the loaded
+package. Meanwhile, the loading of a pluggdapps package itself should load all the
+interface and plugin class implemented by that package. Thus, when a call to
+plugin_init() is made, which is after calling the `package` entry-point of
+all pluggdapps packages, we can expect that a complete system of interfaces
+and plugins will be loaded and available for query.
+"""
 
 import pkg_resources as pkg
 
 # Import pluggdapps core
 import pluggdapps.const
 import pluggdapps.utils       as h
-import pluggdapps.config
 import pluggdapps.plugin
 import pluggdapps.platform
 import pluggdapps.interfaces
@@ -38,17 +54,10 @@ for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
     packages.append( pkgname )
 
 # Load modules
-import pluggdapps.cookie
-import pluggdapps.errorpage
 import pluggdapps.ncloud
-import pluggdapps.request
-import pluggdapps.resource
-import pluggdapps.response
-import pluggdapps.rootapp
-import pluggdapps.routers
-import pluggdapps.views
-import pluggdapps.webapp
+
 # Load packages
+import pluggdapps.web
 import pluggdapps.commands
 
 # Initialize plugin data structures

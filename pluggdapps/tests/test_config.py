@@ -2,8 +2,6 @@ import unittest
 from   os.path              import dirname, join
 from   pprint               import pprint
 
-import pluggdapps.config
-from   pluggdapps.config    import *
 from   pluggdapps.erlport   import Port
 
 baseini = join( dirname( __file__ ), 'tests', 'develop.ini' )

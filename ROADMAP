@@ -12,7 +12,8 @@ Native Web Server :
 
 * Implement a native web server. Already there is an evented web-server using
   linux epoll mechanism. But it is yet to be ironed out and tested.
-
+  Code is available in pluggdapps/evserver directory. Move the code to
+  separate package and make it available as an IServer plugin.
 
 
 Maintenance :

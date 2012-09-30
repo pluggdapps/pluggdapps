@@ -11,13 +11,12 @@ interface."""
 import hmac, hashlib, base64, re, calendar, email, time
 from   http.cookies import CookieError, SimpleCookie
 
-from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import implements, Plugin
 from   pluggdapps.interfaces    import ICookie
 import pluggdapps.utils         as h
 
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPCookie."
 

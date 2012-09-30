@@ -297,9 +297,11 @@ if __name__ == '__main__' :
         descrs = (0,1)
 
     port = Pluggdapps.boot( args.configini,
+                            # Initializers for Pluggdapps() class
+                            erlang=True,
+                            # Initializers for Port() class.
                             descrs=descrs,
                             packet=int(args.packet), 
-                            compressed=args.compressed,
-                            erlang=True )
+                            compressed=args.compressed )
     run( port )
 

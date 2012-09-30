@@ -6,13 +6,12 @@
 
 from   urllib.parse import urljoin
 
-from   pluggdapps.config     import ConfigDict
 from   pluggdapps.plugin     import implements, IWebApp, query_plugin, \
                                     isimplement, Plugin
 from   pluggdapps.interfaces import IController, IRouter
 import pluggdapps.utils as h
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for WebApp base class inherited by all " \
     "pluggdapps web-applications."

@@ -41,8 +41,7 @@ REQUEST message:
     { Method, Args }
 
 `Method`,
-    Denotes the type of request. Can be one of the following,
-    ATOM_GET, ATOM_POST
+    Denotes the type of request. Methods are explained below.
 `Args`,
     List of arguments that are semantically related to `Method`.
 `KWargs`,
@@ -56,6 +55,23 @@ RESPONSE message:
   Since requests are serialized, any message that does not have an arity of 2
   and a valid Method as its first element should be considered as response
   tuple. Which contains a single term.
+
+Request method:
+---------------
+
+ATOM_GET,
+
+ATOM_POST,
+
+ATOM_LOOPBACK,
+
+ATOM_APPY,
+
+ATOM_QUERY_PLUGIN,
+
+ATOM_PLUGIN_ATTRIBUTE,
+
+ATOM_PLUGIN_METHOD,
 
 """
 
@@ -111,7 +127,7 @@ class Port( object ):
 
         Blocks until an entire erlang term is read and returns python data.
         """
-        from pluggdapps.erlcodec  import decode
+        from pluggdapps.erl.codec import decode
         if self.ind :
             data = self._read_data( self.packet )
             length = unpack( self._format, data )[0]
@@ -122,7 +138,7 @@ class Port( object ):
     def _write( self, val ):
         """Internal function to encode python data `val` to erlang binary term
         and send them to erlang side."""
-        from pluggdapps.erlcodec  import encode
+        from pluggdapps.erl.codec  import encode
         if self.outd :
             # Received at erlang side as { Port, {data, Data} }.
             data = encode( val, compressed=self.compressed )
@@ -138,7 +154,6 @@ class Port( object ):
     def listen( self ):
         """Blocking call, listening for a REQUEST from erlang-netscale
         side."""
-        from pluggdapps.erlcodec import ATOM_GET, ATOM_POST
         return self._read()
 
     def respond( self, resp ):

@@ -6,8 +6,6 @@
 
 from   pprint import pprint
 
-import pluggdapps.config
-from   pluggdapps.config     import *
 from   pluggdapps.plugin     import implements, IWebApp, Plugin, pluginname
 from   pluggdapps.platform   import Pluggdapps
 from   pluggdapps.interfaces import ICommand
@@ -109,7 +107,7 @@ class CommandConfig( Plugin ):
 
 
     def describe_config( self, settings ):
-        if isinstance( settings, ConfigDict ) :
+        if isinstance( settings, h.ConfigDict ) :
             pprint( settings.specifications(), indent=4, width=80 )
         else :
             pprint( settings, indent=4, width=80 )

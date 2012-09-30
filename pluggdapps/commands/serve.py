@@ -6,18 +6,11 @@
 
 import os, fcntl, signal, sys, time, threading, traceback
 
-from   pluggdapps.config     import ConfigDict
 from   pluggdapps.plugin     import implements, ISettings, Singleton, pluginname
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils      as h
 
-# TODO :
-#   * Should we explicitly check for multi-process server and avoid reloading
-#   strategy ?
-#   * While restarting, should we also consider pa.boot() method ?
-
-
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
     "Configuration for serve sub-command." )
 

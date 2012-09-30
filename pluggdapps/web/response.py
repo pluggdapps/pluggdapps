@@ -7,7 +7,6 @@
 import http.client, itertools
 import datetime as dt
 
-from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import implements, Plugin, query_plugin
 from   pluggdapps.interfaces    import IResponse, IResponseTransformer, \
                                        ICookie, IErrorPage
@@ -20,7 +19,7 @@ import pluggdapps.utils         as h
 #   3. clear_cookie() method doesn't seem to use expires field to remove the
 #      cookie from browser. Should we try that implementation instead ?
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for HTTPResponse implementing IResponse interface."
 

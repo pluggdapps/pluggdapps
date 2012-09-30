@@ -4,6 +4,7 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
+from pluggdapps.utils.config import *
 from pluggdapps.utils.path import *
 from pluggdapps.utils.asset import *
 from pluggdapps.utils.exc import *

@@ -4,11 +4,10 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-from   pluggdapps.config        import ConfigDict
 from   pluggdapps.plugin        import implements, Plugin
 from   pluggdapps.interfaces    import IErrorPage
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     ("Configuration settings for HTTPErrorPage implementing IErrorPage "
      "interface.")

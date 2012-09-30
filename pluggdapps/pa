@@ -11,68 +11,41 @@ from   argparse     import ArgumentParser
 from   os.path      import dirname, join
 
 import pluggdapps
-from   pluggdapps.const      import ROOTAPP, DEFAULT_INI
-from   pluggdapps.platform   import Pluggdapps, platform_logs, mount_logs
-from   pluggdapps.plugin     import plugin_init, pluginnames, query_plugins,\
-                                    ISettings, pluginname
+from   pluggdapps.const      import DEFAULT_INI
+from   pluggdapps.platform   import Pluggdapps
+from   pluggdapps.plugin     import query_plugins, PluginMeta, pluginname
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
-DEFAULT_INI = join( dirname(__file__), 'tests', 'confs', 'develop.ini' )
-webapps = {}
 
-def main():
+def mainoptions() :
     # setup main script arguments
     description = "Pluggdapps command line script."
     mainparser = ArgumentParser( description=description )
     mainparser.add_argument( '-c',
                              dest='config', default=DEFAULT_INI,
                              help="specify config file(s)" )
-    mainparser.add_argument( '-r', 
-                             action="store_true", dest="reload",
-                             help="Restart server on file modifications" )
-    mainparser.add_argument( '-m',
-                             action="store_true", dest="monitor",
-                             help=( "Used by the reloader to create a monitor "
-                                    "thread. Not to be used directly, use -r." )
-                           )
-    mainparser.add_argument( '-i',
-                             action="append", dest='imports', default=[],
-                             help="specify modules to import" )
-    mainparser.add_argument( '--pa', 
-                             action="append", dest='tostartpath', default=[],
-                             help="add given paths to the beginning of sys.path"
-                           )
-    mainparser.add_argument( '--pz', 
-                             action="append", dest='toendpath', default=[],
-                             help="add given paths to the end of sys.path" )
+    return mainparser
 
-    subcommands = query_plugins( None, ICommand, 'commands' )
+def main():
+    # Create command line parser.
+    # Get a list of sub-commands supported in command line.
+    # Take only the command-line parameters uptil a subcommand.
+    mainparser = mainoptions()
+    subcmds = [ x[7:] for x in PluginMeta._implementers[ ICommand ].keys() ]
+    mainargs = takewhile( lambda x : x not in subcmds, sys.argv[1:] )
+    args = mainparser.parse_args( mainargs )
 
-    subcmdnames = list( map( lambda x : pluginname(x)[7:], subcommands ))
-    cmdargs = []
-    for x in sys.argv[1:] :
-        if x in subcmdnames : break
-        cmdargs.append( x )
-    args = mainparser.parse_args( cmdargs )
-    args.pa = pa = Pluggdapps.boot( args.config )
+    # pluggdapps platform object.
+    pa = Pluggdapps.boot( args.config )
 
     # setup sub-command arguments
-    subcommands = query_plugins( None, ICommand, 'commands' )
+    subcommands = query_plugins( pa, None, ICommand, 'commands' )
     subparsers = mainparser.add_subparsers( help="Sub-commands" )
     [ subcmd.subparser( mainparser, subparsers ) for subcmd in subcommands ]
 
+    # Do a full parsing of command line arguments.
     args = mainparser.parse_args()
-
-    # --pa option
-    [ sys.path.insert(0, p) for p in args.tostartpath ]
-
-    # --pz option
-    [ sys.path.append(p) for p in args.toendpath ]
-
-    # -i (import)
-    sys.path.insert( 0, '' )
-    for i in args.imports : exec( "import %s" % i )
 
     pa.bootapps()   # Boot applications
 

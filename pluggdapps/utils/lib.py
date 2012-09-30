@@ -15,7 +15,7 @@ __all__ = [
     'sourcepath', 'parsecsv', 'parsecsvlines', 'classof', 'subclassof',
     'asbool', 'asint', 'asfloat', 'timedelta_to_seconds', 'set_close_exec', 
     'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
-    'reseed_random',
+    'reseed_random', 'takewhile', 'dropwhile',
     # Classes
     'Context',
 ]
@@ -146,3 +146,29 @@ def reseed_random():
     random.seed ! (at least as of python 2.6).  If os.urandom is not 
     available, we mix in the pid in addition to a timestamp."""
     random.seed( int( hexlify( os.urandom(16) ), 16 ))
+
+def mergedict( *args ) :
+    """For a list of dictionaries in `args` return a new dictionary containing
+    super-imposed key,value pairs from `args`"""
+    d = {}
+    [ d.update( arg ) for arg in args ]
+    return d
+
+def takewhile( pred, lst ):
+    """Iterate over `lst` until `pred` is True and return only the iterated
+    elements."""
+    r = []
+    for e in lst :
+        if pred(e) == False : break
+        r.append(e)
+    return r
+
+def dropwhile( pred, lst ):
+    """Iterate over `lst` until `pred` is True and return the remaining
+    elements in `lst`."""
+    i = 0
+    for e in lst :
+        if pred(e) == False : break
+        i += 1
+    return lst[i:]
+

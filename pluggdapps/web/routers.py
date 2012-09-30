@@ -7,14 +7,13 @@
 from copy import deepcopy
 
 from   pluggdapps.const        import URLSEP
-from   pluggdapps.config       import ConfigDict
 from   pluggdapps.plugin       import implements, Plugin
 from   pluggdapps.interfaces   import IRouter, IResource
 from   pluggdapps.views        import HTTPNotFound
 from   pluggdapps.routermixins import TraverseMixin, MatchMixin
 import pluggdapps.utils        as h
 
-_ram_settings = ConfigDict()
+_ram_settings = h.ConfigDict()
 _ram_settings.__doc__ = \
     "Configuration settings for url Router RouteAndMatch."
 

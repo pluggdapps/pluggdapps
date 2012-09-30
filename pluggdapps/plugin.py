@@ -110,8 +110,7 @@ import sys, inspect, io
 from   copy             import deepcopy
 from   pprint           import pprint
 
-from   pluggdapps.const     import ROOTAPP
-from   pluggdapps.config    import app2sec, plugin2sec
+import pluggdapps.utils as h
 
 # TODO :
 #   1. Unit test cases.
@@ -185,16 +184,6 @@ def pluginclass( interface, name ):
     nm = pluginname( name )
     return PluginMeta._implementers.get( interface, {} ).get( nm, None )
 
-def default_settings():
-    """Return dictionary default settings for every loaded plugin."""
-    d = {}
-    for info in PluginMeta._pluginmap.values() :
-        for b in reversed( info['cls'].mro() ) :
-            if hasattr(b, 'default_settings') :
-                d.setdefault( info['name'], {} 
-                            ).update( dict( b.default_settings().items() ))
-    return d
-
 def applications():
     """Return a list of application names (which are actually plugins
     implementing :class:`IWebApp` interface."""
@@ -229,7 +218,7 @@ def pluginname( o ):
 
 #---- Plugin meta framework
 
-core_classes = [ 'Interface', 'PluginBase', 'Singleton' ]
+core_classes = [ 'Interface', 'PluginBase', 'Plugin', 'WebApp', 'Singleton' ]
 
 class PluginMeta( type ):
     """Plugin component manager. Tracks interface specifications, plugin
@@ -285,37 +274,39 @@ class PluginMeta( type ):
                         init = b.__init__._original
                         break
 
-            def masterinit( self, webapp, *args, **kwargs ) :
+            def masterinit( self, pa, webapp, *args, **kwargs ) :
                 """Plugin Init function hooked in by PluginMeta.
                 Consumes ``webapp`` argument and initialize plugin with
                 *args and **kwargs parameters. It also handles the special
                 case of instantiating IWebApp plugins."""
-                # TODO : Optimize the following imports
-                from pluggdapps.platform import settings
-
-                # TODO : make `self.appsettings` into a read only copy
+                from pluggdapps.web.webapp import WebApp
 
                 # Check for instantiated singleton, if so return.
                 if hasattr( self, 'settings' ): return
 
                 self._settngx = {}
-                pluginnm = pluginname(self)
 
-                if isinstance( webapp, tuple ) :
+                # TODO : make `self.appsettings` into a read only copy
+
+                if isinstance( self, WebApp ) : # Ought to be IWebApp plugin
                     appsec, t, v, configini = webapp
-                    self.appsettings = settings[ webapp ]
+                    self.appsettings = args[0]  # appsettings from boot()
+                    args = args[1:]
                     self._settngx.update( self.appsettings[appsec] )
-                    self.webapp = None
-                elif webapp :
+                    self.webapp = self
+                elif webapp :                   # Not a IWebApp plugin
                     self.appsettings = webapp.appsettings
-                    self._settngx.update( self.appsettings[plugin2sec(pluginnm)] )
+                    self._settngx.update(
+                            self.appsettings[ h.plugin2sec( pluginname( self )) ]
+                    )
                     self.webapp = webapp
-                else :
+                else :                          # plugin not under a webapp
                     self.appsettings = {}
-                    self._settngx.update( 
-                            settings.get( plugin2sec(pluginnm), {} ))
+                    self._settngx.update(
+                            pa.settings[ h.plugin2sec( pluginname( self )) ]
+                    )
                     self.webapp = None
-                self.settings = settings
+                self.settings = pa.settings
 
                 # Plugin settings
                 self._settngx.update( kwargs.pop( 'settings', {} ))
@@ -333,7 +324,7 @@ class PluginMeta( type ):
                 using,
                     super().__init__( *args, **kwargs )
                 use,
-                    self._super_init( *args, **kwargs )
+                    self._super_init( __class__, *args, **kwargs )
 
                 Other methods that are overloaded as called as is.
                 """
@@ -456,7 +447,25 @@ def implements( *interfaces ):
         PluginMeta._implementers.setdefault( i, {} ).setdefault( nm, '-na-' )
 
 
-#---- Default Interfaces for all plugins
+#---- Interfaces
+
+class IConfig( Interface ):
+    """Configuration is inherent part of every plugin. Actually, a plugin is
+    nothing but a dictionary of configuration settings. class:`IConfig`
+    interface is to be used by boot sequence, to parse configurations and
+    translate them into plugin settings.
+    
+    Since configuration need to be parsed as the first thing in boot sequence,
+    :class:`Pluggdapps` can't be using query_plugin() APIs, instead it will
+    directly access the internals of plugin framwork to get to this plugin.
+    """
+
+    @classmethod
+    def loadsettings( self, *args ):
+        """This is the single API expected to be supported by this plugin.
+        Since config plugins will not be instantiated only class methods
+        are to be used."""
+
 
 class ISettings( Interface ):
     """Every plugin is a dictionary of configuration. And its configuration
@@ -483,6 +492,7 @@ class ISettings( Interface ):
         "Read only copy of global settings."
     )
 
+    @classmethod
     def default_settings():
         """Class method.
         Return instance of :class:`ConfigDict` providing meta data
@@ -496,6 +506,7 @@ class ISettings( Interface ):
         understood by the plugin and publish configuration manuals for users.
         """
 
+    @classmethod
     def normalize_settings( settings ):
         """Class method.
         ``settings`` is a dictionary of configuration parameters. This method
@@ -508,6 +519,7 @@ class ISettings( Interface ):
         parameters. Processed parameters in ``settings`` are updated 
         in-pace and returned."""
 
+    @classmethod
     def web_admin( settings ):
         """Class method. 
         Plugin settings can be configured via web interfaces and stored in
@@ -712,25 +724,64 @@ def plugin_init():
 
 #---- Query APIs
 
-def query_plugins( webapp, interface, *args, **kwargs ):
+def query_plugins( pa, webapp, interface, *args, **kwargs ):
     """Use this API to query for plugins using the `interface` class it
     implements. Positional and keyword arguments will be used to instantiate
     the plugin object.
+
+    `pa`,
+        :class:`Pluggdapps` class instance, in whose context this query is
+        being made. This argument should be always a valid one.
+
+    `webapp`,
+        Web-application, under whose context this query is being made. It must
+        either be a valid :class:`Plugin` implementing :class:`IWebApp`
+        interface, or a tuple describing the application instance's key
+        indexing into pa.settings dictionary. A query can also be made outside
+        web-application instances, in which case this positional argument
+        should be passed as None. If `webapp` is passed as tuple while querying
+        non-application plugin, it will be resolved to application plugin
+        instance using pa.webapp dictionary, this will eventually be passed to
+        queried plugin during its instantiation.
+
+    `interface`,
+        :class:`Interface`
 
     If ``settings`` key-word argument is present, it will be used to override
     default plugin settings.
 
     Returns a list of plugin instance implementing `interface`
     """
-    plugins = [ pcls( webapp, *args, **kwargs )
+    if isinstance( webapp, tuple ) :
+        appsec, t, v, configini = webapp
+        webapp = pa.webapps.get( h.sec2plugin(appsec), webapp )
+    return [ pcls( pa, webapp, *args, **kwargs )
                 for pcls in PluginMeta._implementers[interface].values() ]
-    return plugins
 
 
-def query_plugin( webapp, interface, name, *args, **kwargs ):
+def query_plugin( pa, webapp, interface, name, *args, **kwargs ):
     """Same as queryPlugins, but returns a single plugin instance as opposed
-    an entire list. Positional and keyword arguments will be used to 
-    instantiate the plugin object.
+    an entire list. `name` will be used to identify that plugin.
+    Positional and keyword arguments will be used to instantiate the plugin
+    object.
+
+    `pa`,
+        :class:`Pluggdapps` class instance, in whose context this query is
+        being made. This argument should be always a valid one.
+
+    `webapp`,
+        Web-application, under whose context this query is being made. It must
+        either be a valid :class:`Plugin` implementing :class:`IWebApp`
+        interface, or a tuple describing the application instance's key
+        indexing into pa.settings dictionary. A query can also be made outside
+        web-application instances, in which case this positional argument
+        should be passed as None. If `webapp` is passed as tuple while querying
+        non-application plugin, it will be resolved to application plugin
+        instance using pa.webapp dictionary, this will eventually be passed to
+        queried plugin during its instantiation.
+
+    `interface`,
+        :class:`Interface`
 
     If ``settings`` key-word argument is present, it will be used to override
     default plugin settings.
@@ -739,7 +790,7 @@ def query_plugin( webapp, interface, name, *args, **kwargs ):
     """
     nm = pluginname(name)
     cls = PluginMeta._implementers[interface][nm]
-    return cls( webapp, *args, **kwargs )
+    return cls( pa, webapp, *args, **kwargs )
 
 
 #---- Formated output for internal data-structures.

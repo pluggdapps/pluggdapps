@@ -7,7 +7,6 @@
 import re
 
 from   pluggdapps.const      import URLSEP
-from   pluggdapps.config     import settingsfor
 from   pluggdapps.plugin     import interface
 from   pluggdapps.interfaces import IRouter
 from   pluggdapps.views      import HTTPNotFound
@@ -78,7 +77,7 @@ class TraverseMixin( BaseMixin ):
 
         # If a router is configured for every segment name, then query and
         # initialize them for the corresponding segment name.
-        segments = settingsfor( 'traverse.', self )
+        segments = h.settingsfor( 'traverse.', self )
         #for segment, routername in segments :
         #    router = query_plugin( self.webapp, IRouter, routername )
         #    router.segment = segment

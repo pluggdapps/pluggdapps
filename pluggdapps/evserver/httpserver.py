@@ -16,8 +16,6 @@ class except to start a server at the beginning of the process
 import socket
 import ssl  # Python 2.6+
 
-from   pluggdapps.const import ROOTAPP
-from   pluggdapps.config import ConfigDict
 from   pluggdapps.plugin import Singleton, implements, query_plugin, \
                                 ISettings, IWebApp
 from   pluggdapps.interfaces          import IServer, IRequest
@@ -31,7 +29,7 @@ import pluggdapps.utils.stack_context as sc
 #   status code to any HTTP/1.1 request message which lacks a Host header
 #   field.
 
-_default_settings = ConfigDict()
+_default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for event poll based HTTP server."
 
