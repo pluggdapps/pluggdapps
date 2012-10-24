@@ -2,6 +2,7 @@ import unittest
 from   os.path              import dirname, join
 from   pprint               import pprint
 
+import pluggapps.utils      as h
 from   pluggdapps.erlport   import Port
 
 baseini = join( dirname( __file__ ), 'tests', 'develop.ini' )
@@ -18,13 +19,9 @@ port    = TestPort( descrs=(3,4) )
 
 class TestConfig( unittest.TestCase ):
 
-    def test_app2sec( self ):
-        assert sec2app( app2sec( 'appname' )) == 'appname'
-        assert is_app_section( app2sec( 'appname' ))
-
     def test_plugin2sec( self ):
-        assert sec2plugin( plugin2sec( 'pluginname' )) == 'pluginname'
-        assert is_plugin_section( plugin2sec( 'pluginname' ))
+        assert h.sec2plugin( h.plugin2sec( 'pluginname' )) == 'pluginname'
+        assert is_plugin_section( h.plugin2sec( 'pluginname' ))
 
     def test_defaultsettings( self ):
         appdefaults, plugindefaults = pluggdapps.config.defaultsettings()

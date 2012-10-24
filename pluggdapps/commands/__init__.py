@@ -4,9 +4,8 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-from pluggdapps.commands import commands
-from pluggdapps.commands import config
-from pluggdapps.commands import ls
-from pluggdapps.commands import serve
-from pluggdapps.commands import unittest
-from pluggdapps.commands import mounts
+import pluggdapps.commands.commands
+import pluggdapps.commands.ls
+import pluggdapps.commands.serve
+import pluggdapps.commands.unittest
+import pluggdapps.commands.mounts

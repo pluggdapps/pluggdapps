@@ -6,7 +6,7 @@
 
 """Handles platform related functions, like parsing configuration settings,
 loading plugins (and applications). As noted elsewhere, a plugin is just a
-dictionary of configuration settings for a class object implementing a one or
+dictionary of configuration settings for a class object implementing one or
 more interface specifications. Configuration settings is central to
 plugin system.
 
@@ -48,63 +48,15 @@ Shall be parsed to settings like,
   }
 
 
-  base.ini                          *----------->mount.ini (per app instance)
-  --------                          |            ----------------------------
-                                    |      
-  [DEFAULT] ------------------------|-----* *--- [DEFAULT]
-  <option> = <value>                |     | |    <option> = <value>
-  ...                               |     | |    ...
-                                    |     | |
-  [pluggdapps]                      |     | | *- [plugin:<pluginname>]
-  <option> = <value>                |     | | |  <option> = <value>
-  ...                               |     | | |  ...
-                                    |     | | |
-  [webmounts] ---------------------*|     | | |  [plugin:...]
-  <appname> = (<type>, <value>)    ||     | | |  ...
-  <appname> = (<type>, <value>, mountini) | | |
-  ...                              |      | | |         Default Settings
-                                   |      | | |         ----------------
-  [webapp:<appname>] ------------------*  **|-|---------- global_default = {
-  <option> = <value>               |   |  | | |           }
-  ...                              |   |  | | |          
-                                   |   |  | | |       *---webapp_configdict = {
-  [webapp:...]                     |   |  | | |       |   }
-  ...                              |   |  | | |       |   ...
-                                   |   |  | | *       |   
-  [plugin:<pluginname>] ---------------|--|-|-*-----* | *-plugin_configdict = {
-  <option> = <value>               |   |  | |       | | | }
-  ...                              |   |  | |       | | | ...
-                                   |   |  | |       | | |
-  [plugin:...]                     |   |  | |       | | |
-  ...                              |   |  | |       | | |
-                                   |   |  | |       | | |
-  Settings                         |   |  | |       | | |
-  --------                         |   |  | |       | | |
-   { 'pluggdapps'    :<sett>,  <---|---|--* |       | | |
-     'webmounts'     :<sett>,  <---*   |    |       | | |
-     'plugin:<name>' :<sett>,          |    |       | | |
-     ...                               |    |       | | |
-     ('webapp:<appname>',: <instsett>, **---*       | | |
-      type, val, conf)                 |            | | |
-     ...                               |            | | |
-   }                                   *            | | |
-                                      **------------|-* |
-                                      |             |   |
-                                      V             *--**
-             { 'webapp:<appname>'   : <settings>,       |
-               'plugin:<pluginname> : <settings>, <-----*
-               ...                                      
-             }                                           
-                                                         
 Special sections:
 -----------------
 
 Special sections, base.ini can have the following special sections,
 [DEFAULT], [pluggdapps] and [webmounts]. All other section names are to be
-prefixed with either "plugin:<pluginname>".
+prefixed with "plugin:<pluginname>".
   
   * [DEFAULT] special section, settings that are applicable to all configuration
-    sections including plugins, refered configuration files.
+    sections including plugins and refered configuration files.
   
   * [pluggdapps] special section, settings that are applicable to pluggdapps
     platform typically handled by :class:`Pluggdapps`.
@@ -117,7 +69,8 @@ Notes:
 ------
 
   * base.ini file acts as the master configuration file and can refer to other
-    configuration file per application available under pluggdapps.
+    configuration file per application, via [webmounts] section, available
+    under pluggdapps.
   
 
 Mounting applications:
@@ -132,18 +85,16 @@ Configured under [webmounts] special section in master ini file.
   
   * An application is nothing but a plugin implementing :class:`IApplication`
     interface specification.
-  
-
-
-
 """
 
 from   configparser          import SafeConfigParser
+from   os.path               import dirname
+from   copy                  import deepcopy
 
-from   pluggdapps.const      import MOUNT_SUBDOMAIN, MOUNT_SCRIPT
-from   pluggdapps.plugin     import Singleton, ISettings, applications, \
-                                    query_plugin, query_plugins, IWebApp
-from   pluggdapps.interfaces import IRequest, IResponse
+from   pluggdapps.const      import MOUNT_SUBDOMAIN, MOUNT_SCRIPT, MOUNT_TYPES,\
+                                    SPECIAL_SECS
+from   pluggdapps.plugin     import Singleton, ISettings, applications, IWebApp
+from   pluggdapps.web.webinterfaces import IRequest, IResponse
 import pluggdapps.utils      as h
 
 
@@ -202,8 +153,9 @@ def defaultsettings():
         name = info['name']
         bases = reversed( info['cls'].mro() )
         sett = {}
-        [sett.update( dict( b.default_settings().items() )) for b in bases]
-        plugindefaults[ plugin2sec(name) ] = sett
+        [ sett.update( dict( b.default_settings().items() )) 
+          for b in bases if hasattr(b, 'default_settings') ]
+        plugindefaults[ h.plugin2sec(name) ] = sett
 
     return plugindefaults
 
@@ -212,24 +164,25 @@ class Pluggdapps( object ):
     """Platform class tying together pluggdapps platform. The platform starts
     with the boot() method call (which is a classmethod)."""
 
-    port = None
-    """If the platform is booted via an erlang port interface this attribute
-    will be set to :class:`Port` object."""
-
     inifile = None
     """Master Configuration file, absolute location."""
 
     settings = {}
     """Default settings from plugins overriden by settings from master
-    configuration file."""
+    configuration file and other backend stores, if any."""
+
+    port = None
+    """If the platform is booted via an erlang port interface this attribute
+    will be set to :class:`Port` object."""
 
     def __init__( self, *args, **kwargs ):
-        self.port = kwargs.pop( 'port', False )
+        self.port = kwargs.pop( 'port', None )
 
+    #---- Overridable methods.
     @classmethod
     def boot( cls, baseini, *args, **kwargs ):
         """Boot sequence
-        * Boot platform using master configuration file, refer module
+        * Boot platform using master configuration file.
 
         Return a new instance of this class object.
         """
@@ -238,27 +191,31 @@ class Pluggdapps( object ):
         pa.settings = pa.loadsettings( baseini )
         return pa
 
+    def start( self ):
+        """Expected to be called after boot(). Start pluggdapps."""
+        pass
+
+    #---- Internal methods.
     def loadsettings( self, inifile ):
-        """Load `baseini` and instance-wise ini files (for each web-app) and
+        """Load `inifile` and instance-wise ini files (for each web-app) and
         return them as dictionary of app settings."""
         from pluggdapps.plugin import plugin_info
 
         SPECIAL_SECS = [ 'pluggdapps' ]
         plugindefaults = defaultsettings()
 
-        # Override plugin defaults for each application with configuration
-        # from its ini-file
-        settings = self.loadini( baseini, plugindefaults )
+        # Override plugin defaults with configuration from ini-file(s)
+        settings = self.loadini( inifile, plugindefaults )
 
         # Normalize special sections settings
         settings['pluggdapps'] = normalize_pluggdapps( settings['pluggdapps'] )
 
         # Normalize plugins
-        for sec, sett in settings.items()[:] :
+        for sec, sett in settings.items() :
             if sec in SPECIAL_SECS : continue
             if not sec.startswith( 'plugin:' ) : continue
 
-            cls = plugin_info( sec2plugin(sec) )['cls']
+            cls = plugin_info( h.sec2plugin(sec) )['cls']
             for b in reversed( cls.mro() ) :
                 if hasattr(b, 'normalize_settings') :
                     sett = b.normalize_settings( sett )
@@ -269,18 +226,18 @@ class Pluggdapps( object ):
 
     def loadini( self, baseini, plugindefaults ):
         """Parse master ini configuration file `baseini` and ini files refered by
-        `baseini`. Construct a dictionary of settings for all sections and
-        plugins."""
+        `baseini`. Construct a dictionary of settings for special sections and
+        plugin sections."""
         from pluggdapps.plugin import pluginnames
 
-        # Initialize return data.
+        # Initialize return dictionary.
         settings = {}
 
         # context for parsing ini files.
         _vars = { 'here' : dirname(baseini) }
 
         # Read master ini file.
-        cp = configparser.SafeConfigParser()
+        cp = SafeConfigParser()
         cp.read( baseini )
 
         # Global defaults
@@ -298,7 +255,7 @@ class Pluggdapps( object ):
             sec_pluggdapps.update( dict( cp.items( 'pluggdapps', vars=_vars )))
         settings['pluggdapps'] = sec_pluggdapps
 
-        settings['DEFAULTS'] = h.mergedict( defaultsett1, defaultsett2 )
+        settings['DEFAULT'] = h.mergedict( defaultsett1, defaultsett2 )
 
         # Override plugin's package default settings with [DEFAULT] settings.
         for pluginsec, sett in plugindefaults.items() :
@@ -309,40 +266,66 @@ class Pluggdapps( object ):
 
         return settings
 
+
+    #---- Query APIs
+
+    def query_plugins( self, interface, webapp, *args, **kwargs ):
+        """Use this API to query for plugins using the `interface` class it
+        implements. Positional and keyword arguments will be used to instantiate
+        the plugin object.
+
+        `interface`,
+            :class:`Interface`
+
+        `webapp`,
+            Optional :class:`WebApp` plugin in whose context the query is made.
+
+        If ``settings`` key-word argument is present, it will be used to override
+        default plugin settings.
+
+        Returns a list of plugin instance implementing `interface`
+        """
+        from pluggdapps.plugin import PluginMeta
+        return [ pcls( self, webapp, *args, **kwargs )
+                 for pcls in PluginMeta._implementers[interface].values() ]
+
+
+    def query_plugin( self, interface, name, webapp, *args, **kwargs ):
+        """Same as queryPlugins, but returns a single plugin instance as opposed
+        an entire list. `name` will be used to identify that plugin.
+        Positional and keyword arguments will be used to instantiate the plugin
+        object.
+
+        `interface`,
+            :class:`Interface`
+
+        `webapp`,
+            Optional :class:`WebApp` plugin in whose context the query is made.
+
+        If ``settings`` key-word argument is present, it will be used to override
+        default plugin settings.
+
+        Return a single Plugin instance.
+        """
+        from pluggdapps.plugin import PluginMeta, pluginname
+        cls = PluginMeta._implementers[ interface ][ pluginname(name) ]
+        return cls( self, webapp, *args, **kwargs )
+
+
     #---- platform logging
 
-    def logerror( self, formatstr, values ):
-        if self.port :
-            Port.logerror( self, formatstr, values )
-        else :
-            formatstr = formatstr.replace( '~', '%' ) if values else formatstr
-            print( formatstr % values )
+    def loginfo( self, formatstr, values=[] ):
+        self.port.loginfo(formatstr, values) if self.port else print(formatstr)
 
-    def logwarn( self, formatstr, values ):
-        if self.port :
-            Port.logerror( self, formatstr, values )
-        else :
-            formatstr = formatstr.replace( '~', '%' ) if values else formatstr
-            print( formatstr % values )
+    def logwarn( self, formatstr, values=[] ):
+        self.port.logwarn(formatstr, values) if self.port else print(formatstr)
 
-    def loginfo( self, formatstr, values ):
-        if self.port :
-            Port.logerror( self, formatstr, values )
-        else :
-            formatstr = formatstr.replace( '~', '%' ) if values else formatstr
-            print( formatstr % values )
-
-    def logwarning( self, formatstr, values ):
-        if self.port :
-            Port.logerror( self, formatstr, values )
-        else :
-            formatstr = formatstr.replace( '~', '%' ) if values else formatstr
-            print( formatstr % values )
-
+    def logerror( self, formatstr, values=[] ):
+        self.port.logerror(formatstr, values) if self.port else print(formatstr)
 
 
 class Webapps( Pluggdapps ):
-    """For web-applications."""
+    """Configuration for web-application plugins."""
 
     m_subdomains = {}
     """Mapping urls to applications based on subdomain."""
@@ -356,12 +339,11 @@ class Webapps( Pluggdapps ):
     def __init__( self, *args, **kwargs ):
         super().__init__( *args, **kwargs )
 
+    #---- Overridable methods
+
     @classmethod
     def boot( cls, baseini, *args, **kwargs ):
         """Boot sequence
-        * Boot platform using master configuration file, refer module
-          `pluggdapps.config`.
-
         Return a new instance of this class object.
         """
         pa = super().boot( baseini, *args, **kwargs )
@@ -369,17 +351,17 @@ class Webapps( Pluggdapps ):
         pa.m_scripts = {}       # Instance attribute
         pa.webapps = {}         # Instance attribute
 
-        appsettings = self.webmounts()
+        appsettings = pa.webmounts()
+
         # Mount webapp instances for subdomains and scripts.
         for instkey, appsett in appsettings.items() :
             appsec, t, mountname, config = instkey
 
             # Instantiate the IWebAPP plugin here for each `instkey`
             appname = h.sec2plugin( appsec )
-            webapp = query_plugin( pa, instkey, IWebApp, appname, appsett )
-            webapp.instkey = instkey
-            webapp.pa = pa
-            webapp.subdomain, webapp.script = None, None
+            webapp = pa.query_plugin( IWebApp, appname, instkey, appsett )
+            webapp.instkey, webapp.subdomain, webapp.script = instkey,None,None
+            pa.webapps[ instkey ] = webapp
 
             # Resolution mapping for web-applications
             if t == MOUNT_SUBDOMAIN :
@@ -390,30 +372,53 @@ class Webapps( Pluggdapps ):
                 webapp.script = mountname
         return pa
 
+    def start( self ):
+        """Boot all loaded application. Web-Apps are loaded when the
+        system is booted via boot() call. Apps are booted only when an
+        explicit call is made to this method."""
+        super().start()
+        appnames = []
+        for instkey, webapp in self.webapps.items() :
+            appsec, t, mountname, config = instkey
+            self.loginfo( "Booting application %r ..." % (instkey,), [] )
+            webapp.onboot()
+            appnames.append( h.sec2plugin( appsec ))
+
+    #---- Internal methods
     def webmounts( self ):
-        """Create application wise settings. If special section webmounts is
-        present, parse referred configuration files."""
+        """Create application wise settings, using special section
+        [webmounts], if any. Also parse referred configuration files."""
         from pluggdapps.plugin import pluginnames, applications
 
-        SPECIAL_SECS = [ 'pluggdapps' ]
         settings = self.settings
+
+        # context for parsing ini files.
+        _vars = { 'here' : dirname(self.inifile) }
+
 
         # Fetch special section [webmounts]. And override them with [DEFAULT]
         # settings.
-        cp = configparser.SafeConfigParser()
+        cp = SafeConfigParser()
         cp.read( self.inifile )
         if cp.has_section('webmounts') :
             webmounts = cp.items( 'webmounts', vars=_vars )
         else :
             webmounts = []
-        settings['webmounts'] = dict(webmounts)
+        settings['webmounts'] = dict( webmounts )
 
         # Parse mount configuration.
-        appsecs = list( map( plugin2sec, applications() ))
+        appsecs = list( map( h.plugin2sec, applications() ))
         defaultmounts = appsecs[:]
-        for (name, val) in webmounts :
-            appsec = plugin2sec( name )
-            if appsec not in appsecs : continue
+        mountls = []
+        _skipopts = list(_vars.keys()) + list(settings['DEFAULT'].keys())
+        for name, val in webmounts :
+            if name in _skipopts : continue
+
+            appsec = h.plugin2sec( name )
+            if appsec not in appsecs : 
+                warn = "In [webmounts]: %r web-app (plugin) not found."%appsec
+                self.logwarn( warn, [] )
+                continue
 
             # Parse mount values and validate them.
             y = [ x.strip() for x in val.split(',') ]
@@ -429,27 +434,29 @@ class Webapps( Pluggdapps ):
                 err = "%r for %r is not a valid mount type" % (t, name)
                 raise Exception( err )
             
-            webmounts.append( (appsec,t,mountname,instconfig) )
-            defaultmounts.pop( appsec )
+            mountls.append( (appsec,t,mountname,instconfig) )
+            defaultmounts.remove( appsec )
 
         # Configure default mount points for remaining applications.
-        [ webmounts.append(
+        [ mountls.append(
             (appsec, MOUNT_SCRIPT, "/"+h.sec2plugin(appsec), None)
           ) for appsec in defaultmounts ]
 
         # Load application configuration from instance configuration file.
         appsettings = {}
-        for appsec, t, mountname, instconfig in webmounts :
+        for appsec, t, mountname, instconfig in mountls :
             appsett = deepcopy( settings )
+            [ appsett.pop(k) for k in SPECIAL_SECS ]
             if instconfig :
                 self.loadinstance( appsett, instconfig )
             appsettings[ (appsec,t,mountname,instconfig) ] = appsett
         return appsettings
 
+
     def loadinstance( self, appsett, instanceini ):
         """Load configuration settings for a web application's instance."""
         _vars = { 'here' : dirname(instanceini) }
-        cp = configparser.SafeConfigParser()
+        cp = SafeConfigParser()
         cp.read( instanceini )
 
         # Update appsett with [DEFAULT] section of instanceini
@@ -461,18 +468,6 @@ class Webapps( Pluggdapps ):
         [ appsett[sec].update( dict( cp.items( sec, vars=_vars )))
           for sec in cp.sections() if sec.startswith( 'plugin:' ) ]
 
-
-    def bootapps( self ):
-        """Boot all loaded application. Web-Apps are loaded when the
-        system is booted via boot() call. Apps are booted only when an
-        explicit call is made to this method."""
-        global webapps
-        appnames = []
-        for appname in sorted( webapps ) :
-            self.loginfo( "Booting application %r ..." % appname, [] )
-            webapps[appname].onboot()
-            appnames.append( appname )
-        return appnames
 
     def appresolve( self, uriparts, headers, body ):
         """Resolve application for `request`."""
@@ -570,32 +565,4 @@ class Webapps( Pluggdapps ):
     def default_settings( cls ):
         return _default_settings
 
-
-def appkey( appname ):
-    rc = []
-    for instkey, v in settings.items() :
-        if not isinstance( instkey, tuple ) : continue
-        appsec, t, v, config = instkey
-        if h.sec2plugin( appsec ) == appname :
-            rc.append( instkey )
-    return rc
-
-
-def platform_logs( f ) :
-    msg = "%s interfaces defined and %s plugins loaded" % (
-           len(PluginMeta._interfmap), len(PluginMeta._pluginmap) )
-    print( msg, file=f )
-    print( "%s applications loaded" % len(applications()), file=f ) 
-    print( "%s pluggdapps packages loaded" % len(pluggdapps.packages), file=f )
-
-
-def mount_logs( f ):
-    global webapps
-    for appname in sorted( webapps ) :
-        mount = m_subdomains.get( appname, None )
-        if mount :
-            print( "%r mounted on subdomain %r" % (appname, mount), file=f )
-        else :
-            mount = m_scripts.get( appname, None )
-            print( "%r mounted on scripts %r" % (appname, mount), file=f )
 

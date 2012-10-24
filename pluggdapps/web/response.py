@@ -7,11 +7,11 @@
 import http.client, itertools
 import datetime as dt
 
-from   pluggdapps.plugin        import implements, Plugin, query_plugin
-from   pluggdapps.interfaces    import IResponse, IResponseTransformer, \
-                                       ICookie, IErrorPage
+from   pluggdapps.plugin            import implements, Plugin
+from   pluggdapps.web.webinterfaces import IResponse, IResponseTransformer, \
+                                           ICookie, IErrorPage
 import pluggdapps.utils.stack_context as sc
-import pluggdapps.utils         as h
+import pluggdapps.utils             as h
 
 # TODO :
 #   1. user locale (server side).

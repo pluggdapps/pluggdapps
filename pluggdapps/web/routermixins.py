@@ -6,11 +6,11 @@
 
 import re
 
-from   pluggdapps.const      import URLSEP
-from   pluggdapps.plugin     import interface
-from   pluggdapps.interfaces import IRouter
-from   pluggdapps.views      import HTTPNotFound
-import pluggdapps.utils      as h
+import pluggdapps.utils             as h
+from   pluggdapps.const             import URLSEP
+from   pluggdapps.plugin            import interface
+from   pluggdapps.web.webinterfaces import IRouter
+from   pluggdapps.web.views         import HTTPNotFound
 
 class BaseMixin( object ):
 

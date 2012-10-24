@@ -15,7 +15,7 @@ __all__ = [
     'sourcepath', 'parsecsv', 'parsecsvlines', 'classof', 'subclassof',
     'asbool', 'asint', 'asfloat', 'timedelta_to_seconds', 'set_close_exec', 
     'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
-    'reseed_random', 'takewhile', 'dropwhile',
+    'reseed_random', 'mergedict', 'takewhile', 'dropwhile',
     # Classes
     'Context',
 ]

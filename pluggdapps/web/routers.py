@@ -6,12 +6,12 @@
 
 from copy import deepcopy
 
-from   pluggdapps.const        import URLSEP
-from   pluggdapps.plugin       import implements, Plugin
-from   pluggdapps.interfaces   import IRouter, IResource
-from   pluggdapps.views        import HTTPNotFound
-from   pluggdapps.routermixins import TraverseMixin, MatchMixin
-import pluggdapps.utils        as h
+import pluggdapps.utils             as h
+from   pluggdapps.const             import URLSEP
+from   pluggdapps.plugin            import implements, Plugin
+from   pluggdapps.web.webinterfaces import IRouter, IResource
+from   pluggdapps.web.views         import HTTPNotFound
+from   pluggdapps.web.routermixins  import TraverseMixin, MatchMixin
 
 _ram_settings = h.ConfigDict()
 _ram_settings.__doc__ = \
@@ -60,7 +60,7 @@ class RouteAndMatch( Plugin, TraverseMixin, MatchMixin ):
         return _ram_settings
 
 
-_routestatic_sett = ConfigDict()
+_routestatic_sett = h.ConfigDict()
 _routestatic_sett.__doc__ = \
     "Configuration settings for url Router RouteMatch."
 

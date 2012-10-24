@@ -6,25 +6,30 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import sys, os, signal, subprocess
+"""Most of the time expect pluggdapps-environment to be loaded via this
+script. Use --help to learn more about each command and its options."""
+
+import sys
 from   argparse     import ArgumentParser
-from   os.path      import dirname, join
 
 import pluggdapps
 from   pluggdapps.const      import DEFAULT_INI
-from   pluggdapps.platform   import Pluggdapps
-from   pluggdapps.plugin     import query_plugins, PluginMeta, pluginname
+from   pluggdapps.platform   import Pluggdapps, Webapps
+from   pluggdapps.plugin     import PluginMeta
 from   pluggdapps.interfaces import ICommand
-import pluggdapps.utils as h
+import pluggdapps.utils      as h
 
 
-def mainoptions() :
+def mainoptions():
     # setup main script arguments
     description = "Pluggdapps command line script."
     mainparser = ArgumentParser( description=description )
-    mainparser.add_argument( '-c',
-                             dest='config', default=DEFAULT_INI,
+    mainparser.add_argument( '-c', dest='config', 
+                             default=DEFAULT_INI,
                              help="specify config file(s)" )
+    mainparser.add_argument( '-w', dest='webapps',
+                             action='store_true', default=True,
+                             help="load with web-framework" )
     return mainparser
 
 def main():
@@ -33,21 +38,26 @@ def main():
     # Take only the command-line parameters uptil a subcommand.
     mainparser = mainoptions()
     subcmds = [ x[7:] for x in PluginMeta._implementers[ ICommand ].keys() ]
-    mainargs = takewhile( lambda x : x not in subcmds, sys.argv[1:] )
+    mainargs = h.takewhile( lambda x : x not in subcmds, sys.argv[1:] )
     args = mainparser.parse_args( mainargs )
 
     # pluggdapps platform object.
-    pa = Pluggdapps.boot( args.config )
+    if not args.config :
+        print("Please supply a configuration file. Do -h for help")
+        sys.exit(1)
+
+    if args.webapps :
+        pa = Webapps.boot( args.config )
+    else :
+        pa = Pluggdapps.boot( args.config )
 
     # setup sub-command arguments
-    subcommands = query_plugins( pa, None, ICommand, 'commands' )
+    subcommands = pa.query_plugins( ICommand, None )
     subparsers = mainparser.add_subparsers( help="Sub-commands" )
     [ subcmd.subparser( mainparser, subparsers ) for subcmd in subcommands ]
 
     # Do a full parsing of command line arguments.
     args = mainparser.parse_args()
-
-    pa.bootapps()   # Boot applications
 
     # Handle subcommand
     args.handler( args )

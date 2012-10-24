@@ -6,10 +6,10 @@
 
 from   urllib.parse import urljoin
 
-from   pluggdapps.plugin     import implements, IWebApp, query_plugin, \
-                                    isimplement, Plugin
-from   pluggdapps.interfaces import IController, IRouter
-import pluggdapps.utils as h
+from   pluggdapps.plugin            import implements, IWebApp, isimplement, \
+                                           Plugin, pluginname
+from   pluggdapps.web.webinterfaces import IController, IRouter
+import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
@@ -51,12 +51,18 @@ _default_settings['irouter']  = {
 }
 
 class WebApp( Plugin ):
+    """Base class for all web applications."""
+
     implements( IWebApp )
+
+    def __init__( self ):
+        self.router = None  # TODO : Make this into default router
 
     def onboot( self ):
         """Inheriting plugins should not forget to call its super() method."""
-        self.router = query_plugin( self, IRouter, self['irouter'] )
-        self.router.onboot()
+        #self.router = query_plugin( self, IRouter, self['irouter'] )
+        #self.router.onboot()
+        pass
 
     def shutdown( self ):
         pass

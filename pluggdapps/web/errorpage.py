@@ -4,8 +4,9 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-from   pluggdapps.plugin        import implements, Plugin
-from   pluggdapps.interfaces    import IErrorPage
+import pluggdapps.utils             as h
+from   pluggdapps.plugin            import implements, Plugin
+from   pluggdapps.web.webinterfaces import IErrorPage
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \

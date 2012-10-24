@@ -12,25 +12,23 @@ packages in the current environment's working set, and look up for
 [pluggdapps]
    package=<entry-point>
 
-entry point callable. Upon finding one, it will the corresponding package and 
-call the entry point, gathering a dictionary of information about the loaded
-package. Meanwhile, the loading of a pluggdapps package itself should load all the
-interface and plugin class implemented by that package. Thus, when a call to
-plugin_init() is made, which is after calling the `package` entry-point of
-all pluggdapps packages, we can expect that a complete system of interfaces
-and plugins will be loaded and available for query.
+entry point callable. Upon finding one, it will load the corresponding package
+and call the entry point, gathering a dictionary of information about the
+loaded package. Its upto the package to load relevant modules implementing
+interfaces and plugins. Thus, when a call to plugin_init() is made, which is
+after calling the `package` entry-point of all pluggdapps packages, we can
+expect that a complete system of interfaces and plugins will be loaded and
+available for query.
 """
 
 import pkg_resources as pkg
 
-# Import pluggdapps core
-import pluggdapps.const
 import pluggdapps.utils       as h
+
+# pluggdapps core
 import pluggdapps.plugin
 import pluggdapps.platform
 import pluggdapps.interfaces
-
-from   pluggdapps.plugin      import plugin_init
 
 __version__ = '0.1dev'
 
@@ -53,13 +51,10 @@ for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
     __import__( pkgname )
     packages.append( pkgname )
 
-# Load modules
-import pluggdapps.ncloud
-
 # Load packages
 import pluggdapps.web
 import pluggdapps.commands
+import pluggdapps.apps
 
 # Initialize plugin data structures
-plugin_init()
-
+pluggdapps.plugin.plugin_init()

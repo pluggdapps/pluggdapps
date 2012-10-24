@@ -23,9 +23,8 @@ _default_settings['reload'] = {
 _default_settings['reload.config'] = {
     'default' : True,
     'types'   : (bool,),
-    'help'    : "Via web configuration is supported by pluggdapps. This "
-                "parameter specifies whether the server should be restarted "
-                "when a configuration parameter is changed."
+    'help'    : "This parameter specifies whether the server should be "
+                "restarted when a configuration parameter is changed."
 }
 _default_settings['reload.poll_interval'] = {
     'default' : 1,
@@ -35,9 +34,11 @@ _default_settings['reload.poll_interval'] = {
 }
 
 class CommandServe( Singleton ):
+    """Sub command that starts a web server (using epoll) for pluggdapps."""
+
     implements( ICommand )
 
-    description = "Start http server."
+    description = "Start epoll based http server."
     cmd = 'serve'
 
     def __init__( self, *args, **kwargs ):
@@ -47,32 +48,40 @@ class CommandServe( Singleton ):
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
-        self._arguments( self.subparser )
+        self.subparser.add_argument( "-r", dest="mreload",
+                                     action="store_true", default=False,
+                                     help="Monitor and reload modules" )
+        return parser
 
     def handle( self, args ):
-        if args.monitor :
-            self.gemini( args )
-        else :
-            self.serve( args )
+        self.pa.start()
+        self.gemini( args ) if args.mreload else self.serve( args )
 
-    def serve( self, pa, args ):
-        pa.serve()
-        pa.shutdown()
+    def serve( self, args ):
+        """Start server without monitoring for modules. Typically used in
+        production mode."""
+        self.pa.serve()      #--- Blocking call.
+        self.pa.shutdown()
 
     def gemini( self, args ):
         """If reload is enabled, then create a thread to poll for changing
         files, based on mtime, and serve http requests. When a file gets
         changed, return with a predefined exit code so that waiting process
-        will restart the gemini server again."""
+        will restart the gemini server again.
+
+        Typically used in development mode.
+        """
         # Launch a thread to poll and then start serving http
         t = threading.Thread( target=self.pollthread, 
                               name='Reloader', args=(args,) )
         t.setDaemon(True)
         t.start()
-        self.serve( args )
+        self.pa.serve( args )
+        self.pa.shutdown( args )
 
     def pollthread( self, args ):
-        # log.info( "Periodic poll started" )
+        """Thread (daemon) to monitor for changing files."""
+        self.pa.loginfo( "Periodic poll started" )
         while True:
             if self.pollthread_checkfiles( args ) == True :
                 # use os._exit() here and not sys.exit() since within a
@@ -108,12 +117,22 @@ class CommandServe( Singleton ):
             if filename not in self.module_mtimes :
                 self.module_mtimes[filename] = mtime
             elif self.module_mtimes[filename] < mtime:
-                # log.info( "Detected a change in %r ..." % filename )
+                self.pa.loginfo( "Detected a change in %r ..." % filename )
                 return True
         return False
 
-    def _arguments( self, parser ):
-        return parser
+    #---- ISettings interface methods
+
+    @classmethod
+    def default_settings( cls ):
+        return _default_settings
+
+    @classmethod
+    def normalize_settings( cls, sett ):
+        sett['reload'] = h.asbool( sett['reload'] )
+        sett['reload.config'] = h.asbool( sett['reload.config'] )
+        sett['reload.poll_interval'] = h.asbool( sett['reload.poll_interval'] )
+        return sett
 
 
     #---- An alternate implementation for linux platforms. But incomplete !!
@@ -155,17 +174,4 @@ class CommandServe( Singleton ):
             fcntl.fcntl( fd, fcntl.F_SETSIG, 0 )
             fcntl.fcntl( fd, fcntl.F_NOTIFY, self.watch_flag )
 
-
-    #---- ISettings interface methods
-
-    @classmethod
-    def default_settings( cls ):
-        return _default_settings
-
-    @classmethod
-    def normalize_settings( cls, sett ):
-        sett['reload'] = h.asbool( sett['reload'] )
-        sett['reload.config'] = h.asbool( sett['reload.config'] )
-        sett['reload.poll_interval'] = h.asbool( sett['reload.poll_interval'] )
-        return sett
 

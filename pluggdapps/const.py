@@ -17,9 +17,10 @@ __all__ = [
     'MOUNT_SUBDOMAIN',  # Token to mount application on subdomain
     'MOUNT_SCRIPT',     # Token to mount application on subdomain
     'MOUNT_TYPES',      # List of mount type tokens
+    'SPECIAL_SECS',     # List of special sections in configuration file
 ]
 
-DEFAULT_INI = join( dirname(__file__), 'tests', 'confs', 'develop.ini' )
+DEFAULT_INI = join( dirname(__file__), 'confs', 'develop.ini' )
 DEFAULT_ENCODING = 'utf-8'
 DEBUG       = False
 URLSEP      = '/'
@@ -27,3 +28,4 @@ ROUTE_PATH_SUFFIX = 'remains'
 MOUNT_SUBDOMAIN = 'subdomain'
 MOUNT_SCRIPT = 'script'
 MOUNT_TYPES = [ MOUNT_SUBDOMAIN, MOUNT_SCRIPT ]
+SPECIAL_SECS = [ 'pluggdapps', 'webmounts' ]

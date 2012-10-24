@@ -4,6 +4,8 @@ import sys, pkg_resources, imp
 from   os.path import isabs, join, split, abspath, isdir, exists
 from   os import listdir
 
+#TODO : IAssetDescriptor
+
 __all__ = [
     'package_path', 'caller_module', 'caller_path', 'package_name',
     'package_of', 'caller_package',

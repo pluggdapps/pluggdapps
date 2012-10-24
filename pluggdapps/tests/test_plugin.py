@@ -2,10 +2,11 @@ import unittest
 from   random import choice
 
 from   pluggdapps.plugin     import *
-from   pluggdapps.interfaces import \
-        ICommand, IController, ICookie, IErrorPage, IRenderer, \
-        IRequest, IResource, IResponse, IResponseTransformer, IRouter, \
-        IServer
+from   pluggdapps.interfaces import ICommand, IServer
+from   pluggdapps.web.webinterfaces import IController, ICookie, IErrorPage,\
+                                           IRenderer, IRequest, IResource, \
+                                           IResponse, IResponseTransformer, \
+                                           IRouter
 
 class TestPlugin( unittest.TestCase ):
 

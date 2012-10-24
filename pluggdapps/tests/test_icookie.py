@@ -6,7 +6,7 @@ import datetime as dt
 from   pluggdapps.plugin     import pluginname, query_plugins, query_plugin, \
                                     IWebApp
 from   pluggdapps.platform   import Pluggdapps
-from   pluggdapps.interfaces import ICookie
+from   pluggdapps.web.webinterfaces import ICookie
 
 
 refheaders = {

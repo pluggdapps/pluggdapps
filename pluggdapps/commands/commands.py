@@ -4,8 +4,7 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-from   pluggdapps.plugin        import implements, Plugin, query_plugins,\
-                                       pluginname
+from   pluggdapps.plugin        import implements, Plugin, pluginname
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
@@ -25,25 +24,30 @@ _default_settings['command_width']  = {
 }
 
 class CommandCommands( Plugin ):
+    """Subcommand for pa-script to list all available sub-commands along with
+    a short description."""
+
     implements( ICommand )
 
     description = "list of script commands and their short description."
     cmd = 'commands'
 
+    #---- ICommand API
     def subparser( self, parser, subparsers ):
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
 
     def handle( self, args ):
-        commands = query_plugins( None, ICommand )
+        commands = self.query_plugins( ICommand )
         commands = sorted( commands, key=lambda x : pluginname(x)[7:] )
         for command in commands :
-            rows = self._formatdescr( pluginname(command)[7:],
+            rows = self.formatdescr( pluginname(command)[7:],
                                       command.description )
             for r in rows : print(r)
 
-    def _formatdescr( self, name, description ):
+    #---- Internal & local functions
+    def formatdescr( self, name, description ):
         fmtstr = '%-' + str(self['command_width']) + 's %s'
         l = self['description_width']
 

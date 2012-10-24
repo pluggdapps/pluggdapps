@@ -8,9 +8,9 @@ import socket, time, re
 from   urllib.parse import urlunsplit
 from   copy         import deepcopy
 
-import pluggdapps.utils      as h
-from   pluggdapps.plugin     import implements, Plugin, query_plugin
-from   pluggdapps.interfaces import IRequest, IResponse, ICookie
+import pluggdapps.utils             as h
+from   pluggdapps.plugin            import implements, Plugin
+from   pluggdapps.web.webinterfaces import IRequest, IResponse, ICookie
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \

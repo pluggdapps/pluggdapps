@@ -11,9 +11,9 @@ interface."""
 import hmac, hashlib, base64, re, calendar, email, time
 from   http.cookies import CookieError, SimpleCookie
 
-from   pluggdapps.plugin        import implements, Plugin
-from   pluggdapps.interfaces    import ICookie
-import pluggdapps.utils         as h
+from   pluggdapps.plugin            import implements, Plugin
+from   pluggdapps.web.webinterfaces import ICookie
+import pluggdapps.utils             as h
 
 
 _default_settings = h.ConfigDict()

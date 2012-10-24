@@ -4,11 +4,12 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-import pluggdapps.cookie
-import pluggdapps.errorpage
-import pluggdapps.request
-import pluggdapps.resource
-import pluggdapps.response
-import pluggdapps.routers
-import pluggdapps.views
-import pluggdapps.webapp
+import pluggdapps.web.webinterfaces
+import pluggdapps.web.webapp
+import pluggdapps.web.routers
+import pluggdapps.web.request
+import pluggdapps.web.response
+import pluggdapps.web.resource
+import pluggdapps.web.cookie
+import pluggdapps.web.views
+import pluggdapps.web.errorpage
