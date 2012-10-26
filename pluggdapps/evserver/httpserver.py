@@ -18,7 +18,7 @@ import ssl  # Python 2.6+
 
 from   pluggdapps.plugin import Singleton, implements, query_plugin, \
                                 ISettings, IWebApp
-from   pluggdapps.interfaces          import IServer, IRequest
+from   pluggdapps.web.webinterfaces   import IHTTPServer, IRequest
 from   pluggdapps.evserver.tcpserver  import TCPServer
 from   pluggdapps.evserver.httpiostream import HTTPIOStream
 import pluggdapps.utils as h 
@@ -177,7 +177,7 @@ class HTTPIOServer( TCPServer, Singleton ):
     implementation is available via base class TCPServer.
 
     """
-    implements( IServer )
+    implements( IHTTPServer )
 
     def __init__( self, **kwargs ):
         self._sett = { k : self[k] for k in self }
