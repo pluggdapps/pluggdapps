@@ -55,8 +55,8 @@ Special sections, base.ini can have the following special sections,
 [DEFAULT], [pluggdapps] and [webmounts]. All other section names are to be
 prefixed with "plugin:<pluginname>".
   
-  * [DEFAULT] special section, settings that are applicable to all configuration
-    sections including plugins and refered configuration files.
+  * [DEFAULT] special section, settings that are applicable to all
+    configuration sections including plugins and refered configuration files.
   
   * [pluggdapps] special section, settings that are applicable to pluggdapps
     platform typically handled by :class:`Pluggdapps`.
@@ -91,7 +91,7 @@ from   configparser          import SafeConfigParser
 from   os.path               import dirname
 from   copy                  import deepcopy
 
-from   pluggdapps.const      import MOUNT_SUBDOMAIN, MOUNT_SCRIPT, MOUNT_TYPES,\
+from   pluggdapps.const      import MOUNT_SUBDOMAIN, MOUNT_SCRIPT,MOUNT_TYPES, \
                                     SPECIAL_SECS
 from   pluggdapps.plugin     import Singleton, ISettings, applications, IWebApp
 from   pluggdapps.web.webinterfaces import IRequest, IResponse
@@ -225,9 +225,9 @@ class Pluggdapps( object ):
 
 
     def loadini( self, baseini, plugindefaults ):
-        """Parse master ini configuration file `baseini` and ini files refered by
-        `baseini`. Construct a dictionary of settings for special sections and
-        plugin sections."""
+        """Parse master ini configuration file `baseini` and ini files refered
+        by `baseini`. Construct a dictionary of settings for special sections
+        and plugin sections."""
         from pluggdapps.plugin import pluginnames
 
         # Initialize return dictionary.
@@ -252,7 +252,9 @@ class Pluggdapps( object ):
                                       dict( pluggdapps_defaultsett().items() ),
                                       defaultsett2 )
         if cp.has_section('pluggdapps') :
-            sec_pluggdapps.update( dict( cp.items( 'pluggdapps', vars=_vars )))
+            sec_pluggdapps.update( dict(
+                    cp.items( 'pluggdapps', raw=True, vars=_vars )
+            ))
         settings['pluggdapps'] = sec_pluggdapps
 
         settings['DEFAULT'] = h.mergedict( defaultsett1, defaultsett2 )
@@ -261,7 +263,7 @@ class Pluggdapps( object ):
         for pluginsec, sett in plugindefaults.items() :
             s = h.mergedict( defaultsett1, sett, defaultsett2 )
             if cp.has_section( pluginsec ) :
-                s.update( dict( cp.items( pluginsec, vars=_vars )))
+                s.update( dict( cp.items( pluginsec, raw=True, vars=_vars )))
             settings[ pluginsec ] = s
 
         return settings
@@ -280,8 +282,8 @@ class Pluggdapps( object ):
         `webapp`,
             Optional :class:`WebApp` plugin in whose context the query is made.
 
-        If ``settings`` key-word argument is present, it will be used to override
-        default plugin settings.
+        If ``settings`` key-word argument is present, it will be used to
+        override default plugin settings.
 
         Returns a list of plugin instance implementing `interface`
         """
@@ -302,8 +304,8 @@ class Pluggdapps( object ):
         `webapp`,
             Optional :class:`WebApp` plugin in whose context the query is made.
 
-        If ``settings`` key-word argument is present, it will be used to override
-        default plugin settings.
+        If ``settings`` key-word argument is present, it will be used to
+        override default plugin settings.
 
         Return a single Plugin instance.
         """
@@ -318,9 +320,11 @@ class Pluggdapps( object ):
         self.port.loginfo(formatstr, values) if self.port else print(formatstr)
 
     def logwarn( self, formatstr, values=[] ):
+        formatstr = 'WARN: ' + formatstr
         self.port.logwarn(formatstr, values) if self.port else print(formatstr)
 
     def logerror( self, formatstr, values=[] ):
+        formatstr = 'ERROR: ' + formatstr
         self.port.logerror(formatstr, values) if self.port else print(formatstr)
 
 
@@ -465,7 +469,7 @@ class Webapps( Pluggdapps ):
         [ sett.update( defaultsett ) for key, sett in appsett.items() ]
 
         # Update plugin sections in appsett from instanceini
-        [ appsett[sec].update( dict( cp.items( sec, vars=_vars )))
+        [ appsett[sec].update( dict( cp.items( sec, raw=True, vars=_vars )))
           for sec in cp.sections() if sec.startswith( 'plugin:' ) ]
 
 

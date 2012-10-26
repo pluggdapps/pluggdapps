@@ -576,8 +576,8 @@ class Plugin( PluginBase ):     # Plugin base class implementing ISettings
         `interface`,
             :class:`Interface`
 
-        If ``settings`` key-word argument is present, it will be used to override
-        default plugin settings.
+        If ``settings`` key-word argument is present, it will be used to
+        override default plugin settings.
 
         Returns a list of plugin instance implementing `interface`
         """
@@ -595,8 +595,8 @@ class Plugin( PluginBase ):     # Plugin base class implementing ISettings
         `interface`,
             :class:`Interface`
 
-        If ``settings`` key-word argument is present, it will be used to override
-        default plugin settings.
+        If ``settings`` key-word argument is present, it will be used to
+        override default plugin settings.
 
         Return a single Plugin instance.
         """
