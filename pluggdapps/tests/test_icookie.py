@@ -62,5 +62,6 @@ class TestICookie( unittest.TestCase ):
             s = cookies['newname'].output()
             del cookies['newname']
             cookies.load( s )
-            val = cookp.decode_signed_value( 'newname', cookies['newname'].value )
+            val = cookp.decode_signed_value( 
+                    'newname', cookies['newname'].value )
             assert val == 'world'

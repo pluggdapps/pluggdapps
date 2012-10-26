@@ -2,11 +2,11 @@ import unittest
 from   random import choice
 
 from   pluggdapps.plugin     import *
-from   pluggdapps.interfaces import ICommand, IServer
+from   pluggdapps.interfaces import ICommand
 from   pluggdapps.web.webinterfaces import IController, ICookie, IErrorPage,\
                                            IRenderer, IRequest, IResource, \
                                            IResponse, IResponseTransformer, \
-                                           IRouter
+                                           IRouter, IHTTPServer
 
 class TestPlugin( unittest.TestCase ):
 
@@ -19,8 +19,8 @@ class TestPlugin( unittest.TestCase ):
 
     def test_interfaces( self ):
         ref = [ ICommand, IController, ICookie, IErrorPage, IRenderer, IRequest,
-                IResource, IResponse, IResponseTransformer, IRouter, IServer,
-                ISettings, IWebApp ]
+                IResource, IResponse, IResponseTransformer, IRouter,
+                IHTTPServer, ISettings, IWebApp ]
         fn = lambda x : x.__name__
         assert sorted( interfaces(), key=fn ) == sorted( ref, key=fn )
 
@@ -91,7 +91,7 @@ class TestPlugin( unittest.TestCase ):
         assert 'webapp' in plugins_
 
     def test_whichmodule( self ):
-        assert whichmodule(TestPlugin).__name__ == 'pluggdapps.tests.test_plugin'
+        assert whichmodule(TestPlugin).__name__=='pluggdapps.tests.test_plugin'
         assert whichmodule(self).__name__ == 'pluggdapps.tests.test_plugin'
         assert whichmodule(whichmodule).__name__ == 'pluggdapps.plugin'
 
@@ -116,7 +116,7 @@ class TestPlugin( unittest.TestCase ):
 
         refs = [ ICommand, IController, ICookie, IErrorPage, IRenderer,
           IRequest, IResource, IResponse, IResponseTransformer, IRouter,
-          IServer ]
+          IHTTPServer ]
         refs = map( fn,  refs )
         for r in refs : assert r in PluginMeta._interfmap.keys()
 
