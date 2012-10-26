@@ -85,6 +85,8 @@ Configured under [webmounts] special section in master ini file.
   
   * An application is nothing but a plugin implementing :class:`IApplication`
     interface specification.
+
+  * It is mandatory to configure root application.
 """
 
 from   configparser          import SafeConfigParser
@@ -473,8 +475,18 @@ class Webapps( Pluggdapps ):
           for sec in cp.sections() if sec.startswith( 'plugin:' ) ]
 
 
-    def appresolve( self, uriparts, headers, body ):
-        """Resolve application for `request`."""
+    #---- APIs related to hosting multiple-applications.
+
+    def resolveapp( self, httpconn, method, uri, version, hdrs ):
+        """Resolve application for `request`. Return a tuple of,
+            (uriparts, mountedat)
+            
+        `uriparts`
+            dictionary of URL parts 
+        `mountedat`
+            (type, mountname, appname)
+        """
+        uriparts = h.parse_url( uri, host=hdrs['Host'] )
         doms = uriparts['hostname'].split('.')
         doms = doms[1:] if doms[0] == 'www' else doms
         # A subdomain available ?
@@ -482,21 +494,22 @@ class Webapps( Pluggdapps ):
 
         mountedat = ()
         if subdomain :
-            for subdom, appname in self.m_subdomains.items() :
-                if subdom == subdomain :
-                    mountedat = ('subdomain', subdom, appname)
+            for x, appname in self.m_subdomains.items() :
+                if x == subdomain :
+                    mountedat = ('subdomain', x, appname)
                     break
+
         if not mountedat :
-            for script, appname in self.m_scripts.items() :
-                if script == '/' : continue
-                if uriparts['path'].startswith( script ) :
-                    uriparts['script'] = script
-                    uriparts['path'] = uriparts['path'][len(script):]
-                    mountedat = ('script', script, appname)
+            for x, appname in self.m_scripts.items() :
+                if uriparts['path'][1:].startswith( x[1:] ) :
+                    uriparts['script'] = x
+                    uriparts['path'] = uriparts['path'][len(x):]
+                    mountedat = ('script', x, appname)
                     break
             else :
                 mountedat = ( 'script', '/', self.m_scripts['/'] )
-        return mountedat
+
+        return (uriparts, mountedat)
 
     def makerequest( self, conn, address, startline, headers, body ):
         global webapps

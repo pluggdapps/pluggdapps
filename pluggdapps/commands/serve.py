@@ -4,21 +4,40 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-import os, fcntl, signal, sys, time, threading, traceback
+import os, fcntl, signal, sys, time, threading, imp
 
-from   pluggdapps.plugin     import implements, ISettings, Singleton, pluginname
-from   pluggdapps.interfaces import ICommand
-import pluggdapps.utils      as h
+from   pluggdapps.plugin            import implements, ISettings, Singleton, \
+                                           pluginname
+from   pluggdapps.interfaces        import ICommand
+from   pluggdapps.web.webinterfaces import IHTTPServer
+import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
     "Configuration for serve sub-command." )
 
+_default_settings['IServer'] = {
+    'default' : 'httpepollserver',
+    'types'   : (str,),
+    'help'    : "Name of HTTP server to start."
+}
 _default_settings['reload'] = {
     'default' : False,
     'types'   : (bool,),
     'help'    : "Whether to monitor for changes to module files and watched "
                 "files, and restart the server."
+}
+_default_settings['reload.config'] = {
+    'default' : True,
+    'types'   : (bool,),
+    'help'    : "This parameter specifies whether the server should be "
+                "restarted when a configuration parameter is changed."
+}
+_default_settings['reload.poll_interval'] = {
+    'default' : 1,
+    'types'   : (int,),
+    'help'    : "Number seconds to poll for watched file's modification "
+                "timestamp. When a file is modified server is restarted."
 }
 _default_settings['reload.config'] = {
     'default' : True,
@@ -54,14 +73,7 @@ class CommandServe( Singleton ):
         return parser
 
     def handle( self, args ):
-        self.pa.start()
-        self.gemini( args ) if args.mreload else self.serve( args )
-
-    def serve( self, args ):
-        """Start server without monitoring for modules. Typically used in
-        production mode."""
-        self.pa.serve()      #--- Blocking call.
-        self.pa.shutdown()
+        self.fork_and_monitor( args ) if args.monitor else self.gemini( args )
 
     def gemini( self, args ):
         """If reload is enabled, then create a thread to poll for changing
@@ -71,17 +83,42 @@ class CommandServe( Singleton ):
 
         Typically used in development mode.
         """
-        # Launch a thread to poll and then start serving http
-        t = threading.Thread( target=self.pollthread, 
-                              name='Reloader', args=(args,) )
-        t.setDaemon(True)
-        t.start()
-        self.pa.serve( args )
-        self.pa.shutdown( args )
+        if args.mreload :
+            # Launch a thread to poll and then start serving http
+            t = threading.Thread( target=self.pollthread, 
+                                  name='Reloader', args=(args,) )
+            t.setDaemon(True)
+            t.start()
+
+        time.sleep(0.5) # To allow the poll-thread to execute first.
+        self.pa.start() # Start pluggdapps
+        server = self.query_plugin( IHTTPServer, self['IServer'] )
+        server.start()  # Blocking call
+
+
+    def fork_and_monitor( self, args ):
+        """Install the reloading monitor."""
+        while True :
+            self.pa.loginfo( "Forking monitor ..." )
+            pid = os.fork()
+            if pid == 0 :   # child process
+                cmdargs = sys.argv[:]
+                cmdargs.remove( '-m' )
+                cmdargs.append( os.environ )
+                h.reseed_random()
+                os.execlpe( sys.argv[0], *cmdargs )
+                # signal.signal( signal.SIGIO, self._watch_handler )
+                # self._watch_files( args )
+                # self.gemini( args )
+            else :          # parent 
+                pid, status = os.wait()
+                if status & 0xFF00 != 0x300 :
+                    sys.exit( status )
+                    
 
     def pollthread( self, args ):
         """Thread (daemon) to monitor for changing files."""
-        self.pa.loginfo( "Periodic poll started" )
+        self.pa.loginfo( "Periodic poll started for module reloader ..." )
         while True:
             if self.pollthread_checkfiles( args ) == True :
                 # use os._exit() here and not sys.exit() since within a
@@ -96,17 +133,15 @@ class CommandServe( Singleton ):
     def pollthread_checkfiles( self, args ):
         """Check whether any of the module files have modified after loading
         this platform. If so, return True else False."""
-        filenames = [args.config] if args.config else []
-        filenames.extend( 
-            getattr( mod, '__file__', None ) for mod in sys.modules.values()
-        )
-        filenames = filter( None, filenames )
-        for filename in filenames:
+        files = [args.config] if args.config else []
+        modfiles = {}
+        for mod in sys.modules.values() :
+            if hasattr( mod, '__file__' ) :
+                modfiles.setdefault( getattr(mod, '__file__'), mod )
+
+        for filename in list( modfiles.keys() ) + files :
             stat = os.stat(filename)
-            if stat:
-                mtime = stat.st_mtime
-            else:
-                mtime = 0
+            mtime = stat.st_mtime if stat else 0
 
             if filename.endswith( '.pyc' ) and os.path.exists( filename[:-1] ):
                 mtime = max(os.stat(filename[:-1]).st_mtime, mtime)
@@ -117,7 +152,7 @@ class CommandServe( Singleton ):
             if filename not in self.module_mtimes :
                 self.module_mtimes[filename] = mtime
             elif self.module_mtimes[filename] < mtime:
-                self.pa.loginfo( "Detected a change in %r ..." % filename )
+                self.pa.loginfo( "%r changed, reloading ...\n" % filename )
                 return True
         return False
 
@@ -139,20 +174,6 @@ class CommandServe( Singleton ):
     #---- Only directories can be watched and sub-directories had to be walked
     #---- and added programmatically.
 
-    def fork_and_monitor( self, args ):
-        """Install the reloading monitor."""
-        while True :
-            pid = os.fork()
-            if pid == 0 :   # child process
-                h.reseed_random()
-                signal.signal( signal.SIGIO, self._watch_handler )
-                self._watch_files( args )
-                self.serve( args )
-            else :          # parent 
-                pid, status = os.wait()
-                if status != 3 :
-                    sys.exit(status)
-
     def _watch_handler( signum, frame ):
         # log.info("file changed; reloading...")
 
@@ -173,5 +194,4 @@ class CommandServe( Singleton ):
             fd = os.open( filename, os.O_RDONLY )
             fcntl.fcntl( fd, fcntl.F_SETSIG, 0 )
             fcntl.fcntl( fd, fcntl.F_NOTIFY, self.watch_flag )
-
 

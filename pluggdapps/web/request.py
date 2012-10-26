@@ -33,8 +33,14 @@ class HTTPRequest( Plugin ):
     elapsedtime = property( lambda self : time.time() - self.receivedat )
 
     # IRequest interface methods and attributes
-    def __init__( self, conn, address, method, uri, uriparts, version,
-                  headers, body ):
+    def __init__( self, conn, method, uri, version, headers, body ):
+
+        self.conn = conn
+        self.method, self.uri, self.version = method, uri, version
+        self.headers = headers
+        self.body = body
+        return
+
         self.receivedat = time.time()
         self.finishedat = None
         xheaders = getattr( conn, 'xheaders', None ) if conn else None

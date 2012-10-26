@@ -7,11 +7,80 @@
 from pluggdapps.plugin import Interface, Attribute
 
 __all__ = [
-    'IRouter', 'IResource', 'ICookie', 'IRequest', 'IController',
-    'IErrorPage', 'IRenderer', 'IResponse', 'IResponseTransformer',
+    'IHTTPServer', 'IHTTPConnection', 'IRouter', 'IResource', 'ICookie',
+    'IRequest', 'IController', 'IErrorPage', 'IRenderer', 'IResponse',
+    'IResponseTransformer',
 ]
 
 # TODO : IAssetDescriptor
+
+class IHTTPServer( Interface ):
+    """Interface to bind and listen for accept HTTP connections."""
+
+    sockets = Attribute(
+        "Dictionary of listening sockets."
+    )
+
+    connections = Attribute(
+        "List of accepted connections. Each connection is a plugin "
+        "implementing :class:`IConnection` interface."
+    )
+
+    def start( *args, **kwargs ):
+        """Starts this server and returns a server object."""
+
+    def stop():
+        """Stops listening for new connections.
+
+        Requests currently in progress may still continue after the
+        server is stopped.
+        """
+
+class IHTTPConnection( Interface ):
+    """Interface for handling HTTP connections accepted by IHTTPServer.
+    Received request are dispatched using :class:`IRequest` plugin."""
+
+    conn = Attribute( "Accepted connection object." )
+
+    address = Attribute( "Address of the client connected on the other end." )
+
+    write_callback = Attribute( "Call-back for writing data to connection." )
+
+    close_callback = Attribute( "Call-back when connection is closed." )
+
+    def __init__( self, conn, addr, server ):
+        """Positional arguments:
+
+        `conn`,
+            Accepted connection object.
+
+        `addr`,
+            Accepted client's address.
+
+        `server`
+            :class:`IServer` plugin object.
+        """
+
+    def get_ssl_certificate() :
+        """In case of SSL traffic, return SSL certifacte."""
+
+    def set_close_callback( callback ):
+        """Subscribe a `callback` function to be called when this connection
+        closed."""
+
+    def write( chunk, callback=None ):
+        """Write the `chunk` of data (bytes) to the connection and optionally
+        subscribe a `callback` function to be called when data is successfully
+        transfered."""
+
+    def finish() :
+        """Call this method once complete response is written to the
+        connection-stream. When this method returns the request is considered
+        closed."""
+
+    def close():
+        """Close this connection."""
+
 
 class IResource( Interface ):
     """Interface specification for resource or model plugins."""
@@ -354,7 +423,7 @@ class IRequest( Interface ):
         "Timestamp when the request was finished."
     )
 
-    def __init__( conn, address, method, uriparts, version, headers, body ):
+    def __init__( conn, method, uri, version, headers, body ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
@@ -363,11 +432,9 @@ class IRequest( Interface ):
 
         ``conn``,
             HTTP socket returned as a result of accepting the connection.
-        ``address``,
-            A tupel of remote client-ip address and its port number.
         ``method``,
             HTTP request method. 
-        ``uriparts``,
+        ``uri``,
             Parsed uri from request start line. A UserDict object as returned
             by :func:`parse_url()` function.
         ``version``,
@@ -409,18 +476,18 @@ class IRequest( Interface ):
         """Use request.webapp.pathfor to generate the url."""
 
     def appurl( appname, name, *traverse, **matchdict ) :
-        """Generate url for different web-application identified by ``appname``.
-        Use request.webapp.urlfor to generate the url."""
+        """Generate url for different web-application identified by
+        ``appname``.  Use request.webapp.urlfor to generate the url."""
 
     def query_plugins( interface, *args, **kwargs ):
         """Query plugins in the request's context. Since every request is
-        under the context of an web-application, appname will be used to make the
-        actual query. Will be using `IRequest.appname` attribute"""
+        under the context of an web-application, appname will be used to make
+        the actual query. Will be using `IRequest.appname` attribute"""
 
     def query_plugin( interface, name, *args, **kwargs ):
         """Query plugin in the request's context. Since every request is
-        under the context of an web-application, appname will be used to make the
-        actual query. Will be using `IRequest.appname` attribute"""
+        under the context of an web-application, appname will be used to make
+        the actual query. Will be using `IRequest.appname` attribute"""
 
 
 class IController( Interface ):
@@ -640,7 +707,8 @@ class IResponse( Interface ):
         It is the responsibility of the caller to finish the request by
         calling :method:`IResponse.finish`.
 
-        The render call writes the response body using :method:`IResponse.write`
+        The render call writes the response body using
+        :method:`IResponse.write`
 
         ``templatefile``,
             File path for html template in asset-specification format.

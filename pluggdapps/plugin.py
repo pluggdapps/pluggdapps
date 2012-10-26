@@ -655,12 +655,12 @@ class IWebApp( Interface ):
     def shutdown():
         """Shutdown this application. Reverse of boot."""
 
-    def start( request ):
+    def dorequest( request ):
         """Once a `request` is resolved to an application, this method is the
-        entry point for the application. Typically this method will be
-        implemented by :class:`Application` base class which will resolve
-        url-routing and finally match with a route-mapping to invoke
-        :class:`IController` plugin."""
+        entry point for request into the resolved application. Typically this
+        method will be implemented by :class:`Application` base class which
+        will do url-routing and finally match with a route-mapping to
+        invoke :class:`IController` plugin."""
 
     def onfinish( request ):
         """When a finish is called on the response. And this call back is 

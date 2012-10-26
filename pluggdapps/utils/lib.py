@@ -7,7 +7,7 @@
 # TODO :
 #   * Improve function asbool() implementation.
 
-import sys, os, fcntl, time, multiprocessing, random
+import sys, os, fcntl, time, multiprocessing, random, io, traceback
 import datetime as dt
 from   binascii import hexlify
 
@@ -15,7 +15,7 @@ __all__ = [
     'sourcepath', 'parsecsv', 'parsecsvlines', 'classof', 'subclassof',
     'asbool', 'asint', 'asfloat', 'timedelta_to_seconds', 'set_close_exec', 
     'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
-    'reseed_random', 'mergedict', 'takewhile', 'dropwhile',
+    'reseed_random', 'mergedict', 'takewhile', 'dropwhile', 'print_exc',
     # Classes
     'Context',
 ]
@@ -171,4 +171,12 @@ def dropwhile( pred, lst ):
         if pred(e) == False : break
         i += 1
     return lst[i:]
+
+def print_exc( typ, val, tb ) :
+    """Return a string representing exception info."""
+    f = io.StringIO()
+    traceback.print_exception( typ, val, tb, file=f )
+    s = f.getvalue()
+    f.close()
+    return s
 

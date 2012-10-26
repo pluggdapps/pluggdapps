@@ -8,4 +8,3 @@ import pluggdapps.commands.commands
 import pluggdapps.commands.ls
 import pluggdapps.commands.serve
 import pluggdapps.commands.unittest
-import pluggdapps.commands.mounts
