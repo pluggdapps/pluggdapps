@@ -13,8 +13,8 @@ _default_settings.__doc__ = \
 
 class NCloud( WebApp ):
 
-    def onboot( self ):
-        super().onboot()
+    def startapp( self ):
+        super().startapp()
 
     def shutdown( self ):
         super().shutdown()

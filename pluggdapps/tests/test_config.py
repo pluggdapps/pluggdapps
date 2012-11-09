@@ -68,8 +68,8 @@ class TestConfig( unittest.TestCase ):
 
         assert settings['webmounts']['test'] == 'this'
         assert settings['pluggdapps']['test'] == 'that'
-        assert settings['plugin:httprequest']['icookie'] == 'httpcookie'
-        assert settings['plugin:httpresponse']['icookie'] == 'newcookie'
+        assert settings['plugin:httprequest']['IHTTPCookie'] == 'httpcookie'
+        assert settings['plugin:httpresponse']['IHTTPCookie'] == 'newcookie'
 
         assert settings['plugin:commandserve'] == \
                     webappsett['plugin:commandserve']
@@ -79,15 +79,15 @@ class TestConfig( unittest.TestCase ):
         assert settings['plugin:commandcommands']['test'] == 'this'
 
         assert 'webapp:rootapp' in rootappsett
-        assert rootappsett['webapp:rootapp']['irouter'] == 'routeandmatch'
-        assert rootappsett['plugin:httprequest']['icookie'] == 'httpcookie'
-        assert rootappsett['plugin:httpresponse']['icookie'] == 'newcookie'
+        assert rootappsett['webapp:rootapp']['IHTTPRouter'] == 'routeandmatch'
+        assert rootappsett['plugin:httprequest']['IHTTPCookie'] == 'httpcookie'
+        assert rootappsett['plugin:httpresponse']['IHTTPCookie'] == 'newcookie'
         assert rootappsett['plugin:httprequest']['test'] == 'this'
 
         assert 'webapp:webapp' in webappsett
-        assert webappsett['webapp:webapp']['iresponse'] == 'newresponse'
-        assert webappsett['plugin:httprequest']['icookie'] == 'newcookie'
-        assert webappsett['plugin:httpresponse']['icookie'] == 'newcookie'
+        assert webappsett['webapp:webapp']['IHTTPResponse'] == 'newresponse'
+        assert webappsett['plugin:httprequest']['IHTTPCookie'] == 'newcookie'
+        assert webappsett['plugin:httpresponse']['IHTTPCookie'] == 'newcookie'
         assert webappsett['plugin:httprequest']['test'] == 'this'
 
 

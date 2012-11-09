@@ -16,7 +16,7 @@ _default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
     "Configuration for serve sub-command." )
 
-_default_settings['IServer'] = {
+_default_settings['IHTTPServer'] = {
     'default' : 'httpepollserver',
     'types'   : (str,),
     'help'    : "Name of HTTP server to start."
@@ -92,7 +92,7 @@ class CommandServe( Singleton ):
 
         time.sleep(0.5) # To allow the poll-thread to execute first.
         self.pa.start() # Start pluggdapps
-        server = self.query_plugin( IHTTPServer, self['IServer'] )
+        server = self.query_plugin( IHTTPServer, self['IHTTPServer'] )
         server.start()  # Blocking call
 
 

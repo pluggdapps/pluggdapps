@@ -6,14 +6,14 @@
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IResource
+from   pluggdapps.web.webinterfaces import IHTTPResource
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
     "Configuration settings for url Router RouteMatch."
 
 class BaseResource( Plugin ):
-    implements( IResource )
+    implements( IHTTPResource )
 
     def __call__( request, c ):
         c['title'] = 'Welcome to pluggdapps'

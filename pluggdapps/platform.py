@@ -96,7 +96,7 @@ from   copy                  import deepcopy
 from   pluggdapps.const      import MOUNT_SUBDOMAIN, MOUNT_SCRIPT,MOUNT_TYPES, \
                                     SPECIAL_SECS
 from   pluggdapps.plugin     import Singleton, ISettings, applications, IWebApp
-from   pluggdapps.web.webinterfaces import IRequest, IResponse
+from   pluggdapps.web.webinterfaces import IHTTPRequest, IHTTPResponse
 import pluggdapps.utils      as h
 
 
@@ -386,11 +386,19 @@ class Webapps( Pluggdapps ):
         appnames = []
         for instkey, webapp in self.webapps.items() :
             appsec, t, mountname, config = instkey
-            self.loginfo( "Booting application %r ..." % (instkey,), [] )
-            webapp.onboot()
+            self.loginfo( "Booting application %r ..." % (instkey,) )
+            webapp.startapp()
             appnames.append( h.sec2plugin( appsec ))
+        return appnames
+
+    def shutdown( self ):
+        for appname in self.webapps.items() :
+            self.loginfo( "Shutting down application %r ..." % appname )
+            webapps[appname].shutdown()
+
 
     #---- Internal methods
+
     def webmounts( self ):
         """Create application wise settings, using special section
         [webmounts], if any. Also parse referred configuration files."""
@@ -422,8 +430,8 @@ class Webapps( Pluggdapps ):
 
             appsec = h.plugin2sec( name )
             if appsec not in appsecs : 
-                warn = "In [webmounts]: %r web-app (plugin) not found."%appsec
-                self.logwarn( warn, [] )
+                self.logwarn(
+                        "In [webmounts]: %r web-app (plugin) not found."%appsec )
                 continue
 
             # Parse mount values and validate them.
@@ -484,7 +492,7 @@ class Webapps( Pluggdapps ):
         `uriparts`
             dictionary of URL parts 
         `mountedat`
-            (type, mountname, appname)
+            (type, mountname, webapp-instance)
         """
         uriparts = h.parse_url( uri, host=hdrs['Host'] )
         doms = uriparts['hostname'].split('.')
@@ -494,38 +502,33 @@ class Webapps( Pluggdapps ):
 
         mountedat = ()
         if subdomain :
-            for x, appname in self.m_subdomains.items() :
-                if x == subdomain :
-                    mountedat = ('subdomain', x, appname)
+            for mountname, webapp in self.m_subdomains.items() :
+                if mountname == subdomain :
+                    mountedat = (MOUNT_SUBDOMAIN, mountname, webapp)
                     break
 
         if not mountedat :
-            for x, appname in self.m_scripts.items() :
-                if uriparts['path'][1:].startswith( x[1:] ) :
-                    uriparts['script'] = x
-                    uriparts['path'] = uriparts['path'][len(x):]
-                    mountedat = ('script', x, appname)
+            for mountname, webapp in self.m_scripts.items() :
+                if uriparts['path'][1:].startswith( mountname[1:] ) :
+                    uriparts['script'] = mountname
+                    uriparts['path'] = uriparts['path'][len(mountname):]
+                    mountedat = (MOUNT_SCRIPT, mountname, webapp)
                     break
-            else :
-                mountedat = ( 'script', '/', self.m_scripts['/'] )
 
         return (uriparts, mountedat)
 
-    def makerequest( self, conn, address, startline, headers, body ):
-        global webapps
-        # Parse request start-line
-        method, uri, version = h.parse_startline( startline )
-        uriparts = h.parse_url( uri, headers.get('Host', None) )
-
+    def dorequest( self, httpconn, method, uriparts, version, hdrs, body ):
         # Resolve application
         (typ, key, appname) = self.appresolve( uriparts, headers, body )
         webapp = webapps[ appname ]
 
-        # IRequest plugin
+        # IHTTPRequest plugin
         request = query_plugin(
-                        webapp, IRequest, webapp['irequest'], conn, address, 
-                        method, uri, uriparts, version, headers, body )
-        response = query_plugin( webapp, IResponse, webapp['iresponse'], self )
+                        webapp, IHTTPRequest, webapp['IHTTPRequest'], conn, 
+                        address, method, uri, uriparts, version, headers, body
+                  )
+        response = query_plugin( webapp, IHTTPResponse, webapp['IHTTPResponse'],
+                                 self )
         request.response = response
 
         return request
@@ -567,14 +570,6 @@ class Webapps( Pluggdapps ):
         uri += app_script
 
         return url
-
-    def shutdown( self ):
-        global webapps
-        for appname in sorted( webapps ) :
-            infostr = "Shutting down application %r ..." % appname
-            self.loginfo( infostr, [] )
-            webapps[appname].shutdown()
-
 
     #---- ISettings interface methods
 

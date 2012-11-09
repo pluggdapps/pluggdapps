@@ -8,7 +8,7 @@ from   urllib.parse import urljoin
 
 from   pluggdapps.plugin            import implements, IWebApp, isimplement, \
                                            Plugin, pluginname
-from   pluggdapps.web.webinterfaces import IController, IRouter
+from   pluggdapps.web.webinterfaces import IController, IHTTPRouter
 import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
@@ -21,33 +21,31 @@ _default_settings['encoding']  = {
     'types'   : (str,),
     'help'    : "Unicode/String encoding to be used.",
 }
-_default_settings['irequest']  = {
-    'default' : 'httprequest',
+_default_settings['IHTTPRouter']  = {
+    'default' : 'patternrouter',
     'types'   : (str,),
-    'help'    : "Plugin class whose instance will be the single argument "
-                "passed on to request handler callable.",
+    'help'    : "Name of the plugin implementing :class:`IHTTPRouter` "
+                "interface. A request is resolved for a view_callable by this "
+                "router plugin."
 }
-_default_settings['iresponse']  = {
-    'default' : 'httpresponse',
-    'types'   : (str,),
-    'help'    : "Plugin class whose instance will be used to compose http "
-                "response corresponding to request generated via "
-                "`IRequest` parameter."
-}
-_default_settings['icookie']  = {
+_default_settings['IHTTPCookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
-    'help'    : "Plugin class implementing ICookie interface specification. "
-                "methods from this plugin will be used to process both "
-                "request cookies and response cookies. This can be overriden "
-                "at corresponding request / response plugin settings."
+    'help'    : "Name of the plugin implementing :class:`IHTTPCookie` "
+                "interface spec. Methods from this plugin will be used "
+                "to process both request cookies and response cookies. "
+                "This configuration can be overriden by corresponding "
+                "request / response plugin settings."
 }
-_default_settings['irouter']  = {
-    'default' : 'routeandmatch',
+_default_settings['IHTTPRequest']  = {
+    'default' : 'httprequest',
     'types'   : (str,),
-    'help'    : "Plugin name implement :class:`IRouter` interface. A request "
-                "is routed through IRouter plugins until a view callable is "
-                "resolved and finally dispatched to it."
+    'help'    : "Name of the plugin to encapsulate HTTP request. "
+}
+_default_settings['IHTTPResponse']  = {
+    'default' : 'httpresponse',
+    'types'   : (str,),
+    'help'    : "Name of the plugin to encapsulate HTTP response."
 }
 
 class WebApp( Plugin ):
@@ -58,16 +56,17 @@ class WebApp( Plugin ):
     def __init__( self ):
         self.router = None  # TODO : Make this into default router
 
-    def onboot( self ):
+    def startapp( self ):
         """Inheriting plugins should not forget to call its super() method."""
-        #self.router = query_plugin( self, IRouter, self['irouter'] )
-        #self.router.onboot()
-        pass
+        self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
+        self.router.onboot()
+        self.cookie = self.query_plugin( IHTTPCookie, self['IHTTPCookie'] )
 
     def shutdown( self ):
-        pass
+        self.router = None
+        self.cookie = None
 
-    def start( self, request ):
+    def dorequest( self, request ):
         c = request.response.context
         view = self.router.route( request, c )
         if isimplement(view, IController) :

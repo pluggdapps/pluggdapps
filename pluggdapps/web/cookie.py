@@ -5,14 +5,14 @@
 #       Copyright (c) 2011 Netscale Computing
 
 """Cookie handling API. Basic cookie processing functions are available from
-its standard library http.cookies. This plugin implements :class:`ICookie`
+its standard library http.cookies. This plugin implements :class:`IHTTPCookie`
 interface."""
 
 import hmac, hashlib, base64, re, calendar, email, time
 from   http.cookies import CookieError, SimpleCookie
 
 from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import ICookie
+from   pluggdapps.web.webinterfaces import IHTTPCookie
 import pluggdapps.utils             as h
 
 
@@ -34,7 +34,7 @@ _default_settings['max_age_seconds']  = {
 }
 
 class HTTPCookie( Plugin ):
-    implements( ICookie )
+    implements( IHTTPCookie )
 
     def parse_cookies( self, headers ):
         cookies = SimpleCookie()

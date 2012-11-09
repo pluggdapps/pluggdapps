@@ -10,29 +10,33 @@ from   copy         import deepcopy
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IRequest, IResponse, ICookie
+from   pluggdapps.web.webinterfaces import IHTTPRequest, IHTTPResponse, IHTTPCookie
+
+# TODO : Product token, header field `Server` to be automatically added in
+# response.
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for HTTPRequest implementing IRequest interface."
+_default_settings.__doc__ = (
+    "Configuration settings for HTTPRequest implementing IHTTPRequest "
+    "interface." )
 
-_default_settings['icookie']  = {
+_default_settings['IHTTPCookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
-    'help'    : "Plugin class implementing ICookie interface specification. "
+    'help'    : "Plugin class implementing IHTTPCookie interface spec. "
                 "Methods from this plugin will be used to process request "
-                "cookies. Overrides :class:`ICookie` if defined in "
+                "cookies. Overrides :class:`IHTTPCookie` if defined in "
                 "application plugin."
 }
 
 class HTTPRequest( Plugin ):
-    implements( IRequest )
+    implements( IHTTPRequest )
 
     do_methods = ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS')
 
     elapsedtime = property( lambda self : time.time() - self.receivedat )
 
-    # IRequest interface methods and attributes
+    # IHTTPRequest interface methods and attributes
     def __init__( self, conn, method, uri, version, headers, body ):
 
         self.conn = conn
@@ -46,7 +50,7 @@ class HTTPRequest( Plugin ):
         xheaders = getattr( conn, 'xheaders', None ) if conn else None
 
         self.cookie_plugin = self.query_plugin(
-                                    self.webapp, ICookie, self['icookie'] )
+                                self.webapp, IHTTPCookie, self['IHTTPCookie'] )
         
         # Socket attributes
         self.connection = conn
@@ -108,7 +112,7 @@ class HTTPRequest( Plugin ):
         return self.cookie_plugin.decode_signed_value( name, value ) 
 
     def onfinish( self ):
-        """Callback when :meth:`IResponse.finish()` is called."""
+        """Callback when :meth:`IHTTPResponse.finish()` is called."""
         self.connection.finish()
         self.finishedat = time.time()
 

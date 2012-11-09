@@ -6,7 +6,7 @@
 
 """HTTP utility functions."""
 
-import re, sys, calendar, email, hashlib, socket
+import re, sys, calendar, email
 from   collections  import UserDict
 import datetime     as dt
 from   urllib.parse import urlsplit, unquote, parse_qs, urlunsplit, quote, \
@@ -19,12 +19,126 @@ from pluggdapps.utils.lib import parsecsv
 strptime = dt.datetime.strptime
 strftime = dt.datetime.strftime
 
+DEFAULT_QVALUE = 1.0
+
 __all__ = [
+    'response_status',
     'port_for_scheme', 'parse_startline', 'parse_url', 'make_url',
     'parse_xscheme', 'parse_remoteip', 'parse_body',
-    'convert_header_value', 'compute_etag', 'HTTPFile', 
-    'HTTPHeaders', 'url_concat', 'parse_multipart_form_data',
+    'convert_header_value', 'HTTPFile', 'HTTPHeaders', 'url_concat',
+    'parse_multipart_form_data',
+    # parse generic headers
+    'parse_cache_control', 'parse_connection', 'parse_date', 'parse_pragma',
+    'parse_trailer', 'parse_transfer_encoding', 'parse_upgrade', 'parse_via',
+    'parse_warning',
+    # parse request headers
+    'parse_accept', 'parse_accept_charset', 'parse_accept_encoding',
+    'parse_accept_language', 'parse_authorization', 'parse_expect',
+    'parse_from', 'parse_host', 'parse_if_match', 'parse_if_modified_since',
+    'parse_if_none_match', 'parse_if_range', 'parse_if_unmodified_since',
+    'parse_max_forwards', 'parse_proxy_authorization', 'parse_range',
+    'parse_referer', 'parse_te', 'parse_user_agent',
+    # parse response headers
+    'parse_accept_ranges', 'parse_age', 'parse_etag', 'parse_location',
+    'parse_proxy_authenticate', 'parse_retry_after', 'parse_server',
+    'parse_vary', 'parse_www_authenticate',
+    # parse entity headers
+    'parse_allow', 'parse_content_encoding', 'parse_content_language',
+    'parse_content_length', 'parse_content_location', 'parse_content_md5',
+    'parse_content_range', 'parse_content_type', 'parse_expires',
+    'parse_last_modified',
 ]
+
+re_OCTET  = r"*"
+re_CHAR   = r"[\x00-\x7F]*"
+re_UALPHA = r"[A-Z]*"
+re_LALPHA = r"[a-z]*"
+re_ALPHA  = r"[A-Za-z]*"
+re_DIGIT  = r"[0-9]*"
+re_HEX    = r"[0-9A-Fa-f]*"
+re_CTL    = r"[\x00-\x1F\x7F]*"
+re_CR     = r"\xD"
+re_LF     = r"\xA"
+re_SP     = r" "
+re_HT     = r"\x9"
+re_DQ     = r"\x22"
+
+# End of line marker. End-of-line marker within an entity-body id defined by
+# its associated media-type.
+re_CRLF   = r"\xD\xA"
+
+# Implied token separator. All linear white space, including folding, has the
+# same semantics as SP.
+re_LWS    = r"[\xD\xA][ \t]+"
+
+# Any OCTET except CTLs, but including LWS.
+# A CRLF is allowed in the definition of TEXT only as part of a header field
+# continuation. It is expected that the folding LWS will be replaced with a
+# single SP before interpretation of the TEXT value.
+re_TEXT   = r"[\x20-\x7E\x80-\xFF\x9\xA\xD]*"
+
+re_sep    = r"[\(\)<>@,;:\\\"/\[\]?=\{\} \t]" # Token separator
+
+re_token  = r"[^\x00-\x1F\x7F\(\)<>@,;:\\\"/\[\]?=\{\} \t]+" # Token
+
+re_quote  = r"\"[^\"]*\""
+
+re_versn  = r"HTTP/1.1"
+
+re_param  = ( r"(" + re_token + r")" +
+              r"=" +
+              r"(" + re_quote + r"|" + re_token + r")" )
+
+re_dirtive= ( r"(" + re_token + r")" +
+              r"(=" +
+              r"(" + re_quote + r"|" + re_token + r"))?" )
+
+#---- Map response code to response message
+
+statuscode = {
+    b'100' : b'CONTINUE',
+    b'101' : b'SWITCHING PROTOCOLS',
+    b'200' : b'OK',
+    b'201' : b'CREATED',
+    b'202' : b'ACCEPTED',
+    b'203' : b'NON-AUTHORITATIVE INFORMATION',
+    b'204' : b'NO CONTENT',
+    b'205' : b'RESET CONTENT',
+    b'206' : b'PARTIAL CONTENT',
+    b'226' : b'IM USED',
+    b'300' : b'MULTIPLE CHOICES',
+    b'301' : b'MOVED PERMANENTLY',
+    b'302' : b'FOUND',
+    b'303' : b'SEE OTHER',
+    b'304' : b'NOT MODIFIED',
+    b'305' : b'USE PROXY',
+    b'306' : b'RESERVED',
+    b'307' : b'TEMPORARY REDIRECT',
+    b'400' : b'BAD REQUEST',
+    b'401' : b'UNAUTHORIZED',
+    b'402' : b'PAYMENT REQUIRED',
+    b'403' : b'FORBIDDEN',
+    b'404' : b'NOT FOUND',
+    b'405' : b'METHOD NOT ALLOWED',
+    b'406' : b'NOT ACCEPTABLE',
+    b'407' : b'PROXY AUTHENTICATION REQUIRED',
+    b'408' : b'REQUEST TIMEOUT',
+    b'409' : b'CONFLICT',
+    b'410' : b'GONE',
+    b'411' : b'LENGTH REQUIRED',
+    b'412' : b'PRECONDITION FAILED',
+    b'413' : b'REQUEST ENTITY TOO LARGE',
+    b'414' : b'REQUEST-URI TOO LONG',
+    b'415' : b'UNSUPPORTED MEDIA TYPE',
+    b'416' : b'REQUESTED RANGE NOT SATISFIABLE',
+    b'417' : b'EXPECTATION FAILED',
+    b'500' : b'INTERNAL SERVER ERROR',
+    b'501' : b'NOT IMPLEMENTED',
+    b'502' : b'BAD GATEWAY',
+    b'503' : b'SERVICE UNAVAILABLE',
+    b'504' : b'GATEWAY TIMEOUT',
+    b'505' : b'HTTP VERSION NOT SUPPORTED',
+}
 
 def port_for_scheme( scheme, port='' ):
     """Calculate port based on `scheme` name. If scheme and port matches, port
@@ -42,15 +156,7 @@ def parse_startline( startline ):
     """Every HTTP request starts with a start line specifying method, uri and
     version. Parse them and return a tuple of (method, uri, version). All
     elements in the return tuple will be available as strings."""
-    try :
-        method, uri, version = [ x.strip(' \t') for x in startline.split(" ") ]
-    except :
-        raise Exception(
-                "Malformed HTTP version in HTTP Request-Line %r" % startline )
-        method = uri = version = None
-    if not version.startswith( "HTTP/" ) :
-        raise Exception( "Unknown HTTP Version %r" % version )
-    return method, uri, version
+    return [ x.strip( b' \t' ) for x in startline.split(b' ') ]
 
 
 def parse_url( uri, host=None, scheme=None ):
@@ -98,6 +204,378 @@ def parse_url( uri, host=None, scheme=None ):
                   password=r.password, hostname=host, port=port, script='' )
     return r
 
+scheme2ports = {
+    'http'  : '80',
+    'https' : '443',
+}
+def compare_url( url1, url2 ):
+    x = urlsplit( url1 )
+    y = urlsplit( url2 )
+    scheme1 = x.scheme.lower() or 'http'
+    scheme2 = y.scheme.lower() or 'http'
+    port1 = x.port or scheme2port.get( scheme1, '80' )
+    port2 = y.port or scheme2port.get( scheme2, '80' )
+    if scheme1 != scheme2 : return False
+    if x.host.lower() != y.host.lower() : return False
+    if port1 != port2 : return False
+    if x.path != y.path : return False
+    if x.query != y.query : return False
+    if x.fragment != y.fragment : return False
+    return True
+
+
+#---- Logic to parse HTTP headers
+
+class HTTPHeaders( dict ):
+    """Dictionary of HTTP headers for both request and response.
+
+    Value of each key, lower-cased string, is represented as list of
+    byte-string. If a header field occur in a request only once, then list
+    of values will have only one element.
+
+    Refer RFC2616 for more information.
+    """
+
+    @classmethod
+    def parse( cls, hdrdata ):
+        """Returns HTTPHeaders object."""
+        def consume( obj, line ):
+            name, value = line.split( b":", 1 )
+            name = name.strip().decode(b'utf8').lower()
+            pvalue = obj.get( name, None )
+            obj[ name ] = value if pvalue == None else (pvalue+', '+value)
+
+        obj, prev_line = cls(), b''
+        for line in hdrdata.splitlines() :
+            if not line : continue
+
+            if line[0].isspace() : # continuation of a multi-line header
+                prev_line += ' ' + line.lstrip(' \t')
+            else :
+                consume( obj, prev_line ) if prev_line else None
+                prev_line = line
+
+        consume( obj, prev_line ) if prev_line else None
+
+        return obj
+
+
+def parse_hdr_parameter( s ):
+    if s :
+        name, val = re.match( s, re_param ).groups()
+        return name.lower(), val
+    return s
+
+def parse_rule( s ):
+    return [ x.strip(b' \r\n\t') for x in s.split(b',', s) ]
+
+def parse_product( s ):
+    return s.split( b'/' )
+
+#---- Generic headers
+
+def parse_cache_control( value ):
+    if value == None : return None
+
+    try :
+        token, value = value.split( b'=' )
+        token = token.strip()
+        value = value.strip()
+    except ValueError :
+        token = value.strip()
+        value = None
+    return (token, value) 
+
+def parse_connection( value ):
+    if value == None : return None
+    return parse_rule( value )
+
+rfc1123_format = "%a, %d %b %Y %H:%M:%S %Z"
+rfc1036_format = "%A, %d-%b-%y %H:%M:%S %Z"
+asctime_format = "%a %b %d %H:%M:%S %Y"
+def parse_date( value ):
+    """HTTP applications have historically allowed three different formats
+    for the representation of date/time stamps:
+
+      Sun, 06 Nov 1994 08:49:37 GMT  ; RFC 822, updated by RFC 1123
+      Sunday, 06-Nov-94 08:49:37 GMT ; RFC 850, obsoleted by RFC 1036
+      Sun Nov  6 08:49:37 1994       ; ANSI C's asctime() format
+
+    The first format is preferred as an Internet standard. This function
+    heuristically parses the date format (from request header) and changes the
+    format to RFC 1123 format.
+
+    Returns `datetime` object
+    """
+    for fmt in [ rfc1123_format, rfc1036_format, asctime_format ] :
+        try :
+            dtime = strptime( datestr, fmt )
+            break
+        except :
+            pass
+    else :
+        return None
+    return dtime
+
+def http_todate( datestr ):
+    """Convert date-time string, RFC 1123 normalized format, to python datetime
+    object."""
+    return strptime( datestr, rfc1123_format )
+
+def http_fromdate( dtime ):
+    """Convert python datetime object to RFC 1123 date format."""
+    return strftime( dtime, rfc1123_format )
+
+def parse_pragma( value ):
+    if value == None : return None
+
+    toks = []
+    for x in parse_rule( value ) :
+        a,b,c = re.match( re_dirtive, x ).groups()
+        toks.append( (a, b or c) if (b or c) else a )
+    return toks
+
+def parse_trailer( value ):
+    if value == None : return None
+
+    return parse_rule( value )
+
+def parse_transfer_encoding( value ):
+    """Return a list of parsed transfer-encoding value."""
+    if value == None : return None
+    toks = []
+    for x in parse_rule(value) :
+        try :
+            parts = value.split( b';' )
+            token = parts[0]
+            params = filter( None, map( parse_hdr_parameter, parts[1:] ))
+            return toks.append( token.lower(), tuple(params) )
+        except :
+            return toks.append( (None, tuple()) )
+
+def parse_upgrade( value ):
+    if value == None : return None
+
+    return list( map( parse_product, parse_rule(value) ))
+
+def parse_via( value ):
+    pass
+
+def parse_warning( value ):
+    pass
+
+#---- Request headers
+
+def parse_accept( value ):
+    """Accept         = "Accept" ":"
+                        #( media-range [ accept-params ] )
+
+       media-range    = ( "*/*"
+                        | ( type "/" "*" )
+                        | ( type "/" subtype )
+                        ) *( ";" parameter )
+       accept-params  = ";" "q" "=" qvalue *( accept-extension )
+       accept-extension = ";" token [ "=" ( token | quoted-string ) ]
+
+    Returns
+        ( ( type, subtype, [ params ] ),
+          ( type, subtype, [ params ] ),
+        )
+      where,
+        params is list of tuple (attr, value) or just a token.
+    """
+    toks = []
+    for v in parse_rule( value ) :
+        try :
+            media_range, accept_params = v.split( b';', 1 )
+        except :
+            media_range, accept_params = v, b''
+        toks.append( media_range.split( b'/' ))
+        for x in accept_params.split( b';' ) :
+            a,b,c = re.match( re_dirtive, x ).groups()
+            toks.append( (a, b or c) if (b or c) else a )
+        toks[-1] = tuple( toks[-1] )
+
+    # sort media-ranges based on qvalue.
+    rangeq = {}
+    def quality( tok ):
+        for v in tok[2:] :
+            try : if v[0] == b'q' : q = float(v[1])
+            except : continue
+        else :
+            q = None
+        if tok[0:2] == ( b'*', b'*' ) :
+            rangeq.setdefault( b'*', q or DEFAULT_QVALUE )
+        elif tok[1] == b'*' :
+            rangeq.setdefault( tok[0], q or DEFAULT_QVALUE )
+        return (tok, q)
+
+    def quality_sort( tok_q ):
+        tok, q = tok_q
+        q = rangeq.get( tok[0], 1.0 ) if q == None else q
+        if tok[0] == b'*' : 
+            key = -2.0
+        elif tok[0] in rangeq :
+            key = -1.0 
+        else :
+            key = q + len( tok )
+        return key
+    return list( sorted( map( quality, toks ), key=quality_sort, reverse=True ))
+
+def parse_accept_charset( value ):
+    """Accept-Charset = "Accept-Charset" ":"
+              1#( ( charset | "*" )[ ";" "q" "=" qvalue ] )
+
+    Returns,
+        (charset, qvalue), where qvalue is in float.
+    """
+    toks, qstar = [], 0.0
+    for v in parse_rule( value ) :
+        try :
+            charset, qvalue = v.split(b';')
+            _, qvalue = re.match( re_param, qvalue ).groups()
+            qvalue = float( qvalue )
+        except :
+            charset, qvalue = v, DEFAULT_QVALUE
+        qstar = qvalue if charset == b'*' else qstar
+
+    def quality_sort( tok_q ):
+        tok, q = tok_q
+        if tok[0] == b'*' : return -1.0
+        else : return q
+
+    return sorted( toks, key=quality_sort, reverse=True )
+
+def parse_accept_encoding( value ):
+    pass
+
+def parse_accept_language( value ):
+    if value == None : return None
+    return tuple( [value] + value.split( b'-' ) )
+
+def parse_authorization( value ):
+    pass
+
+def parse_expect( value ):
+    pass
+
+def parse_from( value ):
+    pass
+
+def parse_host( value ):
+    pass
+
+def parse_if_match( value ):
+    pass
+
+def parse_if_modified_since( value ):
+    pass
+
+def parse_if_none_match( value ):
+    pass
+
+def parse_if_range( value ):
+    pass
+
+def parse_if_unmodified_since( value ):
+    pass
+
+def parse_max_forwards( value ):
+    pass
+
+def parse_proxy_authorization( value ):
+    pass
+
+def parse_range( value ):
+    value = value.strip() if value else None
+    return value if value == b'bytes' else None
+
+def parse_referer( value ):
+    pass
+
+def parse_te( value ):
+    """Return a list of parsed transfer-encoding value."""
+    pass
+
+def parse_user_agent( value ):
+    pass
+
+#---- Response headers
+
+def parse_accept_ranges( value ):
+    pass
+
+def parse_age( value ):
+    pass
+
+def parse_etag( value ):
+    pass
+
+def parse_location( value ):
+    pass
+
+def parse_proxy_authenticate( value ):
+    pass
+
+def parse_retry_after( value ):
+    pass
+
+def parse_server( value ):
+    pass
+
+def parse_vary( value ):
+    pass
+
+def parse_www_authenticate( value ):
+    pass
+
+#---- Entity headers
+
+def parse_allow( value ):
+    pass
+
+def parse_content_encoding( value ):
+    """Return a token 
+        "gzip" | "compress" | "deflate" | "identity"
+    """
+    return value.strip().lower()
+
+
+def parse_content_language( value ):
+    if value == None : return None
+    return tuple( [value] + value.split( b'-' ) )
+
+def parse_content_length( value ):
+    """Return length as integer type."""
+    return int(value) if value else value
+
+def parse_content_location( value ):
+    pass
+
+def parse_content_md5( value ):
+    pass
+
+def parse_content_range( value ):
+    value = value.strip() if value else None
+    return value if value == b'bytes' else None
+
+def parse_content_type( value ):
+    try :
+        parts = value.split( b';' )
+        typ, subtype = parts[0].split( b'/' )
+        params = filter( map( parse_hdr_parameter, parts[1:] ))
+        return typ, subtype, tuple(params)
+    except :
+        return tuple( None, None, tuple() )
+
+def parse_expires( value ):
+    pass
+
+def parse_last_modified( value ):
+    pass
+
+#---- Yet to be cleaned up.
+
 def make_url( baseurl, path, query, fragment ):
     """Using the baseurl and the remaining variable part of a url namely
     path, query, fragment construct a full url that can be sent in response
@@ -135,51 +613,6 @@ def parse_remoteip( addr, hdrs, xheaders ):
     return remote_ip
 
 
-rfc1123_format = "%a, %d %b %Y %H:%M:%S %Z"
-rfc1036_format = "%A, %d-%b-%y %H:%M:%S %Z"
-asctime_format = "%a %b %d %H:%M:%S %Y"
-def http_normalizedate( datestr ):
-    """HTTP applications have historically allowed three different formats
-    for the representation of date/time stamps:
-
-      Sun, 06 Nov 1994 08:49:37 GMT  ; RFC 822, updated by RFC 1123
-      Sunday, 06-Nov-94 08:49:37 GMT ; RFC 850, obsoleted by RFC 1036
-      Sun Nov  6 08:49:37 1994       ; ANSI C's asctime() format
-
-    The first format is preferred as an Internet standard. This function
-    heuristically parses the date format (from request header) and changes the
-    format to RFC 1123 format.
-    """
-    try :
-        dtime = strptime( datestr, rfc1123_format )
-    except :
-        dtime = None
-    if dtime == None :
-        for fmt in [ rfc1036_format, asctime_format ] :
-            try :
-                dtime = strptime( datestr, fmt )
-                break
-            except :
-                pass
-        else :
-            raise Error( "Unknown date format in http header - %r" % datestr )
-    return dtime.strftime( rfc1123_format ) 
-
-
-def http_todate( datestr ):
-    """Convert date-time string, RFC 1123 normalized format, to python datetime
-    object."""
-    return strptime( datestr, rfc1123_format )
-
-
-def http_fromdate( dtime ):
-    """Convert python datetime object to RFC 1123 date format."""
-    return strftime( dtime, rfc1123_format )
-
-
-def parse_fieldvalue( field, value ):
-    pass
-
 def convert_header_value( value ):
     """Transform `value` to marshal them as HTTP header value.
 
@@ -203,12 +636,6 @@ def convert_header_value( value ):
         raise Error( "Unsafe header value %r", value )
     return value
 
-
-def compute_etag( write_buffer ) :
-    """Computes the etag header to be used for this request's response."""
-    hasher = hashlib.sha1()
-    [ hasher.update(x) for x in write_buffer ]
-    return '"%s"' % hasher.hexdigest()
 
 class HTTPFile( UserDict ):
     """Represents an HTTP file, whose instance variables are also accessible
@@ -340,172 +767,6 @@ def _parse_header(line):
                 value = value.replace('\\\\', '\\').replace('\\"', '"')
             pdict[name] = value
     return key, pdict
-
-
-class HTTPHeaders( dict ):
-    """A dictionary that maintains Http-Header-Case for all keys.
-
-    Supports multiple values per key via a pair of new methods,
-    add() and get_list().  The regular dictionary interface returns a single
-    value per key, with multiple values joined by a comma.
-
-    >>> h = HTTPHeaders({"content-type": "text/html"})
-    >>> h.keys()
-    ['Content-Type']
-    >>> h["Content-Type"]
-    'text/html'
-
-    >>> h.add("Set-Cookie", "A=B")
-    >>> h.add("Set-Cookie", "C=D")
-    >>> h["set-cookie"]
-    'A=B,C=D'
-    >>> h.get_list("set-cookie")
-    ['A=B', 'C=D']
-
-    >>> for (k,v) in sorted(h.get_all()):
-    ...    print '%s: %s' % (k,v)
-    ...
-    Content-Type: text/html
-    Set-Cookie: A=B
-    Set-Cookie: C=D
-    """
-    general_headers = [
-       'Cache-Control', 'Connection', 'Date', 'Pragma', 'Trailer', 
-       'Transfer-Encoding', 'Upgrade', 'Via', 'Warning',
-    ]
-    request_headers = [
-       'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language',
-       'Authorization', 'Expect', 'From', 'Host', 'If-Match',
-       'If-Modified-Since', 'If-None-Match', 'If-Range', 'If-Unmodified-Since',
-       'Max-Forwards', 'Proxy-Authorization', 'Range', 'Referer', 'TE',
-       'User-Agent',
-    ]
-    response_headers = [
-       'Accept-Ranges', 'Age', 'ETag', 'Location', 'Proxy-Authenticate',
-       'Retry-After', 'Server', 'Vary', 'WWW-Authenticate', 
-    ]
-    entity_headers = [
-       'Allow', 'Content-Encoding', 'Content-Language', 'Content-Length',
-       'Content-Location', 'Content-MD5', 'Content-Range', 'Content-Type',
-       'Expires', 'Last-Modified',
-    ]
-
-    def __init__( self, *args, **kwargs ):
-        # Don't pass args or kwargs to dict.__init__, as it will bypass
-        # our __setitem__
-        super().__init__( *args, **kwargs )
-        self._as_list = {}
-        self._last_key = None
-        if args and isinstance( args[0], HTTPHeaders ) :   # Copy constructor
-            [ self.add(k,v) for k,v in args[0].get_all() ]
-        else:                                   # Dict-style initialization
-            self.update( *args, **kwargs )
-
-    # Additional public methods
-    def add( self, name, value ):
-        """Adds a new value for the given key."""
-        norm_name = HTTPHeaders._normalize_name( name )
-        self._last_key = norm_name
-        if norm_name in self :
-            # bypass our override of __setitem__ since it modifies _as_list
-            super().__setitem__( norm_name, self[norm_name] + ',' + value )
-            self._as_list[norm_name].append(value)
-        else:
-            self[norm_name] = value
-
-    def get_list( self, name ):
-        """Returns all values for the given header as a list."""
-        norm_name = HTTPHeaders._normalize_name(name)
-        return self._as_list.get( norm_name, [] )
-
-    def get_all( self ):
-        """Returns an iterable of all (name, value) pairs.
-
-        If a header has multiple values, multiple pairs will be
-        returned with the same name.
-        """
-        for name, li in self._as_list.items() :
-            for value in li :
-                yield (name, value)
-
-    def parse_line( self, line ):
-        """Updates the dictionary with a single header line.
-
-        >>> h = HTTPHeaders()
-        >>> h.parse_line("Content-Type: text/html")
-        >>> h.get('content-type')
-        'text/html'
-        """
-        if line[0].isspace() : # continuation of a multi-line header
-            new_part = ' ' + line.lstrip()
-            self._as_list[ self._last_key ][-1] += new_part
-            super().__setitem__( 
-                    self._last_key, self[self._last_key] + new_part )
-        else:
-            name, value = line.split( ":", 1 )
-            self.add( name.strip(), value.strip() )
-
-    @classmethod
-    def parse( cls, headers ):
-        """Returns a dictionary of HTTPHeaders instance from HTTP header text.
-
-        >>> h = HTTPHeaders.parse(
-        >>>         "Content-Type: text/html\\r\\nContent-Length: 42\\r\\n")
-        >>> sorted(h.items())
-        [('Content-Length', '42'), ('Content-Type', 'text/html')]
-        """
-        obj = cls()
-        [ obj.parse_line( line ) for line in headers.splitlines() if line ]
-
-        return obj
-
-    # dict implementation overrides
-
-    def __setitem__( self, name, value ):
-        norm_name = HTTPHeaders._normalize_name(name)
-        super().__setitem__( norm_name, value)
-        self._as_list[norm_name] = [value]
-
-    def __getitem__( self, name ):
-        return super().__getitem__( HTTPHeaders._normalize_name(name) )
-
-    def __delitem__( self, name ):
-        norm_name = HTTPHeaders._normalize_name(name)
-        super().__delitem__( norm_name )
-        del self._as_list[norm_name]
-
-    def __contains__( self, name ):
-        norm_name = HTTPHeaders._normalize_name( name )
-        return super().__contains__( norm_name )
-
-    def get( self, name, default=None ):
-        return super().get( HTTPHeaders._normalize_name(name), default )
-
-    def update(self, *args, **kwargs):
-        # dict.update bypasses our __setitem__
-        for k, v in dict(*args, **kwargs).items() :
-            self[k] = v
-
-    _norm_patt = re.compile(r'^[A-Z0-9][a-z0-9]*(-[A-Z0-9][a-z0-9]*)*$')
-    _normalized_headers = {}
-
-    @staticmethod
-    def _normalize_name( name ):
-        """Converts a name to Http-Header-Case.
-
-        >>> HTTPHeaders._normalize_name("coNtent-TYPE")
-        'Content-Type'
-        """
-        try:
-            return HTTPHeaders._normalized_headers[name]
-        except KeyError:
-            if HTTPHeaders._norm_patt.match(name) :
-                normalized = name
-            else:
-                normalized = "-".join(w.capitalize() for w in name.split("-"))
-            HTTPHeaders._normalized_headers[name] = normalized
-            return normalized
-
 
 class RequestHeader( HTTPHeaders ):
     """Sub class of HTTPHeaders that handles request headers."""

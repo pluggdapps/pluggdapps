@@ -143,16 +143,18 @@ class HTTPEPollServer( Plugin ):
     "IOLoop instance for event-polling."""
 
     def __init__( self ):
+        # Note `ioloop` can be started/stopped/closed only by the server plugin
+        # that instantiates IOLoop()
         self.ioloop = IOLoop( self )
 
         # Attributes
-        self.sockets = {}      # fd->socket mapping.
+        self.sockets = {}      # fd->socket mapping for listening sockets.
         self.connections = []  # [ HTTPConnection() ]
 
     #---- IHTTPServer interface methods.
 
     def start( self ):
-        """Starts this server using IOloop."""
+        """Starts this server using IOloop (EPoll)."""
         self.listen()
         try :
             self.ioloop.start() # Block !
@@ -166,12 +168,20 @@ class HTTPEPollServer( Plugin ):
     def stop( self ):
         """Stop listening for new connections. Expected to be called in case
         of exceptions and SIGNALS"""
-        # Close client connections.
+        # Stop EPoll, this must un-block ioloop.start() call. Do close() after
+        # that.
         self.ioloop.stop()
+        # Close all connections.
         [ httpconn.close() for httpconn in self.connections ]
+        # Close listening sockets
         [ sock.close() for sock in self.sockets.values() ]
 
     #---- Internal methods
+
+    def close_connection( self, httpconn ):
+        """Close a client connection `httpconn` which is
+        :class:`IHTTPConnection` plugin."""
+        self.connections.remove( httpconn )
 
     def listen( self ):
         """Starts accepting connections on the given port.
@@ -194,12 +204,10 @@ class HTTPEPollServer( Plugin ):
         """
         for sock in sockets:
             self.sockets[ sock.fileno() ] = sock
-            add_accept_handler(
-                    self, sock, self.handle_connection, self.ioloop )
+            add_accept_handler(self, sock, self.handle_connection, self.ioloop)
 
     def handle_connection( self, conn, address ):
-        # if query_plugin bombs we still have a valid httpconn
-        httpconn = None
+        httpconn = None     # if query_plugin bombs.
         try :
             httpconn = self.query_plugin( IHTTPConnection, 
                                           self['IHTTPConnection'],
@@ -332,20 +340,10 @@ def add_accept_handler( server, sock, callback, ioloop ):
                 server.pa.loginfo( "Unable to accept connection." )
                 if self['debug'] : raise
 
-            server.pa.loginfo(
-                    "Accepting new connection from %r" % (address,) )
+            server.pa.loginfo( "Accepting new connection from %r"%(address,) )
             callback( connection, address )
 
     ioloop.add_handler( sock.fileno(), accept_handler, IOLoop.READ )
-
-
-def run_callback( server, callback, *args ):
-    """Run a callback with `args`."""
-    try:
-        callback( *args )
-    except Exception:
-        server.pa.logerror( "Exception in callback %r" % callback )
-        if server['debug'] : raise
 
 
 class IOLoop( object ):
@@ -396,11 +394,21 @@ class IOLoop( object ):
     """Create a pipe that we send bogus data to when we want to wake
     the I/O loop when it is idle."""
 
+    poll_threshold = None
+    """Maximum number of descriptors to poll on epoll()."""
+
+    poll_timeout = None
+    """Timout value while waiting on epoll()."""
+
+    server = None
+    """:class:`IHTTPServer` plugin."""
+
     def __init__( self, server ):
 
         self.poll_threshold = server['poll_threshold']
         self.poll_timeout = server['poll_timeout']
         self.server = server
+        self.debug = server['debug']
 
         self._evpoll = select.epoll()
         self._waker = Waker()
@@ -415,30 +423,39 @@ class IOLoop( object ):
         self._running = False
         self._stopped = False
 
-        self.server.pa.loginfo( "Adding poll-loop waker ..." )
+        if self.debug :
+            self.server.pa.loginfo( "Adding poll-loop waker ..." )
+
         self.add_handler( self._waker.fileno(), 
                           lambda fd, events: self._waker.consume(), # handler
                           self.READ )
 
     #---- Manage polled descriptors and its callback handlers.
 
-    def add_handler( self, fd, handler, events ):
-        """Registers the given handler to receive the given events for fd."""
-        self._handlers[fd] = handler
+    def add_handler( self, fd, callback, events ):
+        """Registers the given `callback` to receive the given events for fd.
+
+        Note that exceptions by this socket `callback` must be handled within
+        the callback itself.
+        """
+        self._handlers[fd] = callback
         self._evpoll.register( fd, events | self.ERROR )
         if len(self._handlers) > self.poll_threshold :
-            msg = "Polled descriptors exceeded threshold"%self.poll_threshold
-            self.server.pa.logwarn( msg )
-        if self.server['debug'] :
-            info = "Add descriptor to epoll : %s" % self._handlers.keys()
-            self.server.pa.loginfo( info )
+            self.server.pa.logwarn(
+                "Polled descriptors exceeded threshold" % self.poll_threshold
+            )
+        if self.debug :
+            self.server.pa.loginfo(
+                "Add descriptor to epoll : %s" % self._handlers.keys()
+            )
 
     def update_handler( self, fd, events ):
         """Changes the events we listen for fd."""
         self._evpoll.modify( fd, events | self.ERROR )
-        if self.server['debug'] :
-            info = "Updating descriptor : (%s, %s)" % (fd, events)
-            self.server.pa.loginfo( info )
+        if self.debug :
+            self.server.pa.loginfo(
+                "Updating descriptor : (%s, %s)" % (fd, events)
+            )
 
     def remove_handler( self, fd ):
         """Stop listening for events on fd."""
@@ -448,9 +465,11 @@ class IOLoop( object ):
             self._evpoll.unregister(fd)
         except (OSError, IOError):
             self.server.pa.logwarn( "Error deleting fd from epoll" )
-        if self.server['debug'] :
-            info = "Remove descriptor from epoll : %s:"%self._handlers.keys()
-            self.server.pa.loginfo( info )
+
+        if self.debug :
+            self.server.pa.loginfo(
+                "Remove descriptor from epoll : %s:"%self._handlers.keys()
+            )
 
     #---- Manage timeout handlers on this epoll using heap queue.
 
@@ -461,7 +480,11 @@ class IOLoop( object ):
 
         ``deadline`` may be a number denoting a unix timestamp (as returned
         by ``time.time()`` or a ``datetime.timedelta`` object for a deadline
-        relative to the current time."""
+        relative to the current time.
+        
+        Note that exceptions by timeout `callback` must be handled within the
+        callback itself.
+        """
         timeout = Timeout( deadline, callback )
         heapq.heappush( self._timeouts, timeout )
         return timeout
@@ -481,7 +504,11 @@ class IOLoop( object ):
     #---- manage straight-forward callbacks inside evented ioloop.
 
     def add_callback( self, callback ):
-        """Calls the given callback on the next I/O loop iteration."""
+        """Calls the given callback on the next I/O loop iteration.
+        
+        Note that exceptions within the `callback` must handled within the
+        callback itself.
+        """
         list_empty = self._callbacks
         self._callbacks.append( callback )
         self._waker.wake() if list_empty else None
@@ -506,19 +533,29 @@ class IOLoop( object ):
             # to the next iteration of the event loop.
             callbacks = self._callbacks
             self._callbacks = []
-            [ run_callback( self.server, callback )
-              for callback in callbacks ]
+            for callback in callbacks :
+                try    : callback()
+                except :
+                    err = "Exception in callback %r" % callback
+                    self.server.pa.logerror( err )
+                    if self.debug : raise
 
             # Handle timeouts
             if self._timeouts :
                 now = time.time()
                 while self._timeouts :
-                    if self._timeouts[0].callback is None: # cancelled timeout
+                    if self._timeouts[0].callback is None : # Cancelled timeout
                         heapq.heappop( self._timeouts )
-                    elif self._timeouts[0].deadline <= now:
+
+                    elif self._timeouts[0].deadline <= now : # Handle timeout
                         timeout = heapq.heappop( self._timeouts )
-                        run_callback( self.server, timeout.callback )
-                    else:
+                        try    : timeout.callback()
+                        except :
+                            err = "Exception in callback %r" % timeout
+                            self.server.pa.logerror( err )
+                            if self.debug : raise
+
+                    else : # Adjust poll-timeout
                         seconds = self._timeouts[0].deadline - now
                         poll_timeout = min(seconds, poll_timeout)
                         break
@@ -539,11 +576,11 @@ class IOLoop( object ):
                 # two ways EINTR might be signaled:
                 # * e.errno == errno.EINTR
                 # * e.args is like (errno.EINTR, 'Interrupted system call')
-                if (getattr(e, 'errno', None) == errno.EINTR or
-                    (isinstance(getattr(e, 'args', None), tuple) and
-                     len(e.args) == 2 and e.args[0] == errno.EINTR)):
-                    continue
-                raise
+                if getattr(e, 'errno', None) == errno.EINTR : continue
+                try    : if e.args[0] == errno.EINTR : continue 
+                except : pass
+
+                raise # This exception is bad ! forcefully raise exception
 
             # Pop one fd at a time from the set of pending fds and run
             # its handler. Since that handler may perform actions on
@@ -552,13 +589,12 @@ class IOLoop( object ):
             self._events.update(event_pairs)
             while self._events :
                 fd, events = self._events.popitem()
-                try:
-                    if fd in self._handlers :
-                        self._handlers[fd]( fd, events )
-                except (OSError, IOError) as e:
-                    # Check whether client closed the connection
-                    if e.args[0] != errno.EPIPE:
-                        raise
+                callback = self._handlers.get( fd, None )
+                try : callback( fd, events ) if callback else None
+                except :
+                    err = "Exception in socket callback %r" % callback
+                    server.pa.logerror( err )
+                    if server['debug'] : raise
 
         # reset the stopped flag so another start/stop pair can be issued
         self._stopped = False
@@ -575,11 +611,7 @@ class IOLoop( object ):
         """
         # Close listening sockets and remove them from IOLoop
         self.server.pa.loginfo( "Stopping poll loop ..." )
-        try :
-            [ self.remove_handler( fd ) for fd in self._handlers.keys() ]
-        except :
-            typ, val, tb = sys.exc_info()
-            h.print_exc( typ, val, tb )
+        [ self.remove_handler( fd ) for fd in self._handlers.keys() ]
         self._running = False
         self._stopped = True
         self._waker.wake()  # Wake the ioloop
@@ -608,6 +640,11 @@ _ds2['no_keep_alive']  = {
     'types'   : (bool,),
     'help'    : "HTTP /1.1, whether to close the connection after every "
                 "request.",
+}
+_ds2['connection_timeout']  = {
+    'default' : 60*60*1,    # 1 hours
+    'types'   : (int,),
+    'help'    : "Timeout after which an idle connection is gracefully closed."
 }
 _ds2['max_buffer_size'] = {
     'default' : 104857600,  # 100MB
@@ -645,14 +682,14 @@ class HTTPConnection( Plugin ):
         self.conn = conn
         self.address = addr
         self.server = server
-        self.disconnect = self['no_keep_alive']
+        self.ioloop = server.ioloop
+        self.write_callback = None
+        self.close_callback = None
 
         # Per request attributes
         self.receiving = False
         self.responding = False
         self.request = None
-        self.write_callback = None
-        self.close_callback = None
 
         # Set up a socket from accepted connection (conn, addr).
         sslopts = h.settingsfor( 'ssl.', server )
@@ -665,8 +702,11 @@ class HTTPConnection( Plugin ):
         self.stream = streamcls( self )
 
         # Poll for request start-line
-        self.stream.read_until( b"\r\n\r\n", self.on_headers )
+        self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
         self.stream.set_close_callback( self.on_connection_close )
+
+        # Subscribe timeout
+        self.ioloop.add_timeout( self['connection_timeout'], on_timeout )
 
     def get_ssl_certificate( self ):
         """Return SSL certificate for SSL traffic."""
@@ -676,7 +716,27 @@ class HTTPConnection( Plugin ):
     def set_close_callback( self, callback ):
         self.close_callback = callback
 
-    def write( self, chunk, callback=None ):
+    def dispatch_request( self, method, uri, version, hdrs, body ):
+        # Move to responding state.
+        self.receiving = False
+        self.responding = True
+
+        try :
+            uriparts, mountedat = \
+                    self.pa.resolveapp( self, method, uri, version, hdrs )
+            typ, mountname, webapp = mountedat
+        except :
+            self.pa.logerror( "Unable to resolve request for apps. (%s)"%uri )
+            if self['debug'] : raise
+
+        try :
+            webapp.dorequest( self, method, uriparts, version, hdrs, body )
+        except :
+            self.pa.logerror(
+                    "Application %r cannot handle request %r" % (webapp, uri) )
+            if self['debug'] : raise
+
+    def write( self, hdrs, chunk, callback=None ):
         """Write a chunk of data."""
         if not self.responding :
             self.pa.logerror( "Request is not yet received." )
@@ -684,71 +744,70 @@ class HTTPConnection( Plugin ):
         if self.stream.closed() :
             self.pa.logwarn( 
                     "Cannot write to closed stream %r" % (self.address,) )
+            return
+
+        transenc = h.parse_transfer_encoding( 
+                            hdrs.get( 'transfer-encoding', None ))
+
+        if transenc and transenc[0][0] == 'chunked' :
+            chunk_size = len( chunk )
+            data = ( hex(chunk_size).encode('utf8') + b'\r\n' 
+                     + chunk + b'\r\n' )
         else :
-            self.write_callback = callback
-            self.stream.write( chunk, self.on_write_complete )
+            data = chunk
+
+        self.write_callback = callback
+        self.stream.write( data, self.on_write_complete )
+
         return
 
     def finish( self ):
         if not self.responding :
-            self.pa.logerror( "Cannot finish for closed request." )
+            self.pa.logerror( "Cannot finish for already finished request." )
             return
 
         # If write is pending, leave finish to write-callback
         if not self.stream.writing() :
             self.finish_request()
-        return
 
-    def close( self, force=False ):
+    def close( self ):
         """Close the connection with client."""
-        self.disconnect = True
-        self.tryclose( force=force )
-        return
+        self.tryclose( disconnect=True )
 
     #---- Internal methods
 
     def supports_http_1_1( self ):
+        """Check whether the client support HTTP 1.1"""
         if self.request :
             return self.request[2] == "HTTP/1.1"
         return False
 
-    def dispatch_request( self,  ):
-        """Request recieved. Time to dispatch them to applications."""
-
-        # Move to responding state.
-        self.receiving = False
-        self.responding = True
-
-        method, uri, version, hdrs, body = self.request
-        uriparts, mountedat = \
-                self.pa.resolveapp( self, method, uri, version, hdrs )
-        app.dorequest( self, method, uri, version, hdrs, body )
-
     def finish_request( self ):
-        self.disconnect = self.disconnect or self.isdisconnect()
-        if self.tryclose() == False :
-            self.stream.read_until( b"\r\n\r\n", self.on_headers )
-
-    def isdisconnect( self ):
-        meth, hdrs = self.request[0], self.request[3]
-        conn_val = hdrs.get( "Connection", None )
-        conn_val = conn_val if conn_val is None else conn_val.lower()
-        if self.supports_http_1_1():
-            return conn_val == "close"
-        elif ("Content-Length" in hdrs) or (meth in ("HEAD", "GET") ) :
-            return conn_val != "keep-alive"
-        else:
-            return True
-
-    def tryclose( self, force=False ):
-        """Try to close this connection.""" 
+        """Mark that response is sent and close the connection if required,
+        before subscribing to request-handler."""
         self.responding = False
-        if self.disconnect :
-            self.stream.close()
-            return True
-        return False
+        if self.tryclose() == False :
+            self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
+
+    def tryclose( self, disconnect=False ):
+        """Try to close this connection. If `disconnect` is True,
+        connection-stream is always closed, otherwise it follows HTTP
+        guidelines to close the connection.""" 
+        if disconnect == False :
+            meth, hdrs = self.request[0], self.request[3]
+            conn_val = h.parse_connection( hdrs.get( "connection", None ))
+            if self.supports_http_1_1() :
+                disconnect = conn_val == [ b'close' ]
+            elif ("content-length" in hdrs) or (meth in (b"HEAD", b"GET") ) :
+                disconnect = conn_val != [ b'keep-alive' ]
+
+        self.stream.close() if disconnect == True else None
+        return disconnect
 
     #---- Callback handlers
+
+    BAD_REQUEST = b'HTTP/1.1 400 ' + h.statuscode[b'400'] + '\r\n\r\n'
+    ENTITY_LARGE = b'HTTP/1.1 413 ' + h.statuscode[b'413'] + '\r\n\r\n'
 
     def on_write_complete( self ):
         if self.write_callback is not None:
@@ -765,46 +824,122 @@ class HTTPConnection( Plugin ):
         if self.responding and not self.stream.writing() :
             self.finish_request()
 
-    def on_headers( self, data ):
+    def on_request_headers( self, data ):
+        """A request has started. Parse `data` for startline and headers."""
+        # Remove empty-lines (CRLFs) prefixed to request message
+        if data.strip( b'\r\n' ) == b'' :
+            self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
+            return
+
         self.receiving = True
         try :
             data = data.decode( 'utf-8' )
-            # Remove empty-lines CRLFs prefixed to request message
-            data = data.rstrip('\r\n')
+            data = data.rstrip( b'\r\n' )
             # Get request-startline
-            eol = data.find("\r\n")
-            startline = sline = data[:eol]
+            try :
+                startline, hdrdata = data.split( b"\r\n", 1 )
+            except ValueError :
+                startline, hdrdata = data, b''
 
-            method, uri, version = h.parse_startline( data[:eol] )
-            headers = h.HTTPHeaders.parse( data[eol:] )
-            self.request = (method, uri, version, headers, None)
+            method, uri, version = h.parse_startline( startline )
+            if version != b"HTTP/1.1" :
+                self.write( self.BAD_REQUEST )
+                self.tryclose( disconnect=True )
 
-            content_length = headers.get( "Content-Length" )
+            hdrs = h.HTTPHeaders.parse( hdrdata ) if hdrdata else []
+            self.request = ( method, uri, version, hdrs, None )
 
-            if content_length :
-                content_length = int(content_length)
-                if content_length > self['max_buffer_size'] :
-                    self.pa.logerror( "Request content length too long.")
-                    # TODO: Response should be sent back to client.
-                if headers.get("Expect") == "100-continue":
-                    self.stream.write( b"HTTP/1.1 100 (Continue)\r\n\r\n" )
+            # The presence of a message-body in a request is signaled by the
+            # inclusion of a Content-Length or Transfer-Encoding header field
+            # in the request's message-headers.
+            clen = h.parse_content_length( hdrs.get( "content-length", None))
+            transenc = h.parse_transfer_encoding( 
+                            hdrs.get( 'transfer-encoding', None ))
 
-                # If content is present, read request body.
-                self.stream.read_bytes( content_length, self.on_request_body )
+            if transenc and transenc[0][0] == b'chunked' :
+                hdrs.pop( "content-length", None )
+                self.request = ( method, uri, version, hdrs, ([], []) )
+                self.stream.read_until( b"\r\n", self.on_request_chunk_line )
+
+            elif clen :
+                expect = h.parse_expect( hdrs.get( "expect", None ))
+                if clen > self['max_buffer_size'] :
+                    self.write( self.ENTITY_LARGE )
+                    self.stream_read_bytes( clen, self.on_skip_request )
+
+                elif expect == "100-continue" :
+                    self.write( b"HTTP/1.1 100 (Continue)\r\n\r\n" )
+                    self.stream.read_bytes( clen, self.on_request_body )
+
+                else :
+                    self.stream.read_bytes( clen, self.on_request_body )
 
             else :
                 self.dispatch_request()
 
         except h.Error as e:
-            self.pa.logwarn( "Malformed request %s" % data )
-            self.close()
+            self.pa.logwarn( "Malformed request ..." )
+            self.write( self.BAD_REQUEST )
+            self.tryclose( disconnect=True )
             if self['debug'] : raise
 
         return
 
+    def on_skip_request( self, data ):
+        """Skip `data`, may be it was detected that on-going request is
+        malformed or cannot be supported."""
+        self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
+
     def on_request_body( self, data ):
-        self.request = self.request[:4] + (data,)
+        """Request body receivd. Dispatch request."""
+        self.request[4] = data
         self.dispatch_request()
+
+    def on_request_chunk_line( self, data ):
+        """A new Request chunk has started. We will receive only the
+        chunk-line."""
+        data = data.rstrip( b'\r\n' )
+        hdrs = self.request[3]
+        try :
+            chunk_size, chunk_ext = data.split( b';', 1 )
+            chunk_size = int(chline, 16)
+        except :
+            chunk_size, chunk_ext = int(data, 16), None
+
+        if chunk_size == 0 :    # last_chunk
+            self.request[4][0].append( (chunk_size, chunk_ext, None) )
+            if h.parse_trailer( hdrs.get( 'trailer', None )) :# Trailer present
+                self.stream.read_until( b"\r\n\r\n", self.on_request_trailer )
+            else :
+                self.stream.read_until( b"\r\n", self.on_request_chunks_done )
+        else :
+            self.request[4][0].append( (chunk_size, chunk_ext) )
+            # Increase chunk_size by 2, to include limiting CRLF.
+            self.stream.read_bytes( chunk_size+2, self.on_request_chunk_data )
+
+    def on_request_chunk_data( self, data ):
+        """A request chunk is received."""
+        data = data[:-2]
+        chunk_size, chunk_ext, _ = self.request[4][0].pop(-1)
+        self.request[4][0].append( (chunk_size, chunk_ext, data) )
+        self.stream.read_until( b'\r\n', on_request_chunk_line )
+
+    def on_request_trailer( self, data ):
+        """An optional trailer is received."""
+        chunks, trailers = self.request[4]
+        trailers = h.HTTPHeaders( data )
+        self.request[4] = (chunks, trailers)
+        self.dispatch_request()
+
+    def on_request_chunks_done( self, data ):
+        """The last chunk was received without a trailer. Dispatch."""
+        self.dispatch_request()
+
+    def on_timeout( self ):
+        """The connection was idle and a timeout has occured. Close the
+        connection."""
+        self.tryclose( disconnect=True )
+        self.server.close_connection( self )
 
     def on_connection_close( self ):
         """This method will be invoked by the stream object when socket is
@@ -900,7 +1035,10 @@ class IOStream( object ):
 
     The socket is a resulting connected socket via socket.accept()."""
 
-    socket = None
+    httpconn = None
+    """:class:`IHTTPConnection` plugin."""
+
+    conn = None
     """Socket object (accepted by the server) to stream data."""
 
     address = None
@@ -960,6 +1098,7 @@ class IOStream( object ):
         self.address = httpconn.address
         self.server = httpconn.server
         self.ioloop = self.server.ioloop
+
         self.conn.setblocking( False )
 
         # configuration settings
@@ -1058,21 +1197,19 @@ class IOStream( object ):
     def close( self ):
         """Close this stream."""
         if self.server['debug'] == True :
-            self.server.pa.loginfo( 
+            self.server.pa.loginfo(
                     "Closing the stream for %r" % (self.address,) )
 
         if self.conn is not None:
-
-            if self._read_until_close:
+            if self._read_until_close :
                 self.docallback( self._read_buffer_size, self._read_callback )
-
             if self._state is not None:
                 self.ioloop.remove_handler( self.conn.fileno() )
                 self._state = None
-
             self.conn.close()
             self.conn = None
-        self.maybe_run_close_callback()
+
+        self.try_close_callback()
 
     def reading(self):
         """Returns true if we are currently reading from the stream."""
@@ -1088,7 +1225,7 @@ class IOStream( object ):
 
     #---- Local methods.
 
-    def maybe_run_close_callback(self):
+    def try_close_callback(self):
         """If a close-callback is subscribed, try calling back.  If there are
         pending callbacks, don't run the close callback until they're done
         (see _maybe_add_error_handler)."""
@@ -1115,8 +1252,8 @@ class IOStream( object ):
         data = self.consume( consume_bytes )
         run_callback( self.server, callback, data )
 
-    def handle_events(self, fd, events):
-        """IOLoop handler."""
+    def on_epoll_event( self, fd, events ):
+        """Callback for this socket's (conn's) events monitored by an EPoll."""
 
         if not self.conn:
             self.server.pa.logwarn( "Got events for closed stream %d" % fd )
@@ -1149,10 +1286,9 @@ class IOStream( object ):
             if state != self._state:
                 if self._state is not None :
                     raise Exception( 
-                            "shouldn't happen: handle_events without _state" )
+                            "shouldn't happen: on_epoll_event without _state" )
                 self._state = state
-                self.ioloop.update_handler( 
-                        self.conn.fileno(), self._state )
+                self.ioloop.update_handler( self.conn.fileno(), self._state )
         except Exception :
             self.server.pa.logerror( 
                     "Uncaught exception, closing connection." )
@@ -1192,7 +1328,7 @@ class IOStream( object ):
         if self.read_from_buffer() :
             return
         else:
-            self.maybe_run_close_callback()
+            self.try_close_callback()
 
     def read_from_socket( self ):
         """Attempts to read from the socket.
@@ -1378,7 +1514,7 @@ class IOStream( object ):
     def maybe_add_error_listener( self ):
         if self._state is None and self._pending_callbacks == 0:
             if self.conn is None:
-                self.maybe_run_close_callback()
+                self.try_close_callback()
             else:
                 self.add_io_state( self.ioloop.READ )
 
@@ -1409,7 +1545,7 @@ class IOStream( object ):
         if self._state is None :
             self._state = self.ioloop.ERROR | state
             self.ioloop.add_handler(
-                    self.conn.fileno(), self.handle_events, self._state )
+                    self.conn.fileno(), self.on_epoll_event, self._state )
 
         elif not self._state & state :
             self._state = self._state | state
@@ -1467,9 +1603,9 @@ class SSLIOStream( IOStream ):
     it will be used as additional keyword arguments to ssl.wrap_socket.
     """
 
-    def __init__( self, socket, address, ioloop, server ):
-        self.ssloptions = h.settingsfor( 'ssl.', server )
-        super().__init__( socket, address, ioloop, server )
+    def __init__( self, httpconn )
+        self.ssloptions = h.settingsfor( 'ssl.', httpconn.server )
+        super().__init__( httpconn )
         self._ssl_accepting = True
         self._handshake_reading = False
         self._handshake_writing = False

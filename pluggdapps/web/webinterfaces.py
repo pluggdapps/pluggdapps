@@ -7,9 +7,9 @@
 from pluggdapps.plugin import Interface, Attribute
 
 __all__ = [
-    'IHTTPServer', 'IHTTPConnection', 'IRouter', 'IResource', 'ICookie',
-    'IRequest', 'IController', 'IErrorPage', 'IRenderer', 'IResponse',
-    'IResponseTransformer',
+    'IHTTPServer', 'IHTTPConnection', 'IHTTPRequest', 'IHTTPResource',
+    'IHTTPRouter', 'IHTTPCookie', 'IController', 'IErrorPage', 'IRenderer',
+    'IHTTPResponse', 'IResponseTransformer',
 ]
 
 # TODO : IAssetDescriptor
@@ -38,11 +38,13 @@ class IHTTPServer( Interface ):
 
 class IHTTPConnection( Interface ):
     """Interface for handling HTTP connections accepted by IHTTPServer.
-    Received request are dispatched using :class:`IRequest` plugin."""
+    Received request are dispatched using :class:`IHTTPRequest` plugin."""
 
     conn = Attribute( "Accepted connection object." )
 
     address = Attribute( "Address of the client connected on the other end." )
+
+    server = Attribute( ":class:`IHTTPServer` plugin" )
 
     write_callback = Attribute( "Call-back for writing data to connection." )
 
@@ -58,7 +60,7 @@ class IHTTPConnection( Interface ):
             Accepted client's address.
 
         `server`
-            :class:`IServer` plugin object.
+            :class:`IHTTPServer` plugin object.
         """
 
     def get_ssl_certificate() :
@@ -67,6 +69,13 @@ class IHTTPConnection( Interface ):
     def set_close_callback( callback ):
         """Subscribe a `callback` function to be called when this connection
         closed."""
+
+    def dispatch_request( method, uri, version, hdrs, body ):
+        """Once a complete request is received, dispatch them by passing the
+        request details to this method. This method must resolve and dispatch
+        request to corresponding web-application.
+
+        Note : This method is most likely called by plugins themself."""
 
     def write( chunk, callback=None ):
         """Write the `chunk` of data (bytes) to the connection and optionally
@@ -82,57 +91,61 @@ class IHTTPConnection( Interface ):
         """Close this connection."""
 
 
-class IResource( Interface ):
+class IHTTPEtag( Interface ):
+    """Interface specification to compute entity-tags for HTTP response
+    messages."""
+
+    def etag( response, weak=False ):
+        """Compute entity-tag for :class:`IHTTPResponse` object `response`.
+        Typically payload data will be used to compute ETAG.
+        
+        If `weak` True, compute ETAG for two entities of a resource if the
+        entities are equivalent and could be substituted for each other with
+        no significant change in semantics. Refer RFC1616 for more
+        information."""
+
+
+class IHTTPResource( Interface ):
     """Interface specification for resource or model plugins."""
 
     def __call__( request, c ):
-        """For ``request``, populate :class:`Context` dictionary ``c``. The
-        same context object will be passed down to view callables and 
-        view-templates."""
+        """Resource object to handle http `request`, a :class:`IHTTPRequest`
+        plugin. ``c`` is context dictionary :class:`Context` to passed on to
+        view callables and eventually to view-templates."""
 
 
-class IRouter( Interface ):
-    """Every `IRouter` plugin must treat a request's url as a chain of 
-    resource and resolve them based on the next path segment which are
-    pluggable using :meth:`IRouter.router` method, in the absence
-    of which, the plugin must match request's url against mapping rules.
+class IHTTPRouter( Interface ):
+    """Interface specification for resolving application request to view
+    callable.
     
-    To avoid repeated initialization, the root-router instance will be
-    rememebered by the web-application during :meth:`IWebApp.onboot`.
-    Similarly chained routers will be remembered in :attr:`traversals` where
-    each element in a plugin implementing :class:`IRouter`, whose name is that
-    of the path segment it matches."""
+      * An `IHTTPRouter` plugin typically compares request's url, method and
+        few other header fields with router mapping and resolves view callable.
 
-    segment = Attribute(
-        "If defined for a plugin, must match with first segment-name in "
-        "request url-path. Only then it can be selected for traversal"
-    )
+      * The router is responsible for instantiating resource plugin for a
+        HTTP request based on the resolved view callable.
+    
+    The router plugin will be instantiated by the web-application during boot
+    time and re-used till the platform is shutdown."""
+    
     defaultview = Attribute(
         "If defined for a plugin, must be a view-callable. When there are no "
         "more traversal to be done and no more `views` left to be matched. "
         "Then this attribute is the last resort to return back a "
         "view-callable."
     )
-    traversals = Attribute(
-        "Dictionary of path-segment name to IRouter plugins that can be "
-        "subscribed during onboot() time.If this attribute is left empty, "
-        "then it normally means url will be matched with route-pattern "
-        "definitions."
-    )
     views = Attribute(
-        "Dictionary of view names and view predicates added via `add_view()` "
-        "method."
+        "Dictionary of view names and view predicates / callables added via "
+        "`add_view()` method."
     )
 
     def onboot():
-        """Chained call from :meth:`IWebApp.onboot`. Implementation 
-        should chain the onboot() call further down.
+        """Chained call from :meth:`IWebApp.startapp`. Implementation 
+        can chain this onboot() call further down.
 
-        Typically, path-segment resolution and url route-mapping is constructed
-        here using :metho:`add_view`.
-
-        Initialization of :attr:`traversals` attribute with a list of IRouter 
-        instances for this path segment."""
+        Typically, url route-mapping is constructed here using 
+        :metho:`add_view` or by parsing mapper file. By the end of this
+        method, all route-mapping should be available in :attr:`view`
+        attribute which shall be used for resolving view-callable."""
 
     def route( request, c ):
         """Resolve request url based on traversals. If there is a matching
@@ -142,9 +155,9 @@ class IRouter( Interface ):
         view-callable, or until one of the path segment fail to match.
         
         Along the way, the context object ``c`` will be passed to 
-        :class:`IResource` object configured for IRouter instances. So that
-        the context object can be updated by the resource logic before they
-        are passed to view callable.
+        :class:`IHTTPResource` object configured for :class:`IHTTPRouter` 
+        instances. So that the context object can be updated by the resource
+        logic before they are passed to view callable.
 
         If one of the path segment fails to match along the chained router()
         call, then it is expected that the last router instance at the end of
@@ -190,7 +203,7 @@ class IRouter( Interface ):
             unique among all defined routes in a given web-application.
 
         ``resource``,
-            A plugin name implementing :class:`IResource` interface.
+            A plugin name implementing :class:`IHTTPResource` interface.
 
         ``pattern``,
             The pattern of the route like blog/{year}/{month}/{date}. This 
@@ -222,7 +235,7 @@ class IRouter( Interface ):
         ``params``,
             A dictionary of key,value pairs, when specified, ensures that the 
             associated route will match only when the request has a key in the 
-            :attr:`IRequest.params` dictionary with the supplied value. If
+            :attr:`IHTTPRequest.params` dictionary with the supplied value. If
             the supplied value is None, then the predicate will return True
             if supplied key is present in the request params.  If this
             predicate returns False, route matching continues.
@@ -230,7 +243,7 @@ class IRouter( Interface ):
         ``headers``,
             A dictionary of key,value pairs, when specified, ensures that the
             associated route will match only when the request has key in the
-            :attr:`IRequest.headers` dictionary with the supplied value.
+            :attr:`IHTTPRequest.headers` dictionary with the supplied value.
             Supplied value can be a compiled regular expression, in which
             case, it will be matched against the request header value. If
             value is None, then the predicate will return True if supplied key
@@ -262,9 +275,9 @@ class IRouter( Interface ):
         """
 
 
-class ICookie( Interface ):
+class IHTTPCookie( Interface ):
     """Necessary methods and plugins to be used to handle HTTP cookies. This
-    specification is compatible with IRequest and python's Cookie standard 
+    specification is compatible with IHTTPRequest and python's Cookie standard 
     library."""
 
     def parse_cookies( headers ):
@@ -308,7 +321,7 @@ class ICookie( Interface ):
         method."""
 
 
-class IRequest( Interface ):
+class IHTTPRequest( Interface ):
     """Request object, the only parameter that will be passed to
     :class:`IRquestHandler`."""
 
@@ -382,7 +395,7 @@ class IRequest( Interface ):
     )
     response = Attribute(
         "Response object corresponding to this request. The object is an "
-        "instance of plugin implementing :class:`IResponse` interface."
+        "instance of plugin implementing :class:`IHTTPResponse` interface."
     )
 
     #---- Framework attributes
@@ -399,8 +412,8 @@ class IRequest( Interface ):
         "is eventually matched with route mapping."
     )
     traversed = Attribute(
-        "A list of IRouter plugins each for a matching segment during path "
-        "traversal."
+        "A list of :class:`IHTTPRouter` plugins each for a matching segment "
+        "during path traversal."
     )
     matchrouter = Attribute(
         "Final route, :class:`IRoute` instance, that matches the path "
@@ -427,7 +440,7 @@ class IRequest( Interface ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
-        :method:`IRequest.handle` is called complete request is available
+        :method:`IHTTPRequest.handle` is called complete request is available
         and partially parsed.
 
         ``conn``,
@@ -482,12 +495,12 @@ class IRequest( Interface ):
     def query_plugins( interface, *args, **kwargs ):
         """Query plugins in the request's context. Since every request is
         under the context of an web-application, appname will be used to make
-        the actual query. Will be using `IRequest.appname` attribute"""
+        the actual query. Will be using `IHTTPRequest.appname` attribute"""
 
     def query_plugin( interface, name, *args, **kwargs ):
         """Query plugin in the request's context. Since every request is
         under the context of an web-application, appname will be used to make
-        the actual query. Will be using `IRequest.appname` attribute"""
+        the actual query. Will be using `IHTTPRequest.appname` attribute"""
 
 
 class IController( Interface ):
@@ -503,14 +516,14 @@ class IController( Interface ):
         object will simply be called.
         
         ``request``,
-            Object instance implementing :class:`IRequest` interface.
+            Object instance implementing :class:`IHTTPRequest` interface.
         """
 
     def head( request, c ):
         """Callback method for HEAD request. 
         
         ``request``,
-            Object instance implementing :class:`IRequest` interface.
+            Object instance implementing :class:`IHTTPRequest` interface.
         ``c``,
             Dictionary like context object. Refers to ``request.context`` and
             available inside HTML templates.
@@ -520,7 +533,7 @@ class IController( Interface ):
         """Callback method for GET request. 
         
         ``request``,
-            Object instance implementing :class:`IRequest` interface.
+            Object instance implementing :class:`IHTTPRequest` interface.
         ``c``,
             Dictionary like context object. Refers to ``request.context`` and
             available inside HTML templates.
@@ -530,7 +543,7 @@ class IController( Interface ):
         """Callback method for POST request. 
         
         ``request``,
-            Object instance implementing :class:`IRequest` interface.
+            Object instance implementing :class:`IHTTPRequest` interface.
         ``c``,
             Dictionary like context object. Refers to ``request.context`` and
             available inside HTML templates.
@@ -540,7 +553,7 @@ class IController( Interface ):
         """Callback method for DELETE request. 
         
         ``request``,
-            Object instance implementing :class:`IRequest` interface.
+            Object instance implementing :class:`IHTTPRequest` interface.
         ``c``,
             Dictionary like context object. Refers to ``request.context`` and
             available inside HTML templates.
@@ -550,7 +563,7 @@ class IController( Interface ):
         """Callback method for PUT request. 
         
         ``request``,
-            Object instance implementing :class:`IRequest` interface.
+            Object instance implementing :class:`IHTTPRequest` interface.
         ``c``,
             Dictionary like context object. Refers to ``request.context`` and
             available inside HTML templates.
@@ -563,7 +576,7 @@ class IController( Interface ):
         may or may not remain open. Refer to HTTP/1.1 spec."""
 
 
-class IResponse( Interface ):
+class IHTTPResponse( Interface ):
     """Response object to send reponse status, headers and body."""
 
     cookies = Attribute(
@@ -571,7 +584,7 @@ class IResponse( Interface ):
         "to be sent from server."
     )
     request = Attribute(
-        "Plugin instance implementing :class:`IRequest` interface."
+        "Plugin instance implementing :class:`IHTTPRequest` interface."
     )
     context = Attribute(
         "A dictionary like object that will be passed to resource objects and "
@@ -581,7 +594,7 @@ class IResponse( Interface ):
     def __init__( request ):
         """
         ``request``,
-            is an instance object for plugin implementing :class:`IResponse`
+            is an instance object for plugin implementing :class:`IHTTPResponse`
             interface.
         """
 
@@ -696,7 +709,7 @@ class IResponse( Interface ):
         The default is 302 (temporary).
 
         It is the responsibility of the caller to finish the request by
-        calling :method:`IResponse.finish`.
+        calling :method:`IHTTPResponse.finish`.
         """
 
     def render( templatefile, request, c ):
@@ -705,15 +718,15 @@ class IResponse( Interface ):
         to generate the html. 
 
         It is the responsibility of the caller to finish the request by
-        calling :method:`IResponse.finish`.
+        calling :method:`IHTTPResponse.finish`.
 
         The render call writes the response body using
-        :method:`IResponse.write`
+        :method:`IHTTPResponse.write`
 
         ``templatefile``,
             File path for html template in asset-specification format.
         ``request``,
-            Plugin instance implementing :class:`IRequest` interface. Same as
+            Plugin instance implementing :class:`IHTTPRequest` interface. Same as
             the one passed to :class:`IController` methods.
         ``c``,
             Dictionary like context object. Typically populated by
@@ -735,7 +748,7 @@ class IResponse( Interface ):
 class IResponseTransformer( Interface ):
     """Specification to transform response headers and body. A chain of
     transforms can be configured with plugins implementing 
-    :class:`IResponse`."""
+    :class:`IHTTPResponse`."""
 
     def start_transform( headers, chunk, finished=False ):
         """Start transformation using complete list of response headers and
@@ -757,12 +770,12 @@ class IRenderer( Interface ):
         for http ``request``.
 
         The render call writes the response body using 
-        :method:`IResponse.write`
+        :method:`IHTTPResponse.write`
 
         ``templatefile``,
             File path for html template in asset-specification format.
         ``request``,
-            Plugin instance implementing :class:`IRequest` interface. Same as
+            Plugin instance implementing :class:`IHTTPRequest` interface. Same as
             the one passed to :class:`IController` methods.
         ``c``,
             Dictionary like context object. Typically populated by
@@ -776,7 +789,7 @@ class IErrorPage( Interface ):
     def render( request, status_code, c ):
         """Use ``status_code``, typically an error code, and a collection of
         arguments ``c`` to generate error page for ``request``. This is
-        called as a result of :method:`IResponse.httperror` method.
+        called as a result of :method:`IHTTPResponse.httperror` method.
 
         If this error was caused by an uncaught exception, an ``exc_info``
         triple can be passed as ``c["exc_info"]``. Note that this
@@ -786,7 +799,7 @@ class IErrorPage( Interface ):
         `True`.
 
         The render call writes the response body using 
-        :method:`IResponse.write`
+        :method:`IHTTPResponse.write`
         """
 
 

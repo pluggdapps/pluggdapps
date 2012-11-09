@@ -1,16 +1,15 @@
-# -*- coding: utf-8 -*-
-
-# This file is subject to the terms and conditions defined in
-# file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
-
 import re
 
 import pluggdapps.utils             as h
 from   pluggdapps.const             import URLSEP
 from   pluggdapps.plugin            import interface
-from   pluggdapps.web.webinterfaces import IRouter
+from   pluggdapps.web.webinterfaces import IHTTPRouter
 from   pluggdapps.web.views         import HTTPNotFound
+
+re_patt = re.compile( r'([^{]+)?'
+                      r'(\{([a-z][a-z0-9]*)(,(?:[^"\\]|\\.)*)?\})?'
+                      r'(.+)?' )
+          # prefix, _, name, regex, sufx
 
 class BaseMixin( object ):
 
@@ -50,61 +49,6 @@ class BaseMixin( object ):
         view = self.lookup_traversal( request, c )
         if view == None :
             view = self.lookup_view( request, c )
-        return view
-
-
-class TraverseMixin( BaseMixin ):
-    """Provide necessary method to handle url routing through traversal."""
-
-    def onboot( self ):
-        super().onboot()
-
-        # If an interface is configured for this router, then fetch all the
-        # plugins implementing them and query and initialize them for this 
-        # path-segment-level.
-        traversewith, routers = self['traversewith'], []
-        if traversewith :
-            interf = interface( traversewith )
-            routers = query_plugins( self.webapp, interf )
-        for router in routers :
-            if router.segment == None :
-                raise h.Error(
-                    ("Router %r for interface %r does not have "
-                     "segment attribute") % (router, interf)
-                )
-            router.onboot()
-            self.traversals[router.segment] = router
-
-        # If a router is configured for every segment name, then query and
-        # initialize them for the corresponding segment name.
-        segments = h.settingsfor( 'traverse.', self )
-        #for segment, routername in segments :
-        #    router = query_plugin( self.webapp, IRouter, routername )
-        #    router.segment = segment
-        #    router.onboot()
-        #    self.traversals[segment] = router
-
-    def lookup_traversal( self, request, c ):
-        try : # Probe for current segment and remaining segment
-            _, currseg, remseg = request.resolve_path.split( URLSEP, 2 )
-        except :
-            try : # If not, probe for current segment.
-                _, currseg = request.resolve_path.split( URLSEP, 1 )
-            except :
-                return None
-
-        if not currseg : return None
-
-        # There is a current segment available, check for matching traversals
-        for router in self.traversals :
-            if router.segment == currseg :
-                request.traversed.append( router )
-                request.resolve_path = URLSEP + remseg if remseg else ''
-                break
-        else :
-            router = None
-
-        view = router.route( request, c ) if router else None
         return view
 
 
@@ -152,37 +96,57 @@ class MatchMixin( BaseMixin ):
         view['attr'] = kwargs.get( 'attr', None )
         view['permission'] = kwargs.get( 'permission', None )
         view['pattern'] = pattern
-        regex, tmpl =self._make_regex_tmpl( pattern )
+
+        regex, tmpl, redict = self.compile_url( pattern )
         view['compiled_pattern'] = re.compile( regex )
         view['path_template'] = tmpl
+        view['match_segments'] = redict
 
-    re_name = re.compile( r"([^{]*)({[^{}]+})?(.+)?" )
-    def _make_regex_tmpl( self, pattern ):
+    def compile_url( self, pattern ):
+        """`pattern` is URL routing pattern.
+
+        This method compiles the pattern in three different ways and returns
+        them as a tuple of (regex, tmpl, redict)
+
+        `regex`,
+            A regular expression string that can be used to match incoming
+            request-url to resolve view-callable.
+        `tmpl`,
+            A template formating string that can be used to generate URLs by
+            apps.
+        `redict`,
+            A dictionary of variable components in path segment and optional
+            regular expression that must match its value. This can be used for
+            validation during URL generation.
+        """
+        regex, tmpl, redict = r'^', '', {}
         segs = pattern.split( URLSEP )
-        regex, tmpl = r'^', ''
-        for seg in segs :
+        while segs :
+            seg = segs.pop(0)
             if not seg : continue
             regex, tmpl = (regex + URLSEP), (tmpl + URLSEP)
-            prefix, name, suffix = re_name.match( seg ).groups()
-            if name :
-                name = name[1:-1]
-            try :
-                name, patt = name.split(':')
-            except :
-                patt = None
-            regex += prefix if prefix else ''
-            if name and patt :
-                regex += '(?P<%s>%s)' % (name, patt)
-            elif patt :
-                regex += '(%s)' % patt
-            elif name and suffix :
-                regex += '(?P<%s>.+(?=%s))' % (name, suffix)
-            elif name and name[0] == '*' :
-                regex += '(?P<%s>.+)' % name[1:]
+            prefx, _, name, reg, sufx = re_patt.match( seg ).groups()
+            if name[0] == '*' :
+                rempath = URLSEP.join( [seg] + segs )
+                prefx, _, name, reg, sufx = re_patt.match( rempath ).groups()
+                segs = []
+            reg = reg[1:]
+
+            regex += prefx if prefx else r''
+            if name and reg and sufx :
+                regex += r'(?P<%s>%s(?=%s))%s' % (name, reg, sufx, sufx)
+            elif name and reg :
+                regex += r'(?P<%s>%s)' % (name, reg)
+            elif name and sufx :
+                regex += r'(?P<%s>.+(?=%s))%s' % (name, sufx, sufx)
             elif name :
-                regex += '(?P<%s>[^/]+)' % name
-            regex += suffix if suffix else ''
-            tmpl += suffix + '{' + name.rstrip('*') + '}' + prefix
+                regex += r'(?p<%s>.+)' % (name,)
+            elif sufx :
+                regex += sufx
+            tmpl += prefx if prefx else ''
+            tmpl += '{' + name + '}' if name else ''
+            tmpl += sufx if sufx else ''
+            redict[ name ] = reg
         regex += '$'
-        return regex, tmpl
+        return regex, tmpl, redict
 

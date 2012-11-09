@@ -6,7 +6,7 @@ import datetime as dt
 from   pluggdapps.plugin     import pluginname, query_plugins, query_plugin, \
                                     IWebApp
 from   pluggdapps.platform   import Pluggdapps
-from   pluggdapps.web.webinterfaces import ICookie
+from   pluggdapps.web.webinterfaces import IHTTPCookie
 
 
 refheaders = {
@@ -24,11 +24,11 @@ refheaders = {
             '__utmv=23068709.user; lang="v=2&lang=en-us&c="'
 }
 
-class TestICookie( unittest.TestCase ):
+class TestIHTTPCookie( unittest.TestCase ):
 
     def test_plugins( self ):
         webapp = Pluggdapps.webapps['webapp']
-        cookie_plugins = query_plugins( webapp, ICookie )
+        cookie_plugins = query_plugins( webapp, IHTTPCookie )
         assert 'httpcookie' in list( map( pluginname, cookie_plugins ))
         for cookp in cookie_plugins :
             cookies = cookp.parse_cookies( refheaders )

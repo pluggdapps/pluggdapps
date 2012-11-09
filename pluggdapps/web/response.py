@@ -8,8 +8,8 @@ import http.client, itertools
 import datetime as dt
 
 from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IResponse, IResponseTransformer, \
-                                           ICookie, IErrorPage
+from   pluggdapps.web.webinterfaces import IHTTPResponse, IResponseTransformer, \
+                                           IHTTPCookie, IErrorPage
 import pluggdapps.utils.stack_context as sc
 import pluggdapps.utils             as h
 
@@ -19,9 +19,35 @@ import pluggdapps.utils             as h
 #   3. clear_cookie() method doesn't seem to use expires field to remove the
 #      cookie from browser. Should we try that implementation instead ?
 
+# From RFC :
+#
+# * For response messages, whether or not a message-body is included with
+#   a message is dependent on both the request method and the response
+#   status code (section 6.1.1). All responses to the HEAD request method
+#   MUST NOT include a message-body, even though the presence of entity-
+#   header fields might lead one to believe they do. All 1xx
+#   (informational), 204 (no content), and 304 (not modified) responses
+#   MUST NOT include a message-body. All other responses do include a
+#   message-body, although it MAY be of zero length.
+#
+#   If the message uses the media type "multipart/byteranges", and the
+#   ransfer-length is not otherwise specified, then this self-
+#   elimiting media type defines the transfer-length. This media type
+#   UST NOT be used unless the sender knows that the recipient can arse
+#   it; the presence in a request of a Range header with ultiple byte-
+#   range specifiers from a 1.1 client implies that the lient can parse
+#   multipart/byteranges responses.
+#       A range header might be forwarded by a 1.0 proxy that does not
+#       understand multipart/byteranges; in this case the server MUST
+#       delimit the message using methods defined in items 1,3 or 5 of
+#       this section.
+
+
+
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for HTTPResponse implementing IResponse interface."
+_default_settings.__doc__ = (
+    "Configuration settings for HTTPResponse implementing IHTTPResponse "
+    "interface." )
 
 _default_settings['transforms']     = {
     'default' : '',
@@ -29,12 +55,12 @@ _default_settings['transforms']     = {
     'help'    : "Comma separated transformation plugins to be applied on "
                 "response headers and body.",
 }
-_default_settings['icookie']  = {
+_default_settings['IHTTPCookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
-    'help'    : "Plugin class implementing ICookie interface specification. "
+    'help'    : "Plugin class implementing IHTTPCookie interface specification. "
                 "methods from this plugin will be used to process request "
-                "cookies. Overrides :class:`ICookie` if defined in "
+                "cookies. Overrides :class:`IHTTPCookie` if defined in "
                 "`class`:WebApp plugin."
 }
 _default_settings['ierrorpage']     = {
@@ -44,7 +70,7 @@ _default_settings['ierrorpage']     = {
 }
 
 class HTTPResponse( Plugin ):
-    implements( IResponse )
+    implements( IHTTPResponse )
 
     _status_code = 200
     """HTTP response status code."""
@@ -63,7 +89,7 @@ class HTTPResponse( Plugin ):
         # Cookies
         self.cookies = Cookie.SimpleCookie()
         self.cookie_plugin = request.query_plugin(
-                ICookie, self['icookie'] or self.webapp['icookie'] )
+                IHTTPCookie, self['IHTTPCookie'] or self.webapp['IHTTPCookie'] )
         # Start from a clean slate
         self.clear()
         self.context = h.Context()
@@ -272,7 +298,7 @@ class HTTPResponse( Plugin ):
         and replaced with the error page.
 
         It is the responsibility of the caller to finish the request by
-        calling :method:`IResponse.finish`."""
+        calling :method:`IHTTPResponse.finish`."""
         if self._headers_written :
             self.webapp.pa.logerror(
                     "Cannot send error response after headers written" )
@@ -292,7 +318,7 @@ class HTTPResponse( Plugin ):
         The default is 302 (temporary).
 
         It is the responsibility of the caller to finish the request by
-        calling :method:`IResponse.finish`.
+        calling :method:`IHTTPResponse.finish`.
         """
         if self._headers_written :
             raise Exception("Cannot redirect after headers have been written")
@@ -308,9 +334,9 @@ class HTTPResponse( Plugin ):
 
     def render( self, templatefile, c ):
         """Generate HTML content for request and write them using
-        :method:`IResponse.write`.
+        :method:`IHTTPResponse.write`.
         It is the responsibility of the caller to finish the request by
-        calling :method:`IResponse.finish`."""
+        calling :method:`IHTTPResponse.finish`."""
         pass
 
     def _keep_alive( self, request ):

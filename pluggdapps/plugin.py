@@ -642,18 +642,24 @@ class IWebApp( Interface ):
         "application is mounted on a script name this will be ``None``"
     )
     router = Attribute(
-        "Plugin instance implementing :class:`IRouter` interface. This is the "
-        "root router using which request urls will be resolved to a view "
+        "Plugin instance implementing :class:`IHTTPRouter` interface. This is "
+        "the root router using which request urls will be resolved to a view "
         "callable. Should be instantiated during boot time inside "
-        ":meth:`onboot` method."
+        ":meth:`startapp` method."
+    )
+    cookie = Attribute(
+        "Plugin instance implementing IHTTPCookie interface spec. Methods "
+        "from this plugin will be used to process both request cookies "
+        "and response cookies. This can be overriden at corresponding "
+        "request / response plugin settings."
     )
 
-    def onboot():
+    def startapp():
         """Boot this applications. Called at platform boot-time. 
         Instantiate :attr:`router` attribute."""
 
     def shutdown():
-        """Shutdown this application. Reverse of boot."""
+        """Shutdown this application. Reverse of :meth:`startapp`."""
 
     def dorequest( request ):
         """Once a `request` is resolved to an application, this method is the
@@ -688,10 +694,10 @@ class IWebApp( Interface ):
             arguments.
 
         ``request``,
-            The :class:`IRequest` object for which url is generated.
+            The :class:`IHTTPRequest` object for which url is generated.
 
         ``traverse``,
-            Tuple of :class:`IRouter` plugin-names to prefix the path.
+            Tuple of :class:`IHTTPRouter` plugin-names to prefix the path.
 
         ``matchdict``,
             A dictionary of variables in url-patterns and their corresponding
@@ -703,7 +709,7 @@ class IWebApp( Interface ):
             (suffixed) to the url-path.
 
             `_query`, its value, which must be a dictionary similar to 
-            :attr:`IRequest.getparams`, will be interpreted as query
+            :attr:`IHTTPRequest.getparams`, will be interpreted as query
             parameters and encoded to query string.
 
             `_anchor`, its value will be attached at the end of the url as
