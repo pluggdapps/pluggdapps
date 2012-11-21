@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 DEFAULT_INI = join( dirname(__file__), 'confs', 'develop.ini' )
-DEFAULT_ENCODING = 'utf-8'
+DEFAULT_ENCODING = 'utf8'
 DEBUG       = False
 URLSEP      = '/'
 ROUTE_PATH_SUFFIX = 'remains'

@@ -34,75 +34,75 @@ Notes :
 import os, sys, traceback, argparse, site, time
 from   os.path  import dirname, join, abspath
 
-def run( port ):
+def run( erlport ):
     """Read loop, read and handle request methods, until the port is closed."""
     while True :
         try:
-            request = port.listen()
+            request = erlport.listen()
             if isinstance( request, tuple ) :
-                resp = handle( port, request )
+                resp = handle( erlport, request )
             else :
                 resp = ( ATOM_ERROR, "request expected as tuple" )
-            port.respond( resp )
+            erlport.respond( resp )
         except EOFError:
             break
         except Exception as err :
-            port.logerror( traceback.format_exc(), [] )
+            erlport.logerror( traceback.format_exc(), [] )
             break
 
 
-def handle( port, request ):
+def handle( erlport, request ):
     """Handle request from Erlang. Unlike the request made from pluggdapps,
     this is asynchronous."""
     method, args, kwargs = request
     handler = handlerd.get( method, handle_fail )
-    result = handler( port, method, *args, **dict(kwargs) )
+    result = handler( erlport, method, *args, **dict(kwargs) )
     return (ATOM_OK, result)
 
 
 #---- Method handlers
 
-def handle_fail( port, method, *args, **kwargs ):
+def handle_fail( erlport, method, *args, **kwargs ):
     """If a request is received with invalid method, raise exception."""
     raise Exception( "Invalid method %r" % method )
 
 
-def handle_exit_port( port, method, *args, **kwargs ):
+def handle_exit_port( erlport, method, *args, **kwargs ):
     """Erlang has requested a normal exit. This should send message,
         {Port, {exit_status, Status}}
     to the connected process.
     """
-    port.shutdown()
+    erlport.shutdown()
     sys.exit(0) # Thats it, end of life for this port !!
 
 
-def handle_close_fds( port, method, *args, **kwargs ):
+def handle_close_fds( erlport, method, *args, **kwargs ):
     """Erlang has requested to close the in/out ports. This should send the
     message,
         {Port, eof}
     to the connected process.
     """
-    port.close()
+    erlport.close()
     return ATOM_OK  
 
 
-def handle_loopback( port, method, *args, **kwargs ):
+def handle_loopback( erlport, method, *args, **kwargs ):
     """Loopback request. Send back `args` and `kwargs` a tuple. Primarily used
     for Erlang to Python validation"""
     return ( list(args), kwargs )
 
 
-def handle_reverseback( port, method, *args, **kwargs ):
+def handle_reverseback( erlport, method, *args, **kwargs ):
     """Reverseback request. Similar to loopback except that is in the reverse
     order (i.e) from loopback from python to erlang. Primarily used for Erlang
     to Python validation"""
     ref = test_data()
     refstr = "hello world"
-    tup = port.request( ATOM_LOOPBACK, ref, refstr )
+    tup = erlport.request( ATOM_LOOPBACK, ref, refstr )
     for x, y in zip(tup[0][0], ref) :
-        if x != y : port.logerror( "Failed matching ~p ~p ~n", [x, y] )
+        if x != y : erlport.logerror( "Failed matching ~p ~p ~n", [x, y] )
     if tup[0][1] != refstr :
-        port.logerror( "Failed matching ~p ~n", [refstr, tup[0][1]] )
+        erlport.logerror( "Failed matching ~p ~n", [refstr, tup[0][1]] )
 
     if tup[0] == [ref, refstr] :
         return ATOM_OK
@@ -110,7 +110,7 @@ def handle_reverseback( port, method, *args, **kwargs ):
         return (ATOM_ERROR, tup[0])
 
 
-def handle_profileback( port, method, *args, **kwargs ):
+def handle_profileback( erlport, method, *args, **kwargs ):
     Int  = ('smallint', 10, 10000)
     BInt = ('bigint', 100000, 10000)
     LInt = ('largeint',
@@ -133,29 +133,30 @@ def handle_profileback( port, method, *args, **kwargs ):
     for tup in [ Int, BInt,LInt, Float, BitS, Atm, Tuple, LTuple,
                  List, Bin, LBin, Data] :
         snow = time.time()
-        [ port.request( Atom('loopback'), tup[1]) for x in list(range(tup[2])) ]
+        [ erlport.request( Atom('loopback'), tup[1] )
+            for x in list(range(tup[2])) ]
         t = time.time() - snow
-        port.loginfo( "Time take to loop back ~p is ~p Sec ~n", 
+        erlport.loginfo( "Time take to loop back ~p is ~p Sec ~n", 
                       [Atom(tup[0]), t/tup[2]] )
     return ATOM_OK
 
 
-def handle_apply( port, method, func, *args, **kwargs ):
+def handle_apply( erlport, method, func, *args, **kwargs ):
     """Apply `args` and `kwargs` on function `func`."""
     func = globals().get( func, None )
     if callable( func ) :
-        return func( port, *args, **kwargs )
+        return func( erlport, *args, **kwargs )
     else :
         return (ATOM_ERROR, "%r is not a callable" % func)
 
 
-def handle_query_plugin( port, method, *args, **kwargs ):
+def handle_query_plugin( erlport, method, *args, **kwargs ):
     pass
 
-def handle_plugin_attribute( port, method, *args, **kwargs ):
+def handle_plugin_attribute( erlport, method, *args, **kwargs ):
     pass
 
-def handle_plugin_method( port, method, *args, **kwargs ):
+def handle_plugin_method( erlport, method, *args, **kwargs ):
     pass
 
 
@@ -180,14 +181,14 @@ handlerd = {
 
 #---- Applied methods,
 
-def loadconfig( port, *args, **kwargs ):
+def loadconfig( erlport, *args, **kwargs ):
     msubdomains = { str(k) : v.appname for k,v in pa.m_subdomains.items() }
     mscripts = { str(k) : v.appname for k,v in pa.m_scripts.items() }
     return (ATOM_OK, (pa.settings, msubdomains, mscripts))
 
 
-def bootapps( port, *args, **kwargs ) :
-    return (ATOM_OK, port.bootapps())
+def bootapps( erlport, *args, **kwargs ) :
+    return (ATOM_OK, erlport.bootapps())
 
 
 #---- Test case data for reverseback and profileback.
@@ -296,12 +297,12 @@ if __name__ == '__main__' :
     else : 
         descrs = (0,1)
 
-    port = Pluggdapps.boot( args.configini,
-                            # Initializers for Pluggdapps() class
-                            erlang=True,
-                            # Initializers for Port() class.
-                            descrs=descrs,
-                            packet=int(args.packet), 
-                            compressed=args.compressed )
-    run( port )
+    erlport = Pluggdapps.boot( args.configini,
+                               # Initializers for Pluggdapps() class
+                               erlang=True,
+                               # Initializers for Port() class.
+                               descrs=descrs,
+                               packet=int(args.packet), 
+                               compressed=args.compressed )
+    run( erlport )
 

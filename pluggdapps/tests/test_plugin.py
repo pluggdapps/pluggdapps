@@ -2,13 +2,12 @@ import unittest
 from   random import choice
 
 from   pluggdapps.plugin     import *
-from   pluggdapps.interfaces import ICommand
-from   pluggdapps.web.webinterfaces import IController, IHTTPCookie, \
-                                           IErrorPage,\
-                                           IRenderer, IHTTPRequest, \
+from   pluggdapps.interfaces import ICommand, IWebApp, IHTTPServer
+from   pluggdapps.web.webinterfaces import IHTTPView, IHTTPCookie, \
+                                           IHTTPRenderer, IHTTPRequest, \
                                            IHTTPResource, IHTTPResponse, \
-                                           IResponseTransformer, \
-                                           IHTTPRouter, IHTTPServer
+                                           IHTTPOutBound, \
+                                           IHTTPRouter
 
 class TestPlugin( unittest.TestCase ):
 
@@ -20,9 +19,9 @@ class TestPlugin( unittest.TestCase ):
         assert not isimplement( ls, IWebApp )
 
     def test_interfaces( self ):
-        ref = [ ICommand, IController, IHTTPCookie, IErrorPage, IRenderer,
+        ref = [ ICommand, IHTTPView, IHTTPCookie, IHTTPRenderer,
                 IHTTPRequest, IHTTPRouter, IHTTPResource, IHTTPResponse,
-                IResponseTransformer, IHTTPServer, ISettings, IWebApp ]
+                IHTTPOutBound, IHTTPServer, ISettings, IWebApp ]
         fn = lambda x : x.__name__
         assert sorted( interfaces(), key=fn ) == sorted( ref, key=fn )
 
@@ -116,9 +115,9 @@ class TestPlugin( unittest.TestCase ):
                 'httprequest', 'httpresponse', 'plugin', 'rootapp', 'webapp' ]
         for r in refs : assert r in PluginMeta._pluginmap.keys()
 
-        refs = [ ICommand, IController, IHTTPRouter, IHTTPCookie, IErrorPage,
-                 IRenderer, IHTTPRequest, IHTTPResource, IHTTPResponse, 
-                 IResponseTransformer, IHTTPServer ]
+        refs = [ ICommand, IHTTPView, IHTTPRouter, IHTTPCookie,
+                 IHTTPRenderer, IHTTPRequest, IHTTPResource, IHTTPResponse, 
+                 IHTTPOutBound, IHTTPServer ]
         refs = map( fn,  refs )
         for r in refs : assert r in PluginMeta._interfmap.keys()
 

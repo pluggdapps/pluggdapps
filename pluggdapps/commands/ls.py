@@ -11,7 +11,6 @@ import os.path, io
 from   pluggdapps.const      import SPECIAL_SECS
 from   pluggdapps.plugin     import PluginMeta, implements, Plugin, \
                                     pluginname, applications
-from   pluggdapps.platform   import defaultsettings
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
@@ -85,7 +84,7 @@ class CommandLs( Plugin ):
         webapps = getattr( self.pa, 'webapps', {} ).keys()
         print( "Pluggdapps environment" )
         print( "  Configuration file : %s" % self.pa.inifile )
-        print( "  Port               : %s" % (self.pa.port or None) )
+        print( "  Erlang Port        : %s" % (self.pa.erlport or None) )
         print( "  Loaded packages    : %s" % len(pluggdapps.packages) )
         print( "  Interfaces defined : %s" % len(PluginMeta._interfmap) )
         print( "  Plugins loaded     : %s" % len(PluginMeta._pluginmap) )
@@ -111,11 +110,12 @@ class CommandLs( Plugin ):
                 appsec, t, moutname, instconfig = instkey
                 if h.sec2plugin( appsec ) == args.plugin :
                     print( "Settings for %r" % (instkey,) )
-                    pprint( webapp.appsettings, indent=2 )
+                    pprint( webapp.appsetting, indent=2 )
                     print()
         elif args.ls_settings.startswith('def') and args.plugin :
             print( "Default settings for plugin %r" % args.plugin )
-            pprint( defaultsettings().get( h.plugin2sec(args.plugin), {} ),
+            defaultsett = pa.defaultsettings()
+            pprint( defaultsett().get( h.plugin2sec(args.plugin), {} ),
                     indent=2 )
 
     def ls_plugins( self, args ):
@@ -155,7 +155,7 @@ class CommandLs( Plugin ):
                 print("  Subdomain : ", webapp.subdomain )
                 print("  Router    : ", webapp.router )
                 print("Application settings")
-                pprint( webapp.appsettings, indent=4 )
+                pprint( webapp.appsetting, indent=4 )
                 print()
 
     def ls_webapps( self, args ):

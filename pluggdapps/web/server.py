@@ -6,12 +6,15 @@ In addition to I/O events, the server also does generic callback handling and
 schedule time-based events.
 """
 
-import sys, datetime, errno, heapq, time, os, select, socket, re, collections
+import sys, datetime, errno, heapq, time, os, select, socket, re, \
+       collections, http.client
+
 import ssl  # Python 2.6+
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import Plugin, implements
-from   pluggdapps.web.webinterfaces import IHTTPServer, IHTTPConnection
+from   pluggdapps.web.webinterfaces import IHTTPRequest
+from   pluggdapps.interfaces        import IHTTPServer, IHTTPConnection
 
 
 # TODO :
@@ -23,8 +26,15 @@ _ds1 = h.ConfigDict()
 _ds1.__doc__ = \
     "Configuration settings for event poll based HTTP server."
 
+_ds1['scheme'] = {
+    'default'  : 'http',
+    'types'    : (str,),
+    'help'     : "HTTP Scheme to use, either `http` or `https`. If left "
+                 "empty `scheme` parameter from [pluggdapps] section will be "
+                 "used."
+}
 _ds1['host']  = {
-    'default' : '127.0.0.1',
+    'default' : 'localhost',
     'types'   : (str,),
     'help'    : "Address may be either an IP address or hostname.  If it's a "
                 "hostname, the server will listen on all IP addresses "
@@ -32,13 +42,15 @@ _ds1['host']  = {
                 "or None to listen on all available interfaces. Family may "
                 "be set to either ``socket.AF_INET`` or ``socket.AF_INET6`` "
                 "to restrict to ipv4 or ipv6 addresses, otherwise both will "
-                "be used if available.",
+                "be used if available. If left empty `host` parameter from "
+                "[pluggdapps] section will be used.",
 
 }
 _ds1['port']  = {
-    'default' : 5000,
+    'default' : 0,
     'types'   : (int,),
-    'help'    : "Port addres to bind the http server."
+    'help'    : "Port addres to bind the http server. If left empty `port` "
+                "paramter from [pluggdapps] section will be used."
 }
 _ds1['family'] = {
     'default' : 'AF_INET',
@@ -66,7 +78,8 @@ _ds1['IHTTPConnection']  = {
     'types'   : (str,),
     'help'    : "Plugin to handle client connections."
 }
-#---- SSL settings.
+
+#---- SSL settings, for scheme `https`
 _ds1['ssl.certfile']  = {
     'default' : '',
     'types'   : (str,),
@@ -115,6 +128,14 @@ _ds1['poll_timeout']       = {
                 "poll. Will be used by HTTPIOLoop definition",
 }
 
+def run_callback( server, callback, *args, **kwargs ):
+    """Run a callback with `args`."""
+    try:
+        callback( *args, **kwargs )
+    except Exception:
+        server.pa.logerror( "Exception in callback %r" % callback )
+        if server['debug'] : raise
+
 class HTTPEPollServer( Plugin ):
     """A non-blocking, single-threaded HTTP Server plugin.
 
@@ -140,9 +161,12 @@ class HTTPEPollServer( Plugin ):
     implements( IHTTPServer )
 
     ioloop = None
-    "IOLoop instance for event-polling."""
+    "IOLoop instance for event-polling."
 
     def __init__( self ):
+
+        self.version = b'HTTP/1.1'
+
         # Note `ioloop` can be started/stopped/closed only by the server plugin
         # that instantiates IOLoop()
         self.ioloop = IOLoop( self )
@@ -181,7 +205,8 @@ class HTTPEPollServer( Plugin ):
     def close_connection( self, httpconn ):
         """Close a client connection `httpconn` which is
         :class:`IHTTPConnection` plugin."""
-        self.connections.remove( httpconn )
+        if httpconn in self.connections :
+            self.connections.remove( httpconn )
 
     def listen( self ):
         """Starts accepting connections on the given port.
@@ -191,7 +216,6 @@ class HTTPEPollServer( Plugin ):
         `HTTPEPollServer.start` afterwards.  It is, however, necessary to 
         start the `IOLoop`.
         """
-        port, host, backlog = self['port'], self['host'], self['backlog']
         sockets = self.bind_sockets()
         self.add_sockets( sockets )
 
@@ -256,7 +280,11 @@ class HTTPEPollServer( Plugin ):
                    'AF_INET'   : socket.AF_INET
                  }.get( self['family'], None )
         family = family or socket.AF_UNSPEC
-        address, port, backlog = self['host'], self['port'], self['backlog']
+        address = self['host'] or self.pa.settings['pluggdapps']['host']
+        scheme = self['scheme'] or self.pa.settings['pluggdapps']['scheme']
+        port = self['port'] or self.pa.settings['pluggdapps']['port']
+        port = port or h.port_for_scheme( scheme )
+        backlog = self['backlog']
 
         sockets = []
         address = None if address == "" else address
@@ -424,7 +452,7 @@ class IOLoop( object ):
         self._stopped = False
 
         if self.debug :
-            self.server.pa.loginfo( "Adding poll-loop waker ..." )
+            server.pa.loginfo( "Adding poll-loop waker ..." )
 
         self.add_handler( self._waker.fileno(), 
                           lambda fd, events: self._waker.consume(), # handler
@@ -446,7 +474,7 @@ class IOLoop( object ):
             )
         if self.debug :
             self.server.pa.loginfo(
-                "Add descriptor to epoll : %s" % self._handlers.keys()
+                "Add descriptor to epoll : %s" % list( self._handlers.keys() )
             )
 
     def update_handler( self, fd, events ):
@@ -459,17 +487,15 @@ class IOLoop( object ):
 
     def remove_handler( self, fd ):
         """Stop listening for events on fd."""
+        if self.debug :
+            self.server.pa.loginfo("Remove descriptor from epoll : %s:" % fd)
+
         self._handlers.pop(fd, None)
         self._events.pop(fd, None)
         try:
             self._evpoll.unregister(fd)
         except (OSError, IOError):
             self.server.pa.logwarn( "Error deleting fd from epoll" )
-
-        if self.debug :
-            self.server.pa.loginfo(
-                "Remove descriptor from epoll : %s:"%self._handlers.keys()
-            )
 
     #---- Manage timeout handlers on this epoll using heap queue.
 
@@ -577,8 +603,7 @@ class IOLoop( object ):
                 # * e.errno == errno.EINTR
                 # * e.args is like (errno.EINTR, 'Interrupted system call')
                 if getattr(e, 'errno', None) == errno.EINTR : continue
-                try    : if e.args[0] == errno.EINTR : continue 
-                except : pass
+                if e.args[0] == errno.EINTR : continue 
 
                 raise # This exception is bad ! forcefully raise exception
 
@@ -593,8 +618,8 @@ class IOLoop( object ):
                 try : callback( fd, events ) if callback else None
                 except :
                     err = "Exception in socket callback %r" % callback
-                    server.pa.logerror( err )
-                    if server['debug'] : raise
+                    self.server.pa.logerror( err )
+                    if self.server['debug'] : raise
 
         # reset the stopped flag so another start/stop pair can be issued
         self._stopped = False
@@ -611,7 +636,8 @@ class IOLoop( object ):
         """
         # Close listening sockets and remove them from IOLoop
         self.server.pa.loginfo( "Stopping poll loop ..." )
-        [ self.remove_handler( fd ) for fd in self._handlers.keys() ]
+        fds = list( self._handlers.keys() )
+        [ self.remove_handler( fd ) for fd in fds[:] ]
         self._running = False
         self._stopped = True
         self._waker.wake()  # Wake the ioloop
@@ -662,43 +688,74 @@ class HTTPConnection( Plugin ):
     """Handles a connection to an HTTP client, executing HTTP requests.
 
     We parse HTTP headers and bodies, and execute the request callback
-    until the HTTP conection is closed."""
+    until the HTTP conection is closed.
+
+    * Accepts only HTTP/1.1 request. If otherwise, reponds with bad-request
+      (400) and closes the connection.
+    """
 
     implements( IHTTPConnection )
 
-    request = None
-    """Tuple of (method, uri, version, headers, body)."""
+    write_callback = None
+    """Call-back for writing data to connection."""
 
-    receiving = False
-    """Connection is currently receiving a request."""
+    close_callback = None
+    """Call-back when connection is closed."""
 
-    responding = False
-    """Connection is currently sending a response."""
+    finish_callback = None
+    """Call-back when request is finished."""
 
-    disconnect = False
-    """Should the connection be closed after the response is sent."""
+    stream = None
+    """:class:`IOStream` object."""
+    reqdata = None
+    """Tuple of new request's start line and headers,
+    (method, uri, version, hdrs)"""
+
+    chunk = None
+    """Tuple of on-going request chunk, (chunk_size, chunk_ext, chunk_data)"""
+
+    # error response
+    BAD_REQUEST    = ( b'HTTP/1.1 400 ' + 
+                       http.client.responses[400].encode('utf8') + 
+                       b'\r\n\r\n' )
+    NOT_FOUND      = ( b'HTTP/1.1 404 ' + 
+                       http.client.responses[404].encode('utf8') + 
+                       b'\r\n\r\n' )
+    ENTITY_LARGE   = ( b'HTTP/1.1 413 ' + 
+                       http.client.responses[413].encode('utf8') +
+                       b'\r\n\r\n' )
+    INTERNAL_ERROR = ( b'HTTP/1.1 500 ' + 
+                       http.client.responses[500].encode('utf8') + 
+                       b'\r\n\r\n' )
 
     def __init__( self, conn, addr, server ):
+        from pluggdapps import __version__
+
         self.conn = conn
         self.address = addr
         self.server = server
+        self.product = b'PluggdappsServer/' + __version__.encode('utf8')
+        self.version = server.version
+        self.request = None
+
+        # Book-keeping
         self.ioloop = server.ioloop
+        self.stream = None
+
+        # Book-keeping for on-going request
         self.write_callback = None
         self.close_callback = None
-
-        # Per request attributes
-        self.receiving = False
-        self.responding = False
-        self.request = None
+        self.finish_callback = None
+        self.reqdata = None
 
         # Set up a socket from accepted connection (conn, addr).
         sslopts = h.settingsfor( 'ssl.', server )
-        is_ssl = sslopts['keyfile'] and sslopts['certfile']
-        if is_ssl :
+        scheme = server['scheme'] or self.pa.settings['pluggdapps']['scheme']
+        if scheme == 'https' :
             self.conn = ssl.wrap_socket( conn, server_side=True,
                                          do_handshake_on_connect=False,
                                          **sslopts )
-        streamcls = SSLIOStream if is_ssl else IOStream
+        streamcls = SSLIOStream if scheme == 'https' else IOStream
         self.stream = streamcls( self )
 
         # Poll for request start-line
@@ -706,7 +763,7 @@ class HTTPConnection( Plugin ):
         self.stream.set_close_callback( self.on_connection_close )
 
         # Subscribe timeout
-        self.ioloop.add_timeout( self['connection_timeout'], on_timeout )
+        self.ioloop.add_timeout( self['connection_timeout'], self.on_timeout )
 
     def get_ssl_certificate( self ):
         """Return SSL certificate for SSL traffic."""
@@ -716,40 +773,67 @@ class HTTPConnection( Plugin ):
     def set_close_callback( self, callback ):
         self.close_callback = callback
 
-    def dispatch_request( self, method, uri, version, hdrs, body ):
-        # Move to responding state.
-        self.receiving = False
-        self.responding = True
+    def set_finish_callback( self, callback ):
+        self.finish_callback = callback
 
+    def handle_request( 
+            self, method, uri, version, headers, body=None, chunk=None,
+            trailers=None ):
+
+        # Fresh request, resolve application.
         try :
-            uriparts, mountedat = \
-                    self.pa.resolveapp( self, method, uri, version, hdrs )
-            typ, mountname, webapp = mountedat
+            uriparts, mountedat = self.pa.resolveapp( uri, headers )
+            if mountedat :
+                webapp = mountedat[2]
+            else :
+                self.pa.logerror(
+                    "Unable to resolve request for apps. (%s)" % uri )
+                return
         except :
-            self.pa.logerror( "Unable to resolve request for apps. (%s)"%uri )
+            self.write( self.NOT_FOUND, force=True )
+            self.tryclose( disconnect=True )
             if self['debug'] : raise
 
         try :
-            webapp.dorequest( self, method, uriparts, version, hdrs, body )
+            # Since the connection plugin do not operate in the context
+            # of a webapp, use `webapp` plugin to query for IHTTPRequest.
+            request = webapp.query_plugin(
+                            IHTTPRequest, webapp['IHTTPRequest'],
+                            self, method, uriparts, version, headers )
         except :
+            self.write( self.NOT_FOUND, force=True )
+            self.tryclose( disconnect=True )
             self.pa.logerror(
-                    "Application %r cannot handle request %r" % (webapp, uri) )
+                "Application %r cannot handle request %r" % (webapp, uri) )
             if self['debug'] : raise
 
-    def write( self, hdrs, chunk, callback=None ):
+        self.request = request
+        if chunk :
+            handle_chunk( chunk=chunk, trailers=trailers )
+        else :
+            webapp.dorequest( request, body=body )
+
+    def handle_chunk( self, chunk, trailers=None ):
+        self.request.webapp.dorequest(request, chunk=chunk, trailers=trailers)
+
+    def write( self, chunk, callback=None, force=False ):
         """Write a chunk of data."""
-        if not self.responding :
+        response = getattr( self.request, 'response', None )
+        if force == False and self.request == None :
             self.pa.logerror( "Request is not yet received." )
+            return
+
+        if force == False and response == None :
+            self.pa.logerror(
+                    "Writing on connection without a response object" ) 
+            return
 
         if self.stream.closed() :
             self.pa.logwarn( 
                     "Cannot write to closed stream %r" % (self.address,) )
             return
 
-        transenc = h.parse_transfer_encoding( 
-                            hdrs.get( 'transfer-encoding', None ))
-
-        if transenc and transenc[0][0] == 'chunked' :
+        if response and response.ischunked() :
             chunk_size = len( chunk )
             data = ( hex(chunk_size).encode('utf8') + b'\r\n' 
                      + chunk + b'\r\n' )
@@ -761,14 +845,16 @@ class HTTPConnection( Plugin ):
 
         return
 
-    def finish( self ):
-        if not self.responding :
+    def finish( self, callback=None ):
+        if self.request == None :
             self.pa.logerror( "Cannot finish for already finished request." )
             return
 
+        self.finish_callback = callback
+
         # If write is pending, leave finish to write-callback
         if not self.stream.writing() :
-            self.finish_request()
+            self.dofinish()
 
     def close( self ):
         """Close the connection with client."""
@@ -778,62 +864,72 @@ class HTTPConnection( Plugin ):
 
     def supports_http_1_1( self ):
         """Check whether the client support HTTP 1.1"""
-        if self.request :
-            return self.request[2] == "HTTP/1.1"
+        if self.reqdata :
+            return self.reqdata[2] == b'HTTP/1.1'
         return False
 
-    def finish_request( self ):
+    def dofinish( self ):
         """Mark that response is sent and close the connection if required,
         before subscribing to request-handler."""
-        self.responding = False
-        if self.tryclose() == False :
+        disconnect = self.tryclose()
+
+        if self.finish_callback :
+            callback, self.finish_callback = self.finish_callback, None
+            callback()
+
+        self.request = None
+
+        if disconnect == False :
             self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
 
     def tryclose( self, disconnect=False ):
         """Try to close this connection. If `disconnect` is True,
         connection-stream is always closed, otherwise it follows HTTP
         guidelines to close the connection.""" 
-        if disconnect == False :
-            meth, hdrs = self.request[0], self.request[3]
-            conn_val = h.parse_connection( hdrs.get( "connection", None ))
+        if disconnect == False and self.request :
+            meth, hdrs = self.request.method, self.request.headers
+            conn_val = h.connection( hdrs.get( "connection", None ))
             if self.supports_http_1_1() :
                 disconnect = conn_val == [ b'close' ]
             elif ("content-length" in hdrs) or (meth in (b"HEAD", b"GET") ) :
                 disconnect = conn_val != [ b'keep-alive' ]
 
-        self.stream.close() if disconnect == True else None
+        if disconnect == True :
+            self.stream.close()
+            if self.finish_callback : 
+                callback = self.finish_callback
+                self.finish_callback = None
+                callback()
+            self.server.close_connection( self )
+
         return disconnect
 
     #---- Callback handlers
 
-    BAD_REQUEST = b'HTTP/1.1 400 ' + h.statuscode[b'400'] + '\r\n\r\n'
-    ENTITY_LARGE = b'HTTP/1.1 413 ' + h.statuscode[b'413'] + '\r\n\r\n'
-
     def on_write_complete( self ):
+        """Local callback once response data is written."""
         if self.write_callback is not None:
             callback = self.write_callback
             self.write_callback = None
             callback()
-
-        # on_write_complete is enqueued on the IOLoop whenever the
-        # IOStream's write buffer becomes empty, but it's possible for
-        # another callback that runs on the IOLoop before it to
-        # simultaneously write more data and finish the request.  If
-        # there is still data in the IOStream, a future
-        # on_write_complete will be responsible for calling finish_request().
-        if self.responding and not self.stream.writing() :
-            self.finish_request()
+        if self.request and self.request.has_finished() :
+            self.dofinish()
 
     def on_request_headers( self, data ):
         """A request has started. Parse `data` for startline and headers."""
+        if self.request != None :
+            self.write( self.INTERNAL_ERROR, force=True )
+            self.tryclose()
+            self.pa.logerror(
+                "Cannot start a new request when there is on-going request.." )
+            if self['debug'] : raise
+
         # Remove empty-lines (CRLFs) prefixed to request message
         if data.strip( b'\r\n' ) == b'' :
             self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
             return
 
-        self.receiving = True
         try :
-            data = data.decode( 'utf-8' )
             data = data.rstrip( b'\r\n' )
             # Get request-startline
             try :
@@ -843,11 +939,11 @@ class HTTPConnection( Plugin ):
 
             method, uri, version = h.parse_startline( startline )
             if version != b"HTTP/1.1" :
-                self.write( self.BAD_REQUEST )
+                self.write( self.BAD_REQUEST, force=True )
                 self.tryclose( disconnect=True )
 
             hdrs = h.HTTPHeaders.parse( hdrdata ) if hdrdata else []
-            self.request = ( method, uri, version, hdrs, None )
+            self.reqdata = ( method, uri, version, hdrs )
 
             # The presence of a message-body in a request is signaled by the
             # inclusion of a Content-Length or Transfer-Encoding header field
@@ -858,28 +954,28 @@ class HTTPConnection( Plugin ):
 
             if transenc and transenc[0][0] == b'chunked' :
                 hdrs.pop( "content-length", None )
-                self.request = ( method, uri, version, hdrs, ([], []) )
                 self.stream.read_until( b"\r\n", self.on_request_chunk_line )
 
             elif clen :
                 expect = h.parse_expect( hdrs.get( "expect", None ))
                 if clen > self['max_buffer_size'] :
-                    self.write( self.ENTITY_LARGE )
+                    self.write( self.ENTITY_LARGE, force=True )
                     self.stream_read_bytes( clen, self.on_skip_request )
 
                 elif expect == "100-continue" :
-                    self.write( b"HTTP/1.1 100 (Continue)\r\n\r\n" )
+                    self.write( b"HTTP/1.1 100 (Continue)\r\n\r\n",force=True )
                     self.stream.read_bytes( clen, self.on_request_body )
 
                 else :
                     self.stream.read_bytes( clen, self.on_request_body )
 
             else :
-                self.dispatch_request()
+                self.handle_request( *self.reqdata )
+                self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
 
         except h.Error as e:
-            self.pa.logwarn( "Malformed request ..." )
-            self.write( self.BAD_REQUEST )
+            self.pa.logerror( "Malformed request ..." )
+            self.write( self.BAD_REQUEST, force=True )
             self.tryclose( disconnect=True )
             if self['debug'] : raise
 
@@ -892,14 +988,14 @@ class HTTPConnection( Plugin ):
 
     def on_request_body( self, data ):
         """Request body receivd. Dispatch request."""
-        self.request[4] = data
-        self.dispatch_request()
+        self.handle_request( *self.reqdata, body=data )
+        self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
 
     def on_request_chunk_line( self, data ):
         """A new Request chunk has started. We will receive only the
         chunk-line."""
         data = data.rstrip( b'\r\n' )
-        hdrs = self.request[3]
+        hdrs = self.reqdata[3]
         try :
             chunk_size, chunk_ext = data.split( b';', 1 )
             chunk_size = int(chline, 16)
@@ -907,39 +1003,51 @@ class HTTPConnection( Plugin ):
             chunk_size, chunk_ext = int(data, 16), None
 
         if chunk_size == 0 :    # last_chunk
-            self.request[4][0].append( (chunk_size, chunk_ext, None) )
+            self.chunk = (chunk_size, chunk_ext, None)
             if h.parse_trailer( hdrs.get( 'trailer', None )) :# Trailer present
                 self.stream.read_until( b"\r\n\r\n", self.on_request_trailer )
             else :
                 self.stream.read_until( b"\r\n", self.on_request_chunks_done )
         else :
-            self.request[4][0].append( (chunk_size, chunk_ext) )
+            self.reqdata[5] = (chunk_size, chunk_ext, None)
             # Increase chunk_size by 2, to include limiting CRLF.
             self.stream.read_bytes( chunk_size+2, self.on_request_chunk_data )
 
     def on_request_chunk_data( self, data ):
         """A request chunk is received."""
-        data = data[:-2]
-        chunk_size, chunk_ext, _ = self.request[4][0].pop(-1)
-        self.request[4][0].append( (chunk_size, chunk_ext, data) )
-        self.stream.read_until( b'\r\n', on_request_chunk_line )
+        chunk_size, chunk_ext, _ = self.chunk
+        chunk = (chunk_size, chunk_ext, data[:-2])
+        if self.request :
+            self.handle_chunk( chunk=chunk )
+        else :
+            self.handle_request( *self.reqdata, chunk=chunk )
+        self.stream.read_until( b"\r\n", self.on_request_chunk_line )
 
     def on_request_trailer( self, data ):
         """An optional trailer is received."""
-        chunks, trailers = self.request[4]
-        trailers = h.HTTPHeaders( data )
-        self.request[4] = (chunks, trailers)
-        self.dispatch_request()
+        chunk_size, chunk_ext, _ = self.chunk
+        chunk = (chunk_size, chunk_ext, None)
+        ts = h.HTTPHeaders( data )
+        if self.request :
+            self.handle_chunk( chunk=chunk, trailers=ts )
+        else :
+            self.handle_request( *self.reqdata, chunk=chunk, trailers=ts )
+        self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
 
     def on_request_chunks_done( self, data ):
         """The last chunk was received without a trailer. Dispatch."""
-        self.dispatch_request()
+        chunk_size, chunk_ext, _ = self.chunk
+        chunk = (chunk_size, chunk_ext, data)
+        if self.request :
+            self.handle_chunk( chunk=chunk )
+        else :
+            self.handle_request( *self.reqdata, chunk=chunk )
+        self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
 
     def on_timeout( self ):
         """The connection was idle and a timeout has occured. Close the
         connection."""
         self.tryclose( disconnect=True )
-        self.server.close_connection( self )
 
     def on_connection_close( self ):
         """This method will be invoked by the stream object when socket is
@@ -949,6 +1057,7 @@ class HTTPConnection( Plugin ):
             callback = self.close_callback
             self.close_callback = None
             callback()
+        self.tryclose( disconnect=True )
 
     #---- ISettings interface methods
 
@@ -1603,7 +1712,7 @@ class SSLIOStream( IOStream ):
     it will be used as additional keyword arguments to ssl.wrap_socket.
     """
 
-    def __init__( self, httpconn )
+    def __init__( self, httpconn ):
         self.ssloptions = h.settingsfor( 'ssl.', httpconn.server )
         super().__init__( httpconn )
         self._ssl_accepting = True

@@ -7,14 +7,15 @@
 def HTTPNotFound( request, c ):
     res = request.response
     res.set_status( 404 )
-    res.write()
-    res.flush()
-    res.finish()
+    res.flush( finished=True )
+
+def HTTPNotAcceptable( request, c ):
+    res = request.response
+    res.set_status( 406 )
+    res.flush( finished=True )
 
 def HTTPServiceUnavailable( request, c ):
     res = request.response
     res.set_status( 503 )
     res.set_header( request.webapp.pa['retry_after'] )
-    res.write()
-    res.flush()
-    res.finish()
+    res.flush( finished=True )

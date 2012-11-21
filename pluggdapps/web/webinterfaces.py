@@ -7,112 +7,10 @@
 from pluggdapps.plugin import Interface, Attribute
 
 __all__ = [
-    'IHTTPServer', 'IHTTPConnection', 'IHTTPRequest', 'IHTTPResource',
-    'IHTTPRouter', 'IHTTPCookie', 'IController', 'IErrorPage', 'IRenderer',
-    'IHTTPResponse', 'IResponseTransformer',
+    'IHTTPRequest', 'IHTTPResource', 'IHTTPRouter', 'IHTTPCookie',
+    'IHTTPSession', 'IHTTPView', 'IHTTPRenderer', 'IHTTPResponse',
+    'IHTTPOutBound',
 ]
-
-# TODO : IAssetDescriptor
-
-class IHTTPServer( Interface ):
-    """Interface to bind and listen for accept HTTP connections."""
-
-    sockets = Attribute(
-        "Dictionary of listening sockets."
-    )
-
-    connections = Attribute(
-        "List of accepted connections. Each connection is a plugin "
-        "implementing :class:`IConnection` interface."
-    )
-
-    def start( *args, **kwargs ):
-        """Starts this server and returns a server object."""
-
-    def stop():
-        """Stops listening for new connections.
-
-        Requests currently in progress may still continue after the
-        server is stopped.
-        """
-
-class IHTTPConnection( Interface ):
-    """Interface for handling HTTP connections accepted by IHTTPServer.
-    Received request are dispatched using :class:`IHTTPRequest` plugin."""
-
-    conn = Attribute( "Accepted connection object." )
-
-    address = Attribute( "Address of the client connected on the other end." )
-
-    server = Attribute( ":class:`IHTTPServer` plugin" )
-
-    write_callback = Attribute( "Call-back for writing data to connection." )
-
-    close_callback = Attribute( "Call-back when connection is closed." )
-
-    def __init__( self, conn, addr, server ):
-        """Positional arguments:
-
-        `conn`,
-            Accepted connection object.
-
-        `addr`,
-            Accepted client's address.
-
-        `server`
-            :class:`IHTTPServer` plugin object.
-        """
-
-    def get_ssl_certificate() :
-        """In case of SSL traffic, return SSL certifacte."""
-
-    def set_close_callback( callback ):
-        """Subscribe a `callback` function to be called when this connection
-        closed."""
-
-    def dispatch_request( method, uri, version, hdrs, body ):
-        """Once a complete request is received, dispatch them by passing the
-        request details to this method. This method must resolve and dispatch
-        request to corresponding web-application.
-
-        Note : This method is most likely called by plugins themself."""
-
-    def write( chunk, callback=None ):
-        """Write the `chunk` of data (bytes) to the connection and optionally
-        subscribe a `callback` function to be called when data is successfully
-        transfered."""
-
-    def finish() :
-        """Call this method once complete response is written to the
-        connection-stream. When this method returns the request is considered
-        closed."""
-
-    def close():
-        """Close this connection."""
-
-
-class IHTTPEtag( Interface ):
-    """Interface specification to compute entity-tags for HTTP response
-    messages."""
-
-    def etag( response, weak=False ):
-        """Compute entity-tag for :class:`IHTTPResponse` object `response`.
-        Typically payload data will be used to compute ETAG.
-        
-        If `weak` True, compute ETAG for two entities of a resource if the
-        entities are equivalent and could be substituted for each other with
-        no significant change in semantics. Refer RFC1616 for more
-        information."""
-
-
-class IHTTPResource( Interface ):
-    """Interface specification for resource or model plugins."""
-
-    def __call__( request, c ):
-        """Resource object to handle http `request`, a :class:`IHTTPRequest`
-        plugin. ``c`` is context dictionary :class:`Context` to passed on to
-        view callables and eventually to view-templates."""
-
 
 class IHTTPRouter( Interface ):
     """Interface specification for resolving application request to view
@@ -127,15 +25,9 @@ class IHTTPRouter( Interface ):
     The router plugin will be instantiated by the web-application during boot
     time and re-used till the platform is shutdown."""
     
-    defaultview = Attribute(
-        "If defined for a plugin, must be a view-callable. When there are no "
-        "more traversal to be done and no more `views` left to be matched. "
-        "Then this attribute is the last resort to return back a "
-        "view-callable."
-    )
     views = Attribute(
-        "Dictionary of view names and view predicates / callables added via "
-        "`add_view()` method."
+        "Dictionary of view-names to view-callables and its predicates, "
+        "typically added via add_view() interface method."
     )
 
     def onboot():
@@ -143,58 +35,13 @@ class IHTTPRouter( Interface ):
         can chain this onboot() call further down.
 
         Typically, url route-mapping is constructed here using 
-        :metho:`add_view` or by parsing mapper file. By the end of this
+        :metho:`add_view` or by parsing a mapper file. By the end of this
         method, all route-mapping should be available in :attr:`view`
         attribute which shall be used for resolving view-callable."""
 
-    def route( request, c ):
-        """Resolve request url based on traversals. If there is a matching
-        path-segment with one of its traversals, then use the matching router
-        and invoke its router() method. This call be chained until all the
-        path-segments are resolved, in which case it should return a
-        view-callable, or until one of the path segment fail to match.
-        
-        Along the way, the context object ``c`` will be passed to 
-        :class:`IHTTPResource` object configured for :class:`IHTTPRouter` 
-        instances. So that the context object can be updated by the resource
-        logic before they are passed to view callable.
-
-        If one of the path segment fails to match along the chained router()
-        call, then it is expected that the last router instance at the end of
-        the chain will match the remaining resolve_path using url-pattern
-        matching.
-
-        What ever be the case, the chained call to router() must eventually 
-        return back a view callable to web-application."""
-
-    def genpath( request, name, *traverse, **matchdict ):
-        """Generate path, including query and fragment (aka anchor) using this
-        request and using,
-
-        ``name``,
-            Name of the view to generate a routable path for.
-
-        ``traverse``,
-            Valid list of path segment names to be prefixed in the final path.
-
-        ``matchdict``,
-            Dictionary of name, value strings, where names represent the
-            variable components in the route. Following keys are treated
-            special,
-                _remains
-            The semantics for these values are same as defined for method
-            :meth:`IWebApp.pathfor`.
-
-            Note that among the special keys _query and _anchor is expected to
-            be pruned off before reaching this method.
-        """
-
-    def add_view( name, resource=None,
-                  # Predicate arguments
-                  pattern=None, xhr=None, method=None, arguments=None,
-                  header=None, accept=None, path_info=None,
-                  # View controler
-                  view_callable=None, attr=None, permission=None ):
+    def add_view( name, pattern, resource=None,
+                  # View-callable
+                  view_callable=None, attr=None ):
         """Add a router mapping rule for this router object which will be used
         by match() method.
         
@@ -202,89 +49,99 @@ class IHTTPRouter( Interface ):
             The name of the route. This attribute is required and it must be
             unique among all defined routes in a given web-application.
 
-        ``resource``,
-            A plugin name implementing :class:`IHTTPResource` interface.
-
         ``pattern``,
             The pattern of the route like blog/{year}/{month}/{date}. This 
             argument is required. If the pattern doesn't match the current 
             URL, route matching continues.
 
-        ``xhr``,
-            This value should be either True or False. If this value is 
-            specified and is True, the request must possess an 
-            HTTP_X_REQUESTED_WITH (aka X-Requested-With) header for this route 
-            to match. This is useful for detecting
-            AJAX requests.
-            If this predicate returns False, route matching continues.
-
-        ``method``,
-            A string representing an HTTP method name, like 'GET', 'POST' ...
-            If this argument is not specified, this route will match if
-            the request has any request method. 
-            If specified and the predicate doesn't match, route matching 
-            continues.
-
-        ``path_info``,
-            This value represents a regular expression pattern that will be
-            tested against the resolve_path request attribute.
-            If the regex matches, this predicate will return True.
-            If this predicate returns False, route matching continues.
-            Note that path_info is matched after ``pattern``.
-
-        ``params``,
-            A dictionary of key,value pairs, when specified, ensures that the 
-            associated route will match only when the request has a key in the 
-            :attr:`IHTTPRequest.params` dictionary with the supplied value. If
-            the supplied value is None, then the predicate will return True
-            if supplied key is present in the request params.  If this
-            predicate returns False, route matching continues.
-
-        ``headers``,
-            A dictionary of key,value pairs, when specified, ensures that the
-            associated route will match only when the request has key in the
-            :attr:`IHTTPRequest.headers` dictionary with the supplied value.
-            Supplied value can be a compiled regular expression, in which
-            case, it will be matched against the request header value. If
-            value is None, then the predicate will return True if supplied key
-            is present in the request's header dictionary.
-            If this predicate returns False, route matching contines.
-
-        ``accept``,
-            This value represents a match query for one or more mimetypes in 
-            the Accept HTTP request header. If this value is specified, it 
-            must be in one of the following forms:
-              * a mimetype match token in the form text/plain, a wildcard
-                mimetype.
-              * match token in the form text/*.
-              * or a match-all wildcard mimetype match token in the form */*. 
-            If any of the forms matches the Accept header of the request, this
-            predicate will be True. If this predicate returns False, route
-            matching continues.
+        ``resource``,
+            A plugin name implementing :class:`IHTTPResource` interface.
 
         ``view_callable``,
-            Plugin name implementing :class:`IController` interface
-            specification.
+            A plugin name or plugin instance implementing :class:`IHTTPView`
+            interface, or just a plain python callable. What ever the case,
+            please do go through the :class:`IHTTPView` interface
+            specification before authoring a view-callable.
 
         ``attr``,
             Callable method attribute for ``view`` plugin.
+        """
 
-        ``permission``,
-            The permission name required to invoke the view associated with
-            this route. 
+    def route( request, c ):
+        """Resolve request url for ``request``. For a successful match,
+        populate relevant attributes, like `matchdict` and `view`, in 
+        ``request`` plugin. Once resolved, call the configured 
+        :class:`IHTTPResource` plugin for the view and return the
+        view-callable. A view-callable can be a plain python
+        callable that accepts request and context arguments or a plugin
+        implementing :class:`IHTTPView` interface.
+        
+        ``request``,
+            Plugin instance implementing :class:`IHTTPRequest` interface.
+
+        ``c``,
+            Dictionary like context object. Typically populated by
+            :class:`IHTTPResource` and view-callable. Made availabe inside
+            HTML templates.
         """
 
 
+    def urlpath( request, name, **matchdict ):
+        """Generate path, including query and fragment (aka anchor), for
+        `request` using arguments,
+
+        ``request``,
+            Plugin instance implementing :class:`IHTTPRequest` interface.
+
+        ``name``,
+            Name of the view to generate a routable url-path.
+
+        ``matchdict``,
+            Dictionary of (name, value) strings, where names represent the
+            variable components in the route. Special keys `_query` and
+            `_anchor` are used differently.
+
+        Returns urlpath string. This does not include SCRIPT_NAME,
+        netlocation and scheme.
+        """
+
+
+class IHTTPResource( Interface ):
+    """Interface specification for resource or model plugins."""
+
+    def __call__( request, c ):
+        """Resource object to handle http `request`, a :class:`IHTTPRequest`
+        plugin. ``c`` is context dictionary :class:`Context` to be passed on to
+        view callables and eventually to view-templates.
+        
+        Return updated :class:`Context` plugin. The context dictionary is also
+        preserved in the :class:`IHTTPResponse` plugin.
+        """
+
+
+class IHTTPEtag( Interface ):
+    """Interface specification to compute entity-tags for HTTP response
+    messages."""
+
+    def compute( response, weak=False ):
+        """Compute entity-tag for :class:`IHTTPResponse` object `response`.
+        Typically payload data will be used to compute ETAG.
+        
+        If `weak` True, compute ETAG for two entities of a resource if the
+        entities are equivalent and could be substituted for each other with
+        no significant change in semantics. Refer RFC1616 for more
+        information."""
+
+
 class IHTTPCookie( Interface ):
-    """Necessary methods and plugins to be used to handle HTTP cookies. This
-    specification is compatible with IHTTPRequest and python's Cookie standard 
-    library."""
+    """Handle HTTP cookies. This specification is compatible with IHTTPRequest
+    and python's Cookie standard library."""
 
     def parse_cookies( headers ):
         """Use HTTP `headers` dictionary, to parse cookie name/value pairs, 
         along with its meta-information, into Cookie Morsels.
             
-            headers.get( 'Cookie', '' ) 
+            headers.get( 'cookie', '' ) 
 
         should give the cookie string from `headers`.
         
@@ -307,18 +164,27 @@ class IHTTPCookie( Interface ):
         """
 
     def create_signed_value( name, value ):
-        """To avoid cookie-forgery `value` is digitally signed binary of,
-        typically, a cookie_secret, name, timestamp of current time and 
-        value.
-        
-        `name` and `value` are expected to be in string.
+        """Encode `name` and `value` string into byte-string using
+        webapp['encoding'] settings, convert value into base64 and return a
+        byte-string like,
+            <base64-encoded-value>|<timestamp>|<signature>
+
+        <signature> is generated using `secret`, `name`, base64 encoded 
+        `value` and timestamp-in-seconds and return as string.
         """
 
     def decode_signed_value( name, value ):
-        """`value` is digitally signed binary of typically a cookie_secret, 
-        name, timestamp and value. Validate the cookie and decode them if need
-        be and return an interpreted value. Reverse of `create_signed_value()`
-        method."""
+        """Reverse of `create_signed_value`.
+
+        `signedval` is expected to be in,
+            <base64-encoded-value>|<timestamp>|<signature>
+
+        Returns orignal value string.
+        """
+
+
+class IHTTPSession( Interface ):
+    """Handle cookie based user-sessions."""
 
 
 class IHTTPRequest( Interface ):
@@ -326,47 +192,44 @@ class IHTTPRequest( Interface ):
     :class:`IRquestHandler`."""
 
     # ---- Socket Attributes
-    connection = Attribute(
-        "An HTTP request is attached to a single HTTP connection, which can "
-        "be accessed through the 'connection' attribute. Since connections "
-        "are typically kept open in HTTP/1.1, multiple requests can be "
-        "handled sequentially on a single connection."
+    httpconn = Attribute(
+        ":class:`IHTTPConnection` plugin instance."
     )
 
     # ---- HTTP Attributes
     method = Attribute(
-        "HTTP request method, e.g. 'GET' or 'POST'"
+        "HTTP request method, e.g. b'GET' or b'POST'"
     )
     uri = Attribute(
-        "HTTP Request URI"
+        "HTTP Request URI in byte-string as found in request start-line"
     )
+    version = Attribute(
+        "HTTP protocol version found in request start-line, e.g. b'HTTP/1.1'"
+    )
+    headers = Attribute(
+        "Dictionary-like object for HTTP headers. Key name are in string, "
+        "while values are in byte-string."
+    )
+    body = Attribute(
+        "Request body, if present, as a byte string."
+    )
+    chunks = Attribute(
+        "List of request chunks. Matching view-callable will be called for "
+        "every request chunk, stored as the last element in this list, that "
+        "are received. It is upto the application logic to clear previous"
+        "chunks or to preserve them, until the request is finished."
+    )
+    trailers = Attribute(
+        "Similar to `headers` attribute. But received after the last chunk of "
+        "request in chunked transfer-coding."
+    )
+    #---- Processed attributes
     uriparts = Attribute(
         "UserDict object of uri parts in decoded, parsed and unquoted form. "
         "`scheme`, `netloc`, `path`, `query`, `fragment`, `username`, "
         "`password`, `hostname`, `port`, `script`, keys are available. "
         "Except query, which is a dictionary of query arguments, all other "
         "values are in string."
-    )
-    baseurl = Attribute(
-        "Computed base url for the request under web-application "
-        "request.webapp. This attribute can also be used as web-application "
-        "url."
-    )
-    version = Attribute(
-        "HTTP protocol version specified in request, e.g. 'HTTP/1.1'"
-    )
-    headers = Attribute(
-        "Dictionary-like object for HTTP headers. Acts like a "
-        "case-insensitive dictionary."
-    )
-    body = Attribute(
-       "Request body, if present, as a byte string."
-    )
-    address = Attribute(
-       "Client's IP address and port number. "
-       "If running behind a load-balancer or a proxy, the real IP address "
-       "provided by a load balancer will be passed in the ``X-Real-Ip`` "
-       "header."
     )
     cookies = Attribute(
         "A dictionary of http.cookies.Morsel objects representing request "
@@ -382,20 +245,20 @@ class IHTTPRequest( Interface ):
         "maps parameter names to lists of values (to support multiple values "
         "for individual names). Names and values are of type `str`."
     )
+    multiparts = Attribute(
+        "POST arguments in multipart format (like uploaded file content) are "
+        "available as a dictionary of name,value pairs."
+    )
 
-    #---- Processed attributes
     params = Attribute(
         "Combined arguments of GET/POST, which maps parameter names to lists "
         "of values (to support multiple values for individual names). Names "
-        "and values are are of type `str`. "
+        "and values are of type `str`. "
     )
     files = Attribute(
-        "File uploads are available in the files property, which maps file "
-        "names to lists of :class:`HTTPFile`."
-    )
-    response = Attribute(
-        "Response object corresponding to this request. The object is an "
-        "instance of plugin implementing :class:`IHTTPResponse` interface."
+        "File uploads are available in this attribute as a dictionary of name "
+        "and a list of files submited under name. File is a dictionary of, "
+        " { 'filename' : ..., 'value' : ..., 'content-type' : ... }"
     )
 
     #---- Framework attributes
@@ -403,29 +266,26 @@ class IHTTPRequest( Interface ):
         "If a session factory has been configured, this attribute will "
         "represent the current user's session object."
     )
+    cookie = Attribute(
+        ":class:`IHTTPCookie` plugin instance to handle request and response "
+        "cookies."
+    )
+    response = Attribute(
+        "Response object corresponding to this request. The object is an "
+        "instance of plugin implementing :class:`IHTTPResponse` interface."
+    )
+
 
     #---- Routing attributes
-    resolve_path = Attribute(
-        "Remaining portion of uri after removing the `baseurl` part that can "
-        "be used to url routing. As and when a segment is consumed for "
-        "routing it is removed from resolve_path and the remaining portion "
-        "is eventually matched with route mapping."
-    )
-    traversed = Attribute(
-        "A list of :class:`IHTTPRouter` plugins each for a matching segment "
-        "during path traversal."
-    )
-    matchrouter = Attribute(
-        "Final route, :class:`IRoute` instance, that matches the path "
-        "remaining after traversal."
+    router = Attribute(
+        ":class:`IHTTPRouter` plugin resolving this request."
     )
     matchdict = Attribute(
-        "If remaining path after traversal has matched during this request's "
-        "url-routing, matched values by the URL pattern will be available as "
-        "matchdict dictionary."
+        "Optinal dictionary attribute that contains maps a variable portion "
+        "of url with matched value."
     )
-    view_name = Attribute(
-        "Name of the view that matched this request's url."
+    view = Attribute(
+        "A view-callable resolved for this request."
     )
 
     #---- Others
@@ -436,28 +296,29 @@ class IHTTPRequest( Interface ):
         "Timestamp when the request was finished."
     )
 
-    def __init__( conn, method, uri, version, headers, body ):
+    def __init__( httpconn, method, uriparts, version, headers ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
         :method:`IHTTPRequest.handle` is called complete request is available
         and partially parsed.
 
-        ``conn``,
-            HTTP socket returned as a result of accepting the connection.
+        ``httpconn``,
+            :class:`IHTTPConnection` plugin instance
+
         ``method``,
-            HTTP request method. 
-        ``uri``,
-            Parsed uri from request start line. A UserDict object as returned
-            by :func:`parse_url()` function.
+            Request method in byte-string.
+
+        ``uriparts``,
+            Request URI in byte-string or dictionary of uriparts.
+
         ``version``,
-            HTTP version string freom request start line.
+            Request version in byte-string.
+
         ``headers``,
-            HTTP request headers that comes after start_line and before an
-            optional body.
-        ``body``,
-            Optional HTTP body. If request body is not found pass this as
-            None.
+            Dictionary request headers. Key names in this dictionary will be
+            decoded to string-type. Value names will be preserved as
+            byte-string.
         """
 
     def supports_http_1_1():
@@ -474,117 +335,97 @@ class IHTTPRequest( Interface ):
         http://docs.python.org/library/ssl.html#sslsocket-objects."""
 
     def get_cookie( name, default=None ):
-        """Gets the value of the cookie with the given name, else default."""
+        """Gets the value of the cookie with the given name, else return 
+        `default`."""
 
     def get_secure_cookie( name, value=None ):
         """Returns the given signed cookie if it validates, or None."""
 
-    def onfinish():
-        """Callback for asyncrhonous finish()."""
-
-    def urlfor( name, *traverse, **matchdict ) :
-        """Use request.webapp.urlfor to generate the url."""
-
-    def pathfor( name, *traverse, **matchdict ) :
-        """Use request.webapp.pathfor to generate the url."""
-
-    def appurl( appname, name, *traverse, **matchdict ) :
-        """Generate url for different web-application identified by
-        ``appname``.  Use request.webapp.urlfor to generate the url."""
-
-    def query_plugins( interface, *args, **kwargs ):
-        """Query plugins in the request's context. Since every request is
-        under the context of an web-application, appname will be used to make
-        the actual query. Will be using `IHTTPRequest.appname` attribute"""
-
-    def query_plugin( interface, name, *args, **kwargs ):
-        """Query plugin in the request's context. Since every request is
-        under the context of an web-application, appname will be used to make
-        the actual query. Will be using `IHTTPRequest.appname` attribute"""
-
-
-class IController( Interface ):
-
-    methods = Attribute(
-        "Request handler can override this attribute to provide a sequence of "
-        "HTTP Methods supported by the plugin. "
-    )
-
-    def __call__( request ):
-        """In the absence of method specific attributes or if the resolver
-        cannot find an instance attribute to apply the handler call back, the
-        object will simply be called.
-        
-        ``request``,
-            Object instance implementing :class:`IHTTPRequest` interface.
+    def ischunked() :
+        """Returns True if this request is received using `chunked`
+        Transfer-Encoding.
         """
 
-    def head( request, c ):
-        """Callback method for HEAD request. 
-        
-        ``request``,
-            Object instance implementing :class:`IHTTPRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
+    def has_finished():
+        """Return True if this request is considered finished, which is when
+        the finish() method is called on :class:`IHTTPResponse`.
         """
 
-    def get( request, c ):
-        """Callback method for GET request. 
+    def handle( body=None, chunk=None, trailers=None, ):
+        """Once a `request` is resolved to an application, this method is the
+        entry point for request into the resolved application.
         
-        ``request``,
-            Object instance implementing :class:`IHTTPRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
-        """
+        ``body``,
+            Optional kwarg, if request body is present. Passed as byte-string.
 
-    def post( request, c ):
-        """Callback method for POST request. 
-        
-        ``request``,
-            Object instance implementing :class:`IHTTPRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
-        """
+        ``chunk``,
+            Optional kwarg, if request is received in chunks. Chunk received
+            as a tuple of, (chunk_size, chunk_ext, chunk_data).
 
-    def delete( request, c ):
-        """Callback method for DELETE request. 
-        
-        ``request``,
-            Object instance implementing :class:`IHTTPRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
-        """
-
-    def put( request, c ):
-        """Callback method for PUT request. 
-        
-        ``request``,
-            Object instance implementing :class:`IHTTPRequest` interface.
-        ``c``,
-            Dictionary like context object. Refers to ``request.context`` and
-            available inside HTML templates.
+        ``trailers``,
+            Optional kwarg, if chunked-request is over and final trailer is
+            being received.
         """
 
     def onfinish():
-        """Called after the end of a request, after the response has been sent
-        to the client. Note that this is not the same as close callback, which
-        is called when the connection get closed. In this case the connection
-        may or may not remain open. Refer to HTTP/1.1 spec."""
+        """Callback for asyncrhonous finish(). Means the response is sent and
+        the request is forgotten."""
+
+    def urlfor( name, **matchdict ) :
+        """Use request.webapp.urlfor() to generate the url."""
+
+    def pathfor( name, **matchdict ) :
+        """Use request.webapp.pathfor() to generate the url."""
+
+    def appurl( instkey, name, **matchdict ) :
+        """Generate url for a different web-application identified by
+        ``webapp``. Typically uses webapp.appurl().
+        
+        ``webapp``,
+            :class:`IWebApp` plugin instance.
+        """
 
 
 class IHTTPResponse( Interface ):
     """Response object to send reponse status, headers and body."""
 
-    cookies = Attribute(
-        "A dictionary of Cookie.Morsel objects representing response cookies "
-        "to be sent from server."
+    #---- HTTP attributes
+    statuscode = Attribute(
+        "Response status code in byte-string."
     )
+    reason = Attribute(
+        "Reason byte-string for response status."
+    )
+    version = Attribute(
+        "HTTP protocol version supported by this server."
+    )
+    headers = Attribute(
+        "HTTP header dictionary to sent in the response message."
+    )
+    body = Attribute(
+        "Response body, if present, as a byte string."
+    )
+    chunk_generator = Attribute(
+        "A python generate which returns a response chunk for every "
+        "iteration."
+    )
+    trailers = Attribute(
+        "In chunked transfer-coding, HTTP header dictionary to be sent after "
+        "the last chunk is transfered."
+    )
+
+    #---- Processed attributes
+    setcookies = Attribute(
+        "A dictionary of Cookie.Morsel objects representing a new set of "
+        "cookies to be set on the client side."
+    )
+
+    #---- Framework attributes
     request = Attribute(
         "Plugin instance implementing :class:`IHTTPRequest` interface."
+    )
+    etag = Attribute(
+        "class:`IHTTPEtag` plugin to be used for response Etag computation."
     )
     context = Attribute(
         "A dictionary like object that will be passed to resource objects and "
@@ -598,31 +439,59 @@ class IHTTPResponse( Interface ):
             interface.
         """
 
-    def clear():
-        """Resets all headers and content for this response."""
-
-    def set_status( status_code ):
-        """Sets the status code for our response."""
-
-    def get_status():
-        """Returns the status code for our response."""
-
     def set_header( name, value ):
-        """Sets the given response header name and value.
+        """Sets the given response header `name` and `value`. If there is 
+        already a response header by `name` present, it will be overwritten.
 
-        If a datetime is given, we automatically format it according to the
-        HTTP specification. If the value is not a string, we convert it to
-        a string. All header values are then encoded as UTF-8."""
+        ``name``,
+            byte-string of header field name, in lower case.
+        ``value``,
+            any type, which can be converted to string.
+
+        Returns the new value for header name as byte-string.
+        """
 
     def add_header( name, value ):
-        """Adds the given response header and value.
+        """Similar to set_header() except that, if there is already a response
+        header by `name` present, `value` will be appended to existing value
+        using ',' seperator.
 
-        Unlike `set_header`, `add_header` may be called multiple times
-        to return multiple values for the same header.
+        ``name``,
+            byte-string of header field name, in lower case.
+        ``value``,
+            Any type which can be converted to string.
+
+        Returns the new value for header name as byte-string.
+        """
+
+    def set_trailers( name, value ):
+        """Sets the given chunk trailing header, `name` and `value`. If 
+        there is already a trailing header by `name` present, it will be
+        overwritten.
+
+        ``name``,
+            byte-string of header field name, in lower case.
+        ``value``,
+            any type, which can be converted to string.
+
+        Returns the new value for header name as byte-string.
+        """
+
+    def add_trailer( name, value ):
+        """Similar to set_trailer() except that, if there is already a
+        trailing header by `name` present, `value` will be appended to
+        existing value using ',' seperator.
+
+        ``name``,
+            byte-string of header field name, in lower case.
+        ``value``,
+            any type, which can be converted to string.
+
+        Returns the new value for header name as byte-string.
         """
 
     def set_cookie( name, value, **kwargs ) :
-        """Sets the given cookie name/value with the given options. Key-word
+        """Set cookie `name`/`value` with optional `kwargs`. Key-word
         arguments typically contains,
           domain, expires_days, expires, path
         Additional keyword arguments are set on the Cookie.Morsel directly.
@@ -633,63 +502,66 @@ class IHTTPResponse( Interface ):
         for available attributes.
         """
 
-    def set_secure_cookie( name, value, expires_days=30, **kwargs ):
-        """Signs and timestamps a cookie so it cannot be forged.
-
-        You must specify the ``cookie_secret`` setting in your `class`:WebApp
-        to use this method. It should be a long, random sequence of bytes
-        to be used as the HMAC secret for the signature.
+    def set_secure_cookie( name, value, **kwargs ):
+        """Similar to set_cookie() method, additionally signs and timestamps a
+        cookie value so it cannot be forged.  Uses
+        :meth:`IHTTPCookie.create_signed_value` method to sign the cookie.
 
         To read a cookie set with this method, use `get_secure_cookie()`.
-
-        Note that the ``expires_days`` parameter sets the lifetime of the
-        cookie in the browser, but is independent of the ``max_age_days``
-        parameter to `get_secure_cookie`.
         """
 
     def clear_cookie( name, path="/", domain=None ):
-        """Deletes the cookie with the given name."""
+        """Deletes the cookie with the given name. Note that `setcookies` will
+        still contain cookie-name `name`, only that it is set to expire in the
+        client side.
+
+        Return the original value of the cookie.
+        """
 
     def clear_all_cookies():
         """Deletes all the cookies the user sent with this request."""
 
-    def write( chunk ):
+    def set_finish_callback( callback ):
+        """Subscribe a `callback` function, to be called when this response is
+        finished."""
+
+    def has_finished():
+        """Return True if finish() method is called on
+        :class:`IHTTPResponse`.
+        """
+
+    def ischunked() :
+        """Returns True if this response is transferred using `chunked`
+        Transfer-Encoding.
+        """
+
+    def write( data ):
         """Writes the given chunk to the output buffer.
 
+        ``data``,
+            byte-string of data to buffer for writing to socket. 
+
         To write the output to the network, use the flush() method below.
-
-        If the given chunk is a dictionary, we write it as JSON and set
-        the Content-Type of the response to be application/json.
-        (if you want to send JSON as a different Content-Type, call
-        set_header *after* calling write()).
-
-        Note that lists are not converted to JSON because of a potential
-        cross-site security vulnerability.  All JSON output should be
-        wrapped in a dictionary.  More details at
-        http://haacked.com/archive/2008/11/20/anatomy-of-a-subtle-json-vulnerability.aspx
         """
 
-    def flush( finishing=False, callback=None ):
-        """Flushes the current output buffer to the network. If ``finishing``
-        is True, it signifies that the flush is the last chunk to be
-        transferred for this chunk. Will be used by output transformers
-        implementing :class:`IResponseTransformer` interface.
+    def flush( trailers=None, finishing=False, callback=None ):
+        """Flushes the current output buffer to the network.
 
-        The ``callback`` argument, if given, can be used for flow control:
-        it will be run when all flushed data has been written to the socket.
-        Note that only one flush callback can be outstanding at a time;
-        if another flush occurs before the previous flush's callback
-        has been run, the previous callback will be discarded.
+        ``trailers``,
+            Dictionary of headers for chunked response, to be sent after the
+            last chunk.
+
+        ``finishing``,
+            If True, signifies that data written since the last flush() on
+            this response instance is the last chunk. In non-chunked mode, it
+            is signifies that the body is done.
+
+        ``callback``,
+            If given, can be used for flow control it will be run when all
+            flushed data has been written to the socket.
         """
 
-    def finish():
-        """Finishes this HTTP response on the open connection and initiates a
-        finish sequence starting from app's onfinish() interface"""
-
-    def onfinish():
-        """Callback for asynchronous writes and flushes."""
-
-    def httperror( status_code=500, **kwargs ):
+    def httperror( status_code=500, message=b'' ):
         """Sends the given HTTP error code to the browser.
 
         If `flush()` has already been called, it is not possible to send
@@ -700,52 +572,70 @@ class IHTTPResponse( Interface ):
         It is the caller's responsibility to finish the request, by calling
         finish()."""
 
-    def redirect( url, permanent=False, status=None ):
-        """Sends a redirect to the given (optionally relative) URL.
-
-        If the ``status`` argument is specified, that value is used as the
-        HTTP status code; otherwise either 301 (permanent) or 302
-        (temporary) is chosen based on the ``permanent`` argument.
-        The default is 302 (temporary).
-
-        It is the responsibility of the caller to finish the request by
-        calling :method:`IHTTPResponse.finish`.
+    def render( *args, **kwargs ):
+        """Use the view configuration parameter 'IHTTPRenderer' to invoke the
+        view plugin and apply IHTTPRenderer.render() method with request, c,
+        args and kwargs.
         """
 
-    def render( templatefile, request, c ):
-        """Render ``templatefile`` under ``context`` to generate response body
-        for http ``request``. Picks a plugin implementing :class:`IRenderer`
-        to generate the html. 
+    def chunk_generator( callback, request, c ):
+        """Return a generator, which, for every iteration will call the
+        `callback` function with `request` and `c` arguments, which are
+        preserved till the iteration is over. The call back should return a
+        a tuple representing a chunk.
+            (chunk_size, chunk_ext, chunk_data)
+        this will formatted into a response chunk and sent across the
+        connection.
+        """
 
-        It is the responsibility of the caller to finish the request by
-        calling :method:`IHTTPResponse.finish`.
+class IHTTPView( Interface ):
 
-        The render call writes the response body using
-        :method:`IHTTPResponse.write`
+    viewname = Attribute(
+        "String name that maps into IHTTPRouter.views dictionary."
+    )
+    view = Attribute(
+        "Dictionary of view predicates for which this view-callbale was "
+        "resolved."
+    )
+    media_type = Attribute(
+        "Predicate similar to add_view() method's media_type key-word "
+        "argument."
+    )
+    charset = Attribute(
+        "Predicate similar to add_view() method's charset key-word "
+        "argument."
+    )
 
-        ``templatefile``,
-            File path for html template in asset-specification format.
+    def __init__( viewname, view ):
+        """Instantiate plugin with `viewname` and `view` attributes."""
+
+    def __call__( request, c ):
+        """In the absence of method specific attributes or if the resolver
+        cannot find an instance attribute to apply the handler call back, the
+        object will simply be called.
+        
         ``request``,
-            Plugin instance implementing :class:`IHTTPRequest` interface. Same as
-            the one passed to :class:`IController` methods.
+            Plugin instance implementing :class:`IHTTPRequest` interface.
+
         ``c``,
             Dictionary like context object. Typically populated by
-            :class:`IController` methods and made availabe inside HTML
-            templates.
+            :class:`IHTTPResource` and view-callable. Made availabe inside 
+            HTML templates.
         """
 
-    def set_close_callback( callback ):
-        """Set a call back function to be called when remote client close 
-        the connection on this request/response or when no-keep-alive is 
-        true, hence closing the connection after the response."""
+    def onfinish( request ):
+        """Optional callable attribute, if present will be called at the end
+        of a request, after the response has been sent to the client. Note
+        that this is not the same as close callback, which
+        is called when the connection get closed. In this case the connection
+        may or may not remain open. Refer to HTTP/1.1 spec.
+        
+        ``request``,
+            Plugin instance implementing :class:`IHTTPRequest` interface.
+        """
 
-    def on_connection_close():
-        """Call back from http-server. Typically, plugin implementing this
-        method should in-turn call the callback function registered via
-        :method:`set_close_callback`."""
 
-
-class IResponseTransformer( Interface ):
+class IHTTPOutBound( Interface ):
     """Specification to transform response headers and body. A chain of
     transforms can be configured with plugins implementing 
     :class:`IHTTPResponse`."""
@@ -762,44 +652,18 @@ class IResponseTransformer( Interface ):
         of response body."""
 
 
-class IRenderer( Interface ):
+class IHTTPRenderer( Interface ): 
     """Attributes and methods to render a page using a supplied context."""
 
-    def render( templatefile, request, c ):
-        """Render ``templatefile`` under ``context`` to generate response body
-        for http ``request``.
-
-        The render call writes the response body using 
-        :method:`IHTTPResponse.write`
-
-        ``templatefile``,
-            File path for html template in asset-specification format.
+    def render( request, c, *args, **kwargs ):
+        """Implementing plugin should interpret `args` and ``kwargs``
+        arguments and invoke one or more rendering resource (like templates).
         ``request``,
-            Plugin instance implementing :class:`IHTTPRequest` interface. Same as
-            the one passed to :class:`IController` methods.
+            Plugin instance implementing :class:`IHTTPRequest` interface. Same
+            as the one passed to view-callable.
+
         ``c``,
             Dictionary like context object. Typically populated by
-            :class:`IController` methods and made availabe inside HTML
-            templates.
+            :class:`IHTTPResource` and view-callable, made 
+            availabe inside HTML templates.
         """
-
-
-class IErrorPage( Interface ):
-
-    def render( request, status_code, c ):
-        """Use ``status_code``, typically an error code, and a collection of
-        arguments ``c`` to generate error page for ``request``. This is
-        called as a result of :method:`IHTTPResponse.httperror` method.
-
-        If this error was caused by an uncaught exception, an ``exc_info``
-        triple can be passed as ``c["exc_info"]``. Note that this
-        exception may not be the "current" exception for purposes of
-        methods like ``sys.exc_info()`` or ``traceback.format_exc``. Note that
-        exception rendering happens only when application's `debug` settings is
-        `True`.
-
-        The render call writes the response body using 
-        :method:`IHTTPResponse.write`
-        """
-
-

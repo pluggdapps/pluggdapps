@@ -83,11 +83,11 @@ from   struct               import pack, unpack
 #       { Port, {data, Data} } is received as binary as well.
 #   * Unit testing for compressed marshalling is yet to be completed.
 
-__all__ = [ 'Port' ]
+__all__ = [ 'ErlPort' ]
 
 formats = { 1: "B", 2: ">H", 4: ">I" }
 
-class Port( object ):
+class ErlPort( object ):
     """Port class that handles data marshalling between netscale and
     pluggdapps.
 

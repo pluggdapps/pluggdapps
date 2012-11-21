@@ -6,11 +6,10 @@
 
 import os, fcntl, signal, sys, time, threading, imp
 
-from   pluggdapps.plugin            import implements, ISettings, Singleton, \
-                                           pluginname
-from   pluggdapps.interfaces        import ICommand
-from   pluggdapps.web.webinterfaces import IHTTPServer
-import pluggdapps.utils             as h
+from   pluggdapps.plugin        import implements, ISettings, Singleton, \
+                                       pluginname
+from   pluggdapps.interfaces    import ICommand, IHTTPServer
+import pluggdapps.utils         as h
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
@@ -59,7 +58,6 @@ class CommandServe( Singleton ):
 
     description = "Start epoll based http server."
     cmd = 'serve'
-
     def __init__( self, *args, **kwargs ):
         self.module_mtimes = {}
 

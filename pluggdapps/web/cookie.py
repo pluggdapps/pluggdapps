@@ -26,6 +26,12 @@ _default_settings['secret']  = {
     'help'    : "Use this to sign the cookie value before sending it with the "
                 "response.",
 }
+_default_settings['value_encoding']  = {
+    'default' : 'latin1',
+    'types'   : (str,),
+    'help'    : "While computing signed cookie value, use this encoding before "
+                "return the value."
+}
 _default_settings['max_age_seconds']  = {
     'default' : 3600 * 24 * 30,
     'types'   : (int,),
@@ -38,32 +44,20 @@ class HTTPCookie( Plugin ):
 
     def parse_cookies( self, headers ):
         cookies = SimpleCookie()
+        cookie = headers.get( 'cookie', '' )
         try    : 
-            cookies.load( headers.get( 'Cookie', '' )  )
+            cookies.load( cookie )
+            return cookies
         except CookieError :
-            self.webapp.pa.logwarn(
-                "Unable to parse cookie : %s" % headers['cookies'], [] )
-        return cookies
+            self.pa.logwarn( "Unable to parse cookie: %s" % cookie )
+            return None
 
     def set_cookie( self, cookies, name, value, **kwargs ) :
-        """Sets the given cookie name/value with the given options. Key-word
-        arguments typically contains,
-            domain, expires_days, expires, path
-
-        Additional keyword arguments are set on the Cookie.Morsel directly.
-        And the cookie library only accepts string type.
-
-        ``cookies`` is from SimpleCookie and updated inplace.
-
-        See python documentation docs/docs-html-3.2.3/library/http.cookies.html
-        for available attributes.
-        """
         if re.search( r"[\x00-\x20]", name + value ):
             # Don't let us accidentally inject bad stuff
             raise ValueError("Invalid cookie %r: %r" % (name, value))
 
-        if name in cookies :
-            del cookies[name]
+        if name in cookies : del cookies[name]
 
         cookies[name] = value
         morsel = cookies[name]
@@ -90,54 +84,38 @@ class HTTPCookie( Plugin ):
         return cookies
 
     def create_signed_value( self, name, value ):
-        """From name and value, using current timestamp encode a base64 value
-        and create a signature for the same.
-        
-        Finally return a bytes value like,
-            <base64-encoded-value>|<timestamp>|<signature>
-
-        <signature> is generated using `secret`, `name`, base64 encoded 
-        `value` and timestamp-in-seconds.
-        """
         encoding = self.webapp['encoding']
-        secret = self['secret'].encode( encoding )
-        name = name.encode( encoding )
-        val64 = base64.b64encode( value.encode( encoding ))
-        timestamp = str( int( time.time() )).encode( encoding )
-        signature = self._create_signature( secret, name, val64, timestamp )
-        signature = signature.encode( encoding )
-        signedval = b"|".join([ val64, timestamp, signature ])
-        return signedval.decode( 'latin1' )
+        parts = [ self['secret'], name, value, str( int( time.time() )) ]
+        parts = [ x.encode( encoding ) for x in parts ]
+        parts[2] = base64.b64encode( parts[2] )
+        signature = self._create_signature( *parts ).encode( encoding )
+        signedval = b"|".join([ parts[2], parts[3], signature ])
+        return signedval.decode( self['value_encoding'] )
 
     def decode_signed_value( self, name, signedval ):
-        """Reverse of `create_signed_value`.
-
-        `signedval` is expected to be in,
-            <base64-encoded-value>|<timestamp>|<signature>
-        Returns orignal value.
-        """
         if not signedval : return None
+
 
         encoding = self.webapp['encoding']
         secret = self['secret'].encode( encoding )
         name = name.encode( encoding )
-        value = signedval.encode( encoding )
 
+        value = signedval.encode( self['value_encoding'] )
         parts = value.split(b"|")
-        if len(parts) != 3 : return None
+        try    : val64, timestamp, signature = parts
+        except : return None
 
-        val64, timestamp, signature = parts
         args = [ name, val64, timestamp ]
         signature_ = self._create_signature( secret, *args )
         signature_ = signature_.encode( encoding )
 
         if not self._time_independent_equals( signature, signature_ ):
-            self.webapp.pa.logwarn("Invalid cookie signature %r" % value,[])
+            self.pa.logwarn( "Invalid cookie signature %r" % value )
             return None
 
         timestamp_val = int( timestamp )
         if timestamp_val < (time.time() - self['max_age_seconds']) :
-            self.webapp.pa.logwarn( "Expired cookie %r" % value, [] )
+            self.pa.logwarn( "Expired cookie %r" % value )
             return None
 
         if timestamp_val > (time.time() + self['max_age_seconds']) :
@@ -146,12 +124,11 @@ class HTTPCookie( Plugin ):
             # digits from the payload to the timestamp without altering the
             # signature.  For backwards compatibility, sanity-check timestamp
             # here instead of modifying _cookie_signature.
-            self.webapp.pa.logwarn(
-              "Cookie timestamp in future; possible tampering %r" % value, [] )
+            self.pa.logwarn( "Cookie timestamp in future %r" % value )
             return None
 
         if timestamp.startswith( b"0" ) :
-            self.webapp.pa.logwarn( "Tampered cookie %r" % value, [] )
+            self.pa.logwarn( "Tampered cookie %r" % value )
         try:
             return base64.b64decode( val64 ).decode( self.webapp['encoding'] )
         except Exception:
@@ -165,13 +142,10 @@ class HTTPCookie( Plugin ):
     def _time_independent_equals( self, a, b ):
         if len(a) != len(b) : return False
         result = 0
-        if type(a[0]) is int :  # python3 byte strings
-            for x, y in zip(a, b):
-                result |= x ^ y
-        else:                   # python2
-            for x, y in zip(a, b):
-                result |= ord(x) ^ ord(y)
-        return result == 0
+        for x, y in zip(a, b) :
+            if x != y : return False
+        else :
+            return True
 
     #---- ISettings interface methods
 

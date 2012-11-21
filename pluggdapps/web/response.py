@@ -6,11 +6,11 @@
 
 import http.client, itertools
 import datetime as dt
+from   http.cookies import CookieError, SimpleCookie
 
 from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IHTTPResponse, IResponseTransformer, \
-                                           IHTTPCookie, IErrorPage
-import pluggdapps.utils.stack_context as sc
+from   pluggdapps.web.webinterfaces import IHTTPResponse, IHTTPOutBound, \
+                                           IHTTPCookie
 import pluggdapps.utils             as h
 
 # TODO :
@@ -19,356 +19,227 @@ import pluggdapps.utils             as h
 #   3. clear_cookie() method doesn't seem to use expires field to remove the
 #      cookie from browser. Should we try that implementation instead ?
 
-# From RFC :
-#
-# * For response messages, whether or not a message-body is included with
-#   a message is dependent on both the request method and the response
-#   status code (section 6.1.1). All responses to the HEAD request method
-#   MUST NOT include a message-body, even though the presence of entity-
-#   header fields might lead one to believe they do. All 1xx
-#   (informational), 204 (no content), and 304 (not modified) responses
-#   MUST NOT include a message-body. All other responses do include a
-#   message-body, although it MAY be of zero length.
-#
-#   If the message uses the media type "multipart/byteranges", and the
-#   ransfer-length is not otherwise specified, then this self-
-#   elimiting media type defines the transfer-length. This media type
-#   UST NOT be used unless the sender knows that the recipient can arse
-#   it; the presence in a request of a Range header with ultiple byte-
-#   range specifiers from a 1.1 client implies that the lient can parse
-#   multipart/byteranges responses.
-#       A range header might be forwarded by a 1.0 proxy that does not
-#       understand multipart/byteranges; in this case the server MUST
-#       delimit the message using methods defined in items 1,3 or 5 of
-#       this section.
-
-
-
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
     "Configuration settings for HTTPResponse implementing IHTTPResponse "
     "interface." )
 
-_default_settings['transforms']     = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Comma separated transformation plugins to be applied on "
-                "response headers and body.",
-}
-_default_settings['IHTTPCookie']  = {
-    'default' : 'httpcookie',
-    'types'   : (str,),
-    'help'    : "Plugin class implementing IHTTPCookie interface specification. "
-                "methods from this plugin will be used to process request "
-                "cookies. Overrides :class:`IHTTPCookie` if defined in "
-                "`class`:WebApp plugin."
-}
-_default_settings['ierrorpage']     = {
-    'default' : 'HTTPErrorPage',
-    'types'   : (str,),
-    'help'    : "",
-}
-
 class HTTPResponse( Plugin ):
     implements( IHTTPResponse )
 
-    _status_code = 200
-    """HTTP response status code."""
+    start_response = False
+    """Response headers are already sent on the connection."""
+
+    write_buffers = None
+    """Either a list of byte-string buffered by write() method. Or a generator
+    function created via chunk_generator() method."""
+
+    flush_callback = None
+    """Flush callback subscribed using flush() method."""
+
+    finish_callback = None
+    """Finish callback subscribed using set_finish_callback() method."""
+
+    finished = False
+    """A request is considered finished when there is no more response data to
+    be sent for the on-going request. This is typically indicated by calling
+    finish() method on the response."""
 
     def __init__( self, request ):
-        # Book keeping
-        self._status_code = 200
-        self._headers = {}
-        self._list_headers = []
-        self._headers_written = False
-        self._write_buffer = []
-        self._transforms = h.parsecsvlines( self['transforms'] )
-        self._close_callback = None
-        self._finished = False
-        self._auto_finish = True
-        # Cookies
-        self.cookies = Cookie.SimpleCookie()
-        self.cookie_plugin = request.query_plugin(
-                IHTTPCookie, self['IHTTPCookie'] or self.webapp['IHTTPCookie'] )
-        # Start from a clean slate
-        self.clear()
+        # Plugin attributes
+        self.statuscode = b'200'
+        self.reason = http.client.responses[ int(self.statuscode) ]
+        self.version = request.httpconn.version
+        self.headers = {}
+        self.body = b''
+        self.chunk_generator = None
+        self.trailers = {}
+        self.setcookies = SimpleCookie()
+        self.request = request
         self.context = h.Context()
 
-        self.default_headers()
+        # Book keeping
+        self.httpconn = request.httpconn
+        self.encoding = self.webapp['encoding']
+        self.start_response = False
+        self.write_buffers = None
+        self.finished = False
+        self.flush_callback = None
+        self.finish_callback = None
 
-    def default_headers( self ) :
-        """Generate default headers for this response. This can be overriden
-        by view callable attributes."""
-        self.set_header( 'Date', h.http_fromdate( dt.datetime.now() ))
-
-    def clear( self ):
-        """Resets all headers and content for this response."""
-        from pluggdapps import __version__
-        # The performance cost of ``HTTPHeaders`` is significant
-        # (slowing down a benchmark with a trivial handler by more than 10%),
-        # and its case-normalization is not generally necessary for
-        # headers we generate on the server side, so use a plain dict
-        # and list instead.
-        self._list_headers = []
-        self._write_buffer = []
-        self._status_code = 200
-        self._headers = {
-            "Server": "PluggdappsServer/%s" % __version__,
-            "Content-Type": "text/html; charset=UTF-8",
-        }
-        self._keep_alive( request )
-
-    def set_status( self, status_code ):
-        """Sets the status code for our response."""
-        assert status_code in http.client.responses
-        self._status_code = status_code
-
-    def get_status( self ):
-        """Returns the status code for our response."""
-        return self._status_code
+    #---- IHTTPResponse APIs
 
     def set_header( self, name, value ):
-        """Sets the given response header name and value.
-
-        If a datetime is given, we automatically format it according to the
-        HTTP specification. If the value is not a string, we convert it to
-        a string. All header values are then encoded as UTF-8.
-        """
-        self._headers[name] = h.convert_header_value( value )
+        value = value if isinstance( value, bytes ) \
+                      else str( value ).encode( self.encoding )
+        self.headers[ name ] = value
+        return value
 
     def add_header( self, name, value ):
-        """Adds the given response header and value.
+        value = value if isinstance( value, bytes ) \
+                      else str( value ).encode( self.encoding )
+        self.headers[ name ] = b','.join( self.headers.get( name, b'' ), value )
+        return self.headers[name]
 
-        Unlike `set_header`, `add_header` may be called multiple times
-        to return multiple values for the same header.
-        """
-        self._list_headers.append((name, h.convert_header_value(value)))
+    def set_trailer( self, name, value ):
+        value = value if isinstance( value, bytes ) \
+                      else str( value ).encode( self.encoding )
+        self.trailers[name] = value
+        return value
+
+    def add_trailer( self, name, value ):
+        value = value if isinstance( value, bytes ) \
+                      else str( value ).encode( self.encoding )
+        self.trailers[name] = b','.join( self.trailers.get( name, b'' ), value )
+        return self.trailers[name]
 
     def set_cookie( self, name, value, **kwargs ):
-        """Sets the given cookie name/value with the given options. Key-word
-        arguments typically contains,
-          domain, expires_days, expires, path
-        Additional keyword arguments are set on the Cookie.Morsel directly.
-
-        By calling this method cookies attribute will be updated inplace.
-
-        See http://docs.python.org/library/cookie.html#morsel-objects
-        for available attributes.
-        """
-        return self.cookie_plugin.set_cookie( 
-                                self.cookies, name, value, **kwargs )
+        return self.request.cookie.set_cookie(
+                    self.setcookies, name, value, **kwargs )
 
     def set_secure_cookie( self, name, value, expires_days=30, **kwargs ):
-        """Signs and timestamps a cookie so it cannot be forged.
-
-        You must specify the ``secret`` setting in your `class`:WebApp
-        to use this method. It should be a long, random sequence of bytes
-        to be used as the HMAC secret for the signature.
-
-        To read a cookie set with this method, use `get_secure_cookie()`.
-
-        Note that the ``expires_days`` parameter sets the lifetime of the
-        cookie in the browser, but is independent of the ``max_age_days``
-        parameter to `get_secure_cookie`.
-        """
-        value = self.cookie_plugin.create_signed_value(name, value)
-        return self.cookie_plugin.set_cookie( 
-            self.cookies, name, value, expires_days=expires_days, **kwargs )
+        cookie = self.request.cookie
+        value = cookie.create_signed_value(name, value)
+        return cookie.set_cookie( self.setcookies, name, value, **kwargs )
 
     def clear_cookie( self, name, path="/", domain=None ):
-        """Deletes the cookie with the given name."""
+        value = self.setcookies[ name ]
         expires = dt.datetime.utcnow() - dt.timedelta(days=365)
-        self.cookie_plugin.set_cookie( 
-            self.cookies, name, "", path=path, expires=expires, domain=domain )
+        self.request.cookie.set_cookie( 
+                    self.setcookies, name, "", path=path, expires=expires, 
+                    domain=domain )
+        return value
 
     def clear_all_cookies(self):
-        """Deletes all the cookies the user sent with this request."""
-        [ self.clear_cookie(name) for name in list( self.cookies.keys() ) ]
+        map( self.clear_cookie, self.setcookies.keys() )
+        return None
 
-    def set_close_callback( self, callback ):
-        """Set a call back to be called when either the server or client
-        closes this connection."""
-        self._close_callback = sc.wrap( callback )
+    def set_finish_callback(self, callback):
+        self.finish_callback = callback
 
-    def on_connection_close( self ):
-        """Callback with this response object."""
-        if self._close_callback :
-            self._close_callback( self )
-            self._close_callback = None
+    def has_finished( self ):
+        return self.finished
 
-    def write( self, chunk ):
-        """Writes the given chunk to the output buffer.
+    def ischunked( self ):
+        x = h.parse_transfer_encoding( 
+                self.headers.get( 'transfer-encoding', None ))
+        return x and x[0][0] == 'chunked'
 
-        To write the output to the network, use the flush() method below.
-
-        If the given chunk is a dictionary, we write it as JSON and set
-        the Content-Type of the response to be application/json.
-        (if you want to send JSON as a different Content-Type, call
-        set_header *after* calling write()).
-
-        Note that lists are not converted to JSON because of a potential
-        cross-site security vulnerability.  All JSON output should be
-        wrapped in a dictionary.  More details at
-        http://haacked.com/archive/2008/11/20/anatomy-of-a-subtle-json-vulnerability.aspx
-        """
-        if self._finished:
+    def write( self, data ):
+        if self.has_finished() :
             raise Exception( "Cannot write() after finish()." )
-        if isinstance( chunk, dict ):
-            chunk = h.json_encode(chunk)
-            self.set_header( 
-                    "Content-Type", "application/json; charset=UTF-8" )
-        self._write_buffer.append( chunk.encode('utf-8') )
 
-    def flush( self, finishing=False, callback=None ):
-        """Flushes the current output buffer to the network.
+        data = data.encode(self.encoding) if isinstance(data, str) else data
+        self.write_buffers = self.write_buffers or []
+        self.write_buffers.append( data )
 
-        The ``callback`` argument, if given, can be used for flow control:
-        it will be run when all flushed data has been written to the socket.
-        Note that only one flush callback can be outstanding at a time;
-        if another flush occurs before the previous flush's callback
-        has been run, the previous callback will be discarded.
-        """
-        chunk = b"".join( self._write_buffer )
-        self._write_buffer = []
-        if not self._headers_written :
-            self._headers_written = True
-            for name in self._transforms :
-                t = self.request.query_plugin( IResponseTransformer, name )
-                self._headers, chunk = \
-                        t.start_transform( self._headers, chunk, finishing )
-            headers = self._generate_headers()
-        else:
-            for name in self._transforms :
-                chunk = t.transform( chunk, finishing )
-            headers = b""
+    def flush( self, finishing=True, callback=None ):
+        if callback :
+            self.flush_callback = callback
 
-        # Ignore the chunk and only write the headers for HEAD requests
-        if self.request.method == "HEAD" :
-            if headers :
-                self._dowrite( headers, callback=callback )
-            return
+        self.finished = finishing
 
-        if headers or chunk:
-            self._dowrite( headers + chunk, callback=callback )
+        if callable( self.write_buffers ) :
+            self.add_headers( 'transfer-encoding', 'chunked' )
+            chunk = self.write_buffers( self.request, self.c )
+            self.try_start_headers( finishing=finishing )
+            if finishing and self.trailers :
+                data = self.header_data( self.trailers )
+                self.httpconn.write( data, self.headers, onflush )
 
-    def finish( self, chunk=None ):
-        """Finishes this response, ending the HTTP request."""
-        if self._finished:
-            raise Exception( "finish() called twice." )
+        else :
+            data = b''.join( self.write_buffers )
+            if finishing == True :
+                if "Content-Length" not in self.headers :
+                    self.set_header( "Content-Length", len( data ) )
+            self.try_start_headers( finishing=finishing )
+            if data and self.request.method not in [ b'HEAD' ] :
+                self.httpconn.write( data, callback=self.onflush )
 
-        self.write(chunk) if chunk is not None else None
+            self.write_buffers = None
 
-        # Automatically support ETags and add the Content-Length header if
-        # we have not flushed any content yet.
-        if not self._headers_written:
-            if ( self._status_code == 200 and
-                 self.request.method in ("GET", "HEAD") and
-                 "Etag" not in self._headers ):
-                etag = h.compute_etag()
-                if etag is not None :
-                    self.set_header("Etag", etag)
-                    inm = self.request.headers.get( "If-None-Match" )
+    def httperror( self, statuscode=500, message=b'' ):
+        self.set_status( statuscode )
+        self.write( message ) if message else None
+        self.flush( finished=True )
+
+    def render( self, *args, **kwargs ):
+        self.request.view
+
+    def chunk_generator( self, callback, request, c ):
+
+        class ChunkGenerator( object ):
+
+            def __iter__( self ):
+                return self
+
+            def next( self ):
+                return callback( request, c )
+
+        return ChunkGenerator()
+
+
+    #---- Local functions
+
+    def try_start_headers( self, finishing=True ) :
+        """Generate default headers for this response. This can be overriden
+        by view callable attributes."""
+        if self.start_response : return True
+
+        self.set_header( 'Date', h.http_fromdate( dt.datetime.now() ))
+        self.set_header( 'Server', self.httpconn.product )
+
+        # Automatically support ETags and add the Content-Length header of
+        # non-chunked transfer-coding.
+        if ( self.ischunked() == False and
+             self.statuscode == b'200' and
+             self.request.method in ("GET", "HEAD") ) :
+            if "Etag" not in self.headers :
+                etagv = self.etag.compute( self ) if self.etag else None
+                if etagv :
+                    self.set_header( "Etag", etag )
+                    inm = self.request.headers.get( "if-none-match" )
                     if inm and inm.find( etag ) != -1:
-                        self._write_buffer = []
-                        self.set_status(304)
-            if "Content-Length" not in self._headers :
-                self.set_header( "Content-Length", 
-                                 sum( map( len, self._write_buffer )) )
+                        self.write_buffers = None
+                        self.set_status( b'304' )
 
-        if hasattr( self.request, "connection" ):
-            # TODO : Understand and fix this.
-            # Now that the request is finished, clear the callback we
-            # set on the IOStream (which would otherwise prevent the
-            # garbage collection of the RequestHandler when there
-            # are keepalive connections)
-            self.request.connection.stream.set_close_callback(None)
-
-        self.flush( finishing=True, callback=self.onfinish )
-
-    def onfinish( self ):
-        self._finished = True
-        self.webapp.onfinish( self.request )
-    
-    def httperror( self, status_code=500, **kwargs ):
-        """Sends the given HTTP error code to the browser.
-
-        If `flush()` has already been called, it is not possible to send
-        an error, so this method will simply terminate the response.
-        If output has been written but not yet flushed, it will be discarded
-        and replaced with the error page.
-
-        It is the responsibility of the caller to finish the request by
-        calling :method:`IHTTPResponse.finish`."""
-        if self._headers_written :
-            self.webapp.pa.logerror(
-                    "Cannot send error response after headers written" )
-            return
-        self.clear()
-        self.set_status( status_code )
-        errorpage = self.request.query_plugin( IErrorPage, 'httperrorpage' )
-        return errorpage.render( self.request, status_code, **kwargs )
-        return
-
-    def redirect( self, url, permanent=False, status=None ):
-        """Sends a redirect to the given (optionally relative) URL.
-
-        If the ``status`` argument is specified, that value is used as the
-        HTTP status code; otherwise either 301 (permanent) or 302
-        (temporary) is chosen based on the ``permanent`` argument.
-        The default is 302 (temporary).
-
-        It is the responsibility of the caller to finish the request by
-        calling :method:`IHTTPResponse.finish`.
-        """
-        if self._headers_written :
-            raise Exception("Cannot redirect after headers have been written")
-        if status is None :
-            status = 301 if permanent else 302
-        else:
-            assert isinstance(status, int) and 300 <= status <= 399
-        self.set_status( status )
-        # Remove whitespace
-        url = re.sub(b(r"[\x00-\x20]+"), "", url.encode('utf-8') )
-        self.set_header( 
-          "Location", urlparse.urljoin( self.request.uri.encode('utf-8'), url))
-
-    def render( self, templatefile, c ):
-        """Generate HTML content for request and write them using
-        :method:`IHTTPResponse.write`.
-        It is the responsibility of the caller to finish the request by
-        calling :method:`IHTTPResponse.finish`."""
-        pass
-
-    def _keep_alive( self, request ):
-        """For HTTP/1.1 connection can be kept alive across multiple request
-        and response."""
-        if not request.supports_http_1_1() :
-            if request.headers.get( "Connection", None ) == "Keep-Alive" :
+        # For HTTP/1.1 connection can be kept alive across multiple request
+        # and response.
+        if not self.request.supports_http_1_1() :
+            if self.request.headers.get( "Connection", None ) == "Keep-Alive" :
                 self.set_header( "Connection", "Keep-Alive" )
 
-    def _generate_headers( self ):
+        self.start_response = True
+        data = self.header_data( self.headers )
+        self.httpconn.write( data, self.headers )
 
-        # TODO : 3 header field types are specifically prohibited from appearing as a
-        # trailer field: Transfer-Encoding, Content-Length and Trailer.
+    def header_data( self, headers ):
+        # TODO : 3 header field types are specifically prohibited from
+        # appearing as a trailer field: Transfer-Encoding, Content-Length and
+        # Trailer.
 
-        code = str( self._status_code )
-        reason = http.client.responses[ self._status_code ]
-        response_line = [ self.request.version, code, reason ]
-        lines = [ ' '.join( response_line ).encode('utf-8') ]
+        code = self.statuscode
+        reason = http.client.responses[ code ].encode( self.encoding )
+        lines = [ b' '.join([ self.version, code, reason ]) ]
 
-        headers = itertools.chain( self._headers.items(), self._list_headers )
-        lines.extend(
-            n.encode('utf-8') + b": " + v.encode('utf-8') for n, v in headers )
+        [ lines.append( h.hdr_camelcase[n] + b': ' + v ) for n, v in headers ]
 
-        [ lines.append(
-            "Set-Cookie: ".encode('utf-8') + cookie.OutputString(None) 
-          ) for cookie in list(self.cookies.values()) ]
+        [ lines.append( b"Set-Cookie: " + cookie.OutputString() )
+          for c in self.setcookies.values() ]
+
         return b"\r\n".join(lines) + b"\r\n\r\n"
 
-    def _dowrite( self, chunk, callback=None ):
-        assert isinstance(chunk, bytes)
-        self.connection.write( chunk, callback=callback )
+    def onflush( self ):
+        if self.flush_callback :
+            callback, self.flush_callback = self.flush_callback, None
+            callback()
 
+        if self.has_finished() : self.onfinish()
+
+    def onfinish( self ):
+        callback, self.finish_callback = self.finish_callback, None
+        callback()
+        self.request.onfinish()
 
     #---- ISettings interface methods
 

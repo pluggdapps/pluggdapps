@@ -8,12 +8,12 @@ import traceback
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IErrorPage
+from   pluggdapps.web.webinterfaces import IHTTPView
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
-    ("Configuration settings for HTTPErrorPage implementing IErrorPage "
-     "interface.")
+    ("Configuration settings for HTTPErrorPage implementing IHTTPView for "
+     "error page interface.")
 
 _default_settings['errortemplate']  = {
     'default' : '',
@@ -22,7 +22,7 @@ _default_settings['errortemplate']  = {
 }
 
 class HTTPErrorPage( Plugin ):
-    implements( IErrorPage )
+    implements( IHTTPView )
 
     def render( self, request, status_code, c ):
         """Use ``status_code``, typically an error code, and a collection of

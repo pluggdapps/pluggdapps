@@ -3,11 +3,11 @@ from   os.path              import dirname, join
 from   pprint               import pprint
 
 import pluggapps.utils      as h
-from   pluggdapps.erlport   import Port
+from   pluggdapps.erlport   import ErlPort
 
 baseini = join( dirname( __file__ ), 'tests', 'develop.ini' )
 
-class TestPort( Port ):
+class TestPort( ErlPort ):
 
     def __init__( self, *args, **kwargs ):
         super().__init__( *args, **kwargs )
@@ -15,7 +15,7 @@ class TestPort( Port ):
     def logerror( self, formatstr, values ):
         print( formatstr, values )
 
-port    = TestPort( descrs=(3,4) )
+erlport    = TestPort( descrs=(3,4) )
 
 class TestConfig( unittest.TestCase ):
 

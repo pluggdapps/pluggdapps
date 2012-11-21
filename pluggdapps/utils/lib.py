@@ -15,7 +15,8 @@ __all__ = [
     'sourcepath', 'parsecsv', 'parsecsvlines', 'classof', 'subclassof',
     'asbool', 'asint', 'asfloat', 'timedelta_to_seconds', 'set_close_exec', 
     'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
-    'reseed_random', 'mergedict', 'takewhile', 'dropwhile', 'print_exc',
+    'reseed_random', 'mergedict', 'multivalue_dict', 'takewhile', 
+    'dropwhile', 'print_exc',
     # Classes
     'Context',
 ]
@@ -152,6 +153,14 @@ def mergedict( *args ) :
     super-imposed key,value pairs from `args`"""
     d = {}
     [ d.update( arg ) for arg in args ]
+    return d
+
+def multivalue_dict( ls ):
+    """List `ls` is a list of tuple (attr, value), there can be more than one
+    tuple with the same `attr` name. Make a dictionary where the key values
+    are list."""
+    d = {}
+    [ d.setdefault( k, [] ).append( v ) for k,v in ls ]
     return d
 
 def takewhile( pred, lst ):

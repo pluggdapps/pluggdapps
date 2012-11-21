@@ -20,86 +20,60 @@ _default_settings.__doc__ = (
     "Configuration settings for HTTPRequest implementing IHTTPRequest "
     "interface." )
 
-_default_settings['IHTTPCookie']  = {
-    'default' : 'httpcookie',
-    'types'   : (str,),
-    'help'    : "Plugin class implementing IHTTPCookie interface spec. "
-                "Methods from this plugin will be used to process request "
-                "cookies. Overrides :class:`IHTTPCookie` if defined in "
-                "application plugin."
-}
-
 class HTTPRequest( Plugin ):
     implements( IHTTPRequest )
 
-    do_methods = ('GET', 'HEAD', 'POST', 'DELETE', 'PUT', 'OPTIONS')
-
-    elapsedtime = property( lambda self : time.time() - self.receivedat )
+    content_type = None
+    """Parsed content type as tuple of,
+        ( type, subtype, [ (attr, value), ... ] ) """
 
     # IHTTPRequest interface methods and attributes
-    def __init__( self, conn, method, uri, version, headers, body ):
+    def __init__( self, httpconn, method, uri, version, headers ):
 
-        self.conn = conn
+        self.router = self.cookie = None
+        self.response = self.session = None
+
+        self.httpconn = conn
         self.method, self.uri, self.version = method, uri, version
         self.headers = headers
-        self.body = body
-        return
+        self.uriparts = h.parse_url( self.uri, host=headers['Host'] 
+                                   ) if isinstance( uri, str ) else uri
+
+        self.body = None
+        self.chunks = []
+        self.trailers = {}
+
+        self.params = {}
+        self.getparams = self.uriparts.query
+        self.params.update( self.getparams )
+
+        self.content_type = h.parse_content_type( 
+                                headers.get( 'content-type', None ))
+        if method in ( b'POST', b'PUT' ) :
+            self.postparams, self.multiparts = \
+                    h.parse_formbody( self.content_type, body )
+            [ self.params.setdefault( name, [] ).extend( value )
+              for name, value in self.postparams.items() ]
+            [ self.params.setdefault( name, [] ).extend( value )
+              for name, value in self.multiparts.items() ]
+            [ self.files.setdefault( name, [] 
+                                   ).extend( (f['filename'], f['value'] ) )
+              for name, value in self.multiparts.items() ]
+        else :
+            self.postparams = {}
+            self.multiparts = {}
+            self.files = {}
+
+        self.cookies = self.cookie.parse_cookies( self.headers )
 
         self.receivedat = time.time()
         self.finishedat = None
-        xheaders = getattr( conn, 'xheaders', None ) if conn else None
-
-        self.cookie_plugin = self.query_plugin(
-                                self.webapp, IHTTPCookie, self['IHTTPCookie'] )
-        
-        # Socket attributes
-        self.connection = conn
-
-        # Request attributes
-        self.method = method
-        self.uriparts = uriparts
-        self.version = version
-        self.headers = headers or h.HTTPHeaders()
-        self.body = body or b""
-        self.baseurl = self.webapp.pa.baseurl( self )
-        self.uri = h.make_url(
-            self.baseurl, uriparts['path'], uriparts['query'],
-            uriparts['fragment'] )
-        # Client's ip-address and port number
-        remoteip, port = address
-        self.address = (
-            h.parse_remoteip( remoteip, self.headers, xheaders ),
-            port )
-        # A dictionary of http.cookies.Morsel
-        self.cookies = self.cookie_plugin.parse_cookies( self.headers )
-        self.getparams = uriparts.query
-        # Parse request body here.
-        self.postparams, self.files = \
-                        h.parse_body( method, self.headers, body )
-
-        # Processed attributes
-        self.params = {}
-        self.params.update( self.getparams )
-        self.params.update( self.postparams )
-
-        # Framework attributes
-        self.session = None
-
-        # Router attributes
-        self.resolve_path = uriparts.path
-        self.traversed = []
-        self.matchrouter = None
-        self.matchdict = None
-        self.view_name = None
 
     def supports_http_1_1( self ):
-        return self.version == "HTTP/1.1"
+        return self.version == b"HTTP/1.1"
 
     def get_ssl_certificate(self):
-        try    :
-            return self.connection.get_ssl_certificate()
-        except :
-            return None
+        return self.httpconn.get_ssl_certificate()
 
     def get_cookie( self, name, default=None ):
         """Gets the value of the cookie with the given name, else default."""
@@ -109,27 +83,48 @@ class HTTPRequest( Plugin ):
         """Returns the given signed cookie if it validates, or None."""
         if value is None :
             value = self.get_cookie(name)
-        return self.cookie_plugin.decode_signed_value( name, value ) 
+        return self.cookie.decode_signed_value( name, value ) 
+
+    def has_finished( self ):
+        return self.response.has_finished()
+
+    def ischunked( self ):
+        x = h.parse_transfer_encoding( 
+                self.headers.get( 'transfer-encoding', None ))
+        return (x[0][0] == 'chunked') if x else False
+
+    def handle( self, body=None, chunk=None, trailers=None ):
+        if body :
+            self.body = body
+        elif chunk and trailers and chunk[0] == 0 :
+            self.chunks.append( chunk )
+            self.trailers = trailers
+        elif chunk :
+            self.chunks.append( chunk )
+
+        c = self.response.context
+        self.router.route( self, c )  # Resolves a view callable.
+
+        if self.view :   # Call the view-callable
+            self.view( self, c )
 
     def onfinish( self ):
         """Callback when :meth:`IHTTPResponse.finish()` is called."""
-        self.connection.finish()
+        # Will be callbe by response.onfinish() callback.
+        self.httpconn.finish()
+        self.view.onfinish()
+        self.webapp.onfinish()
         self.finishedat = time.time()
 
-    def query_plugin( self, *args, **kwargs ):
-        return query_plugin( self.webapp, *args, **kwargs )
+    def urlfor( name, **matchdict ):
+        return self.webapp.urlfor( self, name, **matchdict )
 
-    def query_plugins( self, *args, **kwargs ):
-        return query_plugin( self.webapp, *args, **kwargs )
+    def pathfor( name, **matchdict ):
+        return self.webapp.pathfor( self, name, **matchdict )
 
-    def urlfor( name, *traverse, **matchdict ):
-        return self.webapp.urlfor( None, self, name, *traverse, **matchdict )
+    def appurl( webapp, name, **matchdict ):
+        return webapp.urlfor( self, name, **matchdict )
 
-    def pathfor( name, *traverse, **matchdict ):
-        return self.webapp.pathfor( self, name, *traverse, **matchdict )
-
-    def appurl( appname, name, *traverse, **matchdict ):
-        return self.webapp.urlfor( appname, self, name *traverse, **matchdict )
 
     def __repr__( self ):
         attrs = ( "uriparts", "address", "body" )
@@ -143,4 +138,3 @@ class HTTPRequest( Plugin ):
     @classmethod
     def default_settings( cls ):
         return _default_settings
-
