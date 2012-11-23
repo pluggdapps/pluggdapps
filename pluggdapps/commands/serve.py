@@ -13,7 +13,8 @@ import pluggdapps.utils         as h
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
-    "Configuration for serve sub-command." )
+    "Configuration for serve sub-command."
+)
 
 _default_settings['IHTTPServer'] = {
     'default' : 'httpepollserver',

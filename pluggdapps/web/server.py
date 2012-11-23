@@ -809,12 +809,12 @@ class HTTPConnection( Plugin ):
 
         self.request = request
         if chunk :
-            handle_chunk( chunk=chunk, trailers=trailers )
+            webapp.dorequest( request, chunk=chunk, trailers=trailers )
         else :
             webapp.dorequest( request, body=body )
 
     def handle_chunk( self, chunk, trailers=None ):
-        self.request.webapp.dorequest(request, chunk=chunk, trailers=trailers)
+        self.request.webapp.dochunk( request, chunk=chunk, trailers=trailers )
 
     def write( self, chunk, callback=None, force=False ):
         """Write a chunk of data."""

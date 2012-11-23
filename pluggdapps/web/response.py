@@ -56,7 +56,6 @@ class HTTPResponse( Plugin ):
         self.trailers = {}
         self.setcookies = SimpleCookie()
         self.request = request
-        self.context = h.Context()
 
         # Book keeping
         self.httpconn = request.httpconn

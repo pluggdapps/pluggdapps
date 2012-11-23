@@ -64,8 +64,6 @@ class HTTPRequest( Plugin ):
             self.multiparts = {}
             self.files = {}
 
-        self.cookies = self.cookie.parse_cookies( self.headers )
-
         self.receivedat = time.time()
         self.finishedat = None
 
@@ -94,6 +92,8 @@ class HTTPRequest( Plugin ):
         return (x[0][0] == 'chunked') if x else False
 
     def handle( self, body=None, chunk=None, trailers=None ):
+        self.cookies = self.cookie.parse_cookies( self.headers )
+
         if body :
             self.body = body
         elif chunk and trailers and chunk[0] == 0 :
@@ -101,12 +101,6 @@ class HTTPRequest( Plugin ):
             self.trailers = trailers
         elif chunk :
             self.chunks.append( chunk )
-
-        c = self.response.context
-        self.router.route( self, c )  # Resolves a view callable.
-
-        if self.view :   # Call the view-callable
-            self.view( self, c )
 
     def onfinish( self ):
         """Callback when :meth:`IHTTPResponse.finish()` is called."""

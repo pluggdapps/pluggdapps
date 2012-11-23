@@ -95,7 +95,7 @@ import pluggdapps.commands  # Load pa-script commands
 import pluggdapps.web       # Load web-framework
 
 # Load applications
-# import pluggdapps.docroot
+# import pluggdapps.docroot   # Application to serve static files.
 
 # Initialize plugin data structures
 pluggdapps.plugin.plugin_init()

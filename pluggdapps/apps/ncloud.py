@@ -9,7 +9,7 @@ import pluggdapps.utils         as h
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for root web-app."""
+    "Configuration settings for root web-app."
 
 class NCloud( WebApp ):
 

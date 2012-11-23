@@ -55,7 +55,10 @@ class IHTTPRouter( Interface ):
             URL, route matching continues.
 
         ``resource``,
-            A plugin name implementing :class:`IHTTPResource` interface.
+            A plugin name or plugin instance implementing
+            :class:`IHTTPResource` interface, or just a plain python callable.
+            What ever the case, please do go through the :class:`IHTTPResource`
+            interface specification before authoring a resource-callable.
 
         ``view_callable``,
             A plugin name or plugin instance implementing :class:`IHTTPView`
@@ -70,19 +73,15 @@ class IHTTPRouter( Interface ):
     def route( request, c ):
         """Resolve request url for ``request``. For a successful match,
         populate relevant attributes, like `matchdict` and `view`, in 
-        ``request`` plugin. Once resolved, call the configured 
-        :class:`IHTTPResource` plugin for the view and return the
-        view-callable. A view-callable can be a plain python
-        callable that accepts request and context arguments or a plugin
-        implementing :class:`IHTTPView` interface.
-        
+        ``request`` plugin.  A view-callable can be a plain python callable
+        that accepts request and context arguments or a plugin implementing
+        :class:`IHTTPView` interface.
+
         ``request``,
             Plugin instance implementing :class:`IHTTPRequest` interface.
 
-        ``c``,
-            Dictionary like context object. Typically populated by
-            :class:`IHTTPResource` and view-callable. Made availabe inside
-            HTML templates.
+        ``c``
+            Context dictionary for response, and templates.
         """
 
 
@@ -188,8 +187,7 @@ class IHTTPSession( Interface ):
 
 
 class IHTTPRequest( Interface ):
-    """Request object, the only parameter that will be passed to
-    :class:`IRquestHandler`."""
+    """Interface specification for a request object."""
 
     # ---- Socket Attributes
     httpconn = Attribute(
@@ -319,7 +317,10 @@ class IHTTPRequest( Interface ):
             Dictionary request headers. Key names in this dictionary will be
             decoded to string-type. Value names will be preserved as
             byte-string.
-        """
+
+        When a request object is instantiated no assumption should be made
+        about the web application framework. Only processing of request init
+        parameters are allowd."""
 
     def supports_http_1_1():
         """Returns True if this request supports HTTP/1.1 semantics"""
@@ -352,8 +353,8 @@ class IHTTPRequest( Interface ):
         """
 
     def handle( body=None, chunk=None, trailers=None, ):
-        """Once a `request` is resolved to an application, this method is the
-        entry point for request into the resolved application.
+        """Once a `request` is instantiated, this method is called before
+        resolving and dispatching it to view-callable.
         
         ``body``,
             Optional kwarg, if request body is present. Passed as byte-string.
@@ -596,14 +597,6 @@ class IHTTPView( Interface ):
     view = Attribute(
         "Dictionary of view predicates for which this view-callbale was "
         "resolved."
-    )
-    media_type = Attribute(
-        "Predicate similar to add_view() method's media_type key-word "
-        "argument."
-    )
-    charset = Attribute(
-        "Predicate similar to add_view() method's charset key-word "
-        "argument."
     )
 
     def __init__( viewname, view ):

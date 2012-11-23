@@ -6,11 +6,10 @@
 
 from   pprint import pprint
 from   copy   import deepcopy
-import os.path, io
 
 from   pluggdapps.const      import SPECIAL_SECS
 from   pluggdapps.plugin     import PluginMeta, implements, Plugin, \
-                                    pluginname, applications
+                                    applications
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 

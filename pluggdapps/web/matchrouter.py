@@ -4,15 +4,13 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-from   copy       import deepcopy
-from   os.path    import isfile
 import re
 
 import pluggdapps.utils             as h
 from   pluggdapps.const             import URLSEP
-from   pluggdapps.plugin            import Plugin, implements, isimplement
+from   pluggdapps.plugin            import Plugin, implements
 from   pluggdapps.web.webinterfaces import IHTTPRouter, IHTTPResource, \
-                                           IHTTPView
+                                           IHTTPView, IHTTPResponse
 # Notes :
 #   - An Allow header field MUST be present in a 405 (Method Not Allowed)
 #     response.
@@ -27,14 +25,6 @@ _default_settings['defaultview']  = {
     'help'    : "Use this :class:`IHTTPView` view callable plugin to generate "
                 "a response for request that can't be resolved into a valid "
                 "view-callable."
-}
-_default_settings['IHTTPResource']  = {
-    'default' : 'httpresource',
-    'types'   : (str,),
-    'help'    : ":class:`IHTTPResource` plugin common to all requests routed "
-                "via this IHTTPRouter plugin. View specific IHTTPResource "
-                "plugins configured via add_view() are used after resolving "
-                "the request to a view-callable."
 }
 
 re_patt = re.compile( r'([^{]+)?'
@@ -64,13 +54,10 @@ class MatchRouter( Plugin ):
         view['path_template'] = tmpl
         view['match_segments'] = redict
 
-    def route( request, c ):
-        # Call IHTTPResource plugin configured for this router.
-        res = self.query_plugin( IHTTPResource, self['IHTTPResource'] )
-        res( request, c )
-        
+    def route( self, request, c ):
         for name, view in self.views.items() :
-            m = view['compiled_pattern'].match( request.resolve_path )
+            path = request.uriparts['path']
+            m = view['compiled_pattern'].match( path )
             if m == None : continue
 
             matchdict = m.groupdict()
@@ -85,7 +72,7 @@ class MatchRouter( Plugin ):
                 res = view['resource']
                 if isinstance(res, str) :
                     res = self.query_plugin( IHTTPResource, res )
-                res( request, c )
+                res( request, c ) if res else None
                 break
 
             else :
@@ -96,6 +83,9 @@ class MatchRouter( Plugin ):
         else :
             request.matchdict = {}
             request.view = self.query_plugin( IHTTPView, self['defaultview'] )
+
+        if request.view :   # Call the view-callable
+            request.view( self, c )
 
     def urlpath( self, request, name, **matchdict ):
         view = self.views[ name ]

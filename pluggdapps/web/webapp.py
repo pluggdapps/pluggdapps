@@ -6,8 +6,7 @@
 
 from   urllib.parse import urljoin
 
-from   pluggdapps.plugin            import implements, isimplement, \
-                                           Plugin, pluginname
+from   pluggdapps.plugin            import implements, Plugin
 from   pluggdapps.interfaces        import IWebApp
 from   pluggdapps.web.webinterfaces import IHTTPView, IHTTPRouter
 import pluggdapps.utils             as h
@@ -57,6 +56,18 @@ _default_settings['IHTTPRequest']  = {
     'types'   : (str,),
     'help'    : "Name of the plugin to encapsulate HTTP request. "
 }
+_default_settings['IHTTPResource']  = {
+    'default' : 'httpresource',
+    'types'   : (str,),
+    'help'    : "A plugin name or plugin instance implementing "
+                ":class:`IHTTPResource` interface, or just a plain python "
+                "callable. What ever the case, please do go through the "
+                ":class:`IHTTPResource` interface specification before "
+                "authoring a resource-callable."
+                "View specific IHTTPResource plugins configured via "
+                "add_view() are used after resolving the request to a "
+                "view-callable."
+}
 _default_settings['IHTTPResponse']  = {
     'default' : 'httpresponse',
     'types'   : (str,),
@@ -74,28 +85,39 @@ class WebApp( Plugin ):
     def startapp( self ):
         """Inheriting plugins should not forget to call its super() method."""
         self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
+        self.cookie = self.query_plugin( IHTTPRouter, self['IHTTPCookie'] )
         self.router.onboot()
 
     def dorequest( self, request, body=None, chunk=None, trailers=None ):
-        if not request.router :
-            request.router = self.webapp.router
+        request.router = self.router
+        request.cookie = self.cookie
 
-        if not request.cookie :
-            request.cookie = request.query_plugin( 
-                                IHTTPCookie, self['IHTTPCookie'] )
-        if not request.response :
-            request.response = request.query_plugin(
-                                IHTTPResponse, self['IHTTPResponse'], request )
+        request.handle( body=body, chunk=chunk, trailers=trailers )
 
-        if not request.session :
-            request.session = request.query_plugin(
-                                IHTTPSession, self['IHTTPSession'] )
+        request.response = response = self.query_plugin(
+                            IHTTPResponse, webapp['IHTTPResponse'], request )
+        request.session = self.query_plugin(
+                            IHTTPSession, webapp['IHTTPSession'] )
+        response.etag = self.query_plugin( IHTTPEtag, webapp['IHTTPEtag'] )
+        response.context = c = h.Context()
 
-        if not request.etag :
-            response.etag = response.query_plugin( 
-                                IHTTPEtag, self['IHTTPEtag'] )
 
-        return request.handle( body=body, chunk=chunk, trailers=trailers )
+        # Call IHTTPResource plugin configured for `webapp`.
+        if isinstance( webapp['IHTTPResource'], str ):
+            resc = self.query_plugin( IHTTPResource, webapp['IHTTPResource'] )
+        resc( request, c ) if resc else None
+
+        self.router.route( request, c )
+
+    def dochunk( self, request, chunk=None, trailers=None ):
+        request.handle( chunk=chunk, trailers=trailers )
+
+        # Call IHTTPResource plugin configured for `webapp`.
+        if isinstance( webapp['IHTTPResource'], str ):
+            resc = self.query_plugin( IHTTPResource, webapp['IHTTPResource'] )
+        resc( request, c ) if resc else None
+
+        self.router.route( request, c )
 
     def onfinish( self, request ):
         pass

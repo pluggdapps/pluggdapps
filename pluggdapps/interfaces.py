@@ -89,18 +89,25 @@ class IWebApp( Interface ):
     def dorequest( request, body=None, chunk=None, trailers=None ):
         """`request` was resolved for this application. Request handling
         callback for application. The callback will be issued when,
-            * A complete request without body is received, where the request
+            * A new request without body is received, where the request
               data is available in `request`.
-            * A complete request with a body is received, in which case kwarg
+            * A new request with a body is received, in which case kwarg
               `body` gives the request body as byte-string.
+        """
+ 
+    def dochunk( request, chunk=None, trailers=None ):
+        """`request` was resolved for this application. Request handling
+        callback for application. The callback will be issued when,
+            * A new request with a chunk is received, in which case kwarg
+              `chunks` gives a single element list with received chunk as,
+                ( chunk_size, chunk_ext, chunk_data ) 
             * A request is being received in chunked mode and a request chunk
               just received, in which case `chunk` is a tuple of,
                 ( chunk_size, chunk_ext, chunk_data )
             * The last chunk of the request is received without a trailer.
             * The last chunk of the request is received with a trailer.
         """
-
-
+ 
     def onfinish( request ):
         """When a finish is called on the response. And this call back is 
         issued beginning a finish sequence for this ``request`` in the 
@@ -282,3 +289,24 @@ class IHTTPConnection( Interface ):
         """Close this connection."""
 
 
+class IScaffold( Interface ):
+    """Interface specification for automatically creating scaffolding logic
+    based on collection of user-fed variables and a source-template."""
+
+    description = Attribute(
+        "One line description of scaffolding logic."
+    )
+
+    def __init__( settings={} ):
+        """Initialize interface attributes with ``settings`` parameter.
+        """
+
+    def query_cmdline():
+        """Query command line for variable details."""
+
+    def generate():
+        """Generate the scaffolding logic."""
+
+    def printhelp():
+        """If executed in command line, provide a meaning full description
+        about this scaffolding plugin and variables that can be defined."""

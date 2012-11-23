@@ -73,6 +73,11 @@ web-applications under [webmounts] additional configuration files, exclusive
 to the scope of mounted webapp, can be referred as well.
 
 :class:`Webapps` provides the necessary logic. 
+
+Example [webmounts] section
+
+  [webmounts]
+
 """
 
 from   configparser          import SafeConfigParser
@@ -548,6 +553,36 @@ class Webapps( Pluggdapps ):
                     appsett[sec] = b.normalize_settings( appsett[sec] )
 
 
+    def make_appurl( self, instkey ):
+        """Compute the base url for application specified by `instkey` which
+        is a tuple of,
+            ( appsec, mount-type, mount-name, configfile)
+
+        Return the base-url as byte-string.
+        """
+        host = self.settings['pluggdapps']['host']
+        port = self.settings['pluggdapps']['port']
+        scheme = self.settings['pluggdapps']['scheme']
+        appsec, typ, mountname, config = instkey
+        # Prefix scheme
+        appurl = scheme + '://'
+        # Prefix hostname
+        if typ == MOUNT_SUBDOMAIN :
+            appurl += mountname + '.' + host
+        else :
+            appurl += host
+        # prefix port
+        if port :
+            if (scheme, port) in [ ('http', 80), ('https', 443) ] :
+                port = ''
+            else :
+                port = str(port)
+            appurl += ':' + port
+        # Prefix SCRIPT-NAME, mountname is already prefixed with URLSEP
+        if typ == MOUNT_SCRIPT :
+            appurl += mountname
+        return appurl
+
     #---- Query APIs
 
     @staticmethod
@@ -621,37 +656,7 @@ class Webapps( Pluggdapps ):
                     mountedat = (MOUNT_SCRIPT, mountname, webapp)
                     break
 
-        return (uriparts, mountedat)
-
-    def make_appurl( self, instkey ):
-        """Compute the base url for application specified by `instkey` which
-        is a tuple of,
-            ( appsec, mount-type, mount-name, configfile)
-
-        Return the base-url as byte-string.
-        """
-        host = self.settings['pluggdapps']['host']
-        port = self.settings['pluggdapps']['port']
-        scheme = self.settings['pluggdapps']['scheme']
-        appsec, typ, mountname, config = instkey
-        # Prefix scheme
-        appurl = scheme + '://'
-        # Prefix hostname
-        if typ == MOUNT_SUBDOMAIN :
-            appurl += mountname + '.' + host
-        else :
-            appurl += host
-        # prefix port
-        if port :
-            if (scheme, port) in [ ('http', 80), ('https', 443) ] :
-                port = ''
-            else :
-                port = str(port)
-            appurl += ':' + port
-        # Prefix SCRIPT-NAME, mountname is already prefixed with URLSEP
-        if typ == MOUNT_SCRIPT :
-            appurl += mountname
-        return appurl
+        return uriparts, mountedat
 
     #---- ISettings interface methods
 

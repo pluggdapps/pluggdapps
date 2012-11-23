@@ -9,7 +9,6 @@ import pluggdapps.web.errorpage
 import pluggdapps.web.httpetag
 import pluggdapps.web.matchrouter
 import pluggdapps.web.request
-import pluggdapps.web.resource
 import pluggdapps.web.response
 import pluggdapps.web.server
 import pluggdapps.web.views

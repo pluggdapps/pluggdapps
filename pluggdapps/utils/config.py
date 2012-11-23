@@ -48,8 +48,9 @@ class ConfigItem( dict ):
     ``default``,
         Default value for this settings a.k.a configuration parameter.
         Compulsory field.
-    ``format``,
-        Comma separated value of valid format. Allowed formats are,
+    ``types``,
+        Either a tuple of valid types, or a string of comma separated values.
+        Allowed types are,
             str, int, bool, csv.
         Compulsory field.
     ``help``,
@@ -67,8 +68,11 @@ class ConfigItem( dict ):
         return self['default']
 
     @property
-    def format( self ):
-        return parsecsvlines( self['format'] )
+    def types( self ):
+        if isinstance( self['types'], str ) :
+            return tuple( parsecsvlines( self['types'] ))
+        else :
+            return self['types']
 
     @property
     def help( self ):

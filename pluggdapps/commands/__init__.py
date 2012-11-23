@@ -7,4 +7,5 @@
 import pluggdapps.commands.commands
 import pluggdapps.commands.ls
 import pluggdapps.commands.serve
+import pluggdapps.commands.webapp
 import pluggdapps.commands.unittest
