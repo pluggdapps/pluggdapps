@@ -8,7 +8,8 @@ import os
 from   os.path                  import dirname, join, basename, abspath
 
 import pluggdapps.utils             as h
-from   pluggdapps.scaffolds         import Scaffold
+from   pluggdapps.plugin            import implements, Plugin
+from   pluggdapps.interfaces        import IScaffold
 from   pluggdapps.scaffolds.util    import template_to_source
 from   pluggdapps.interfaces        import IScaffold
 
@@ -18,7 +19,7 @@ _default_settings.__doc__ = (
 )
 
 _default_settings['template_dir']  = {
-    'default' : 'webapp',
+    'default' : 'webapp_template',
     'types'   : (str,),
     'help'    : "Obsolute file path of template source-tree to be used for "
                 "the scaffolding logic."
@@ -34,9 +35,15 @@ _default_settings['webapp_name'] = {
     'help'    : "Web application name."
 }
 
-class ScaffoldingWebApp( Scaffold ):
+class ScaffoldingWebApp( Plugin ):
+    implements( IScaffold )
 
     description = "Create scaffolding logic for a web application."
+
+    #---- IScaffold API methods.
+
+    def __init__( self, target, template_dir=None ):
+        pass
 
     def query_cmdline( self ):
         if self['target_dir'] == '' :
@@ -54,6 +61,14 @@ class ScaffoldingWebApp( Scaffold ):
         print( "Generated %r" % target_dir )
         template_to_source( self['template_dir'], target_dir, _vars )
 
+    def printhelp( self ):
+        sett = self.default_settings()
+        print( self.description )
+        for name, d in sett.specifications().items() :
+            print("  %20s [%s]" % (name, d['default']))
+            pprint( d['help'], indent=4 )
+            print()
+
     #---- ISettings interface methods
 
     @classmethod
@@ -63,3 +78,4 @@ class ScaffoldingWebApp( Scaffold ):
     @classmethod
     def normalize_settings( cls, sett ):
         return sett
+

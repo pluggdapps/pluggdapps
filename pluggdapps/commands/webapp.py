@@ -4,10 +4,10 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 Netscale Computing
 
-from   pluggdapps.const      import SPECIAL_SECS
-from   pluggdapps.plugin     import PluginMeta, implements, Plugin, \
-                                    applications
-from   pluggdapps.interfaces import ICommand
+import os
+
+from   pluggdapps.plugin     import implements, Plugin
+from   pluggdapps.interfaces import ICommand, IScaffold
 import pluggdapps.utils as h
 
 class CommandWebApp( Plugin ):

@@ -92,6 +92,7 @@ for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
 
 import pluggdapps.erl       # Load netscale interfaces.
 import pluggdapps.commands  # Load pa-script commands
+import pluggdapps.scaffolds # Load web-framework
 import pluggdapps.web       # Load web-framework
 
 # Load applications
