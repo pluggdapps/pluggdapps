@@ -3,7 +3,7 @@
 import pluggdapps.utils             as h
 
 
-def SplashPluggdapps( request, c ):
+def SplashPage( request, c ):
     res = request.response
     res.write( "hello world" )
     res.flush( finished=True )
