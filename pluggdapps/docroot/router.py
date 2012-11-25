@@ -1,0 +1,11 @@
+# -*- coding: utf-8 -*-
+
+from   pluggdapps.web.matchrouter import MatchRouter
+from   view                       import SplashPage
+
+class docrootRouter( MatchRouter ):
+
+    def onboot( self ):
+        super().onboot()
+        # Use add_view() method to add view-handlers.
+        self.add_view( 'example', '/', view_callable=SplashPage )
