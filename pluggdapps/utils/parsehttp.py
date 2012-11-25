@@ -23,7 +23,7 @@ DEFAULT_QVALUE = 1.0
 
 __all__ = [
     'port_for_scheme', 'parse_startline', 'parse_url', 'make_url',
-    'parse_formbody',
+    'parse_netpath', 'parse_formbody',
     #---
     'connection', 'parse_date', 'parse_trailer', 'parse_transfer_encoding',
     'accept', 'accept_charset', 'accept_encoding', 'parse_content_length',
@@ -241,7 +241,7 @@ def parse_netpath( netpath ):
     (netloc, '')."""
     parts = netpath.split('/', 1)
     netloc = parts.pop( 0 )
-    script = parts.pop( 0 ) if netloc else ''
+    script = parts.pop( 0 ) if parts else ''
     return netloc, script 
 
 def parse_formbody( content_type, body ):

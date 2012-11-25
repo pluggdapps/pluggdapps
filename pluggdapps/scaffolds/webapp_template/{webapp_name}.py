@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from   pluggdapps.web.webapp        import WebApp
 from   pluggdapps.web.webinterfaces import IHTTPView, IHTTPRouter
 import pluggdapps.utils             as h
 
@@ -64,23 +65,20 @@ _default_settings['IHTTPResponse']  = {{
 
 class {webapp_name}( WebApp ):
 
-    def __init__( self ):
-        super().__init__()
-
     def startapp( self ):
-        super().__init__()
+        super().startapp()
 
-    def dorequest( self, request, body=body, chunk=chunk, trailers=trailers ):
-        super().__init__()
+    def dorequest( self, request, body=None, chunk=None, trailers=None ):
+        super().dorequest()
 
-    def dochunk( self, request, chunk=chunk, trailers=trailers ):
-        super().__init__()
+    def dochunk( self, request, chunk=None, trailers=None ):
+        super().dorequest()
 
     def onfinish( self, request ):
-        super().__init__()
+        super().dorequest()
 
     def shutdown( self ):
-        super().__init__()
+        super().dorequest()
 
 
     #---- ISettings interface methods

@@ -79,9 +79,6 @@ class IWebApp( Interface ):
         """Boot this applications. Called at platform boot-time. 
         Instantiate :attr:`router` attribute."""
 
-    def shutdown():
-        """Shutdown this application. Reverse of :meth:`startapp`."""
-
     def dorequest( request, body=None, chunk=None, trailers=None ):
         """`request` was resolved for this application. Request handling
         callback for application. The callback will be issued when,
@@ -109,6 +106,9 @@ class IWebApp( Interface ):
         issued beginning a finish sequence for this ``request`` in the 
         application's context. Plugin's implementing this method must call
         request.onfinish()."""
+
+    def shutdown():
+        """Shutdown this application. Reverse of :meth:`startapp`."""
 
     def urlfor( request, name, **matchdict ):
         """Generate url (full url) identified by routing-name `name`. Use

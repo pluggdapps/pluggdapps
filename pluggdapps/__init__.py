@@ -96,7 +96,7 @@ import pluggdapps.scaffolds # Load web-framework
 import pluggdapps.web       # Load web-framework
 
 # Load applications
-# import pluggdapps.docroot   # Application to serve static files.
+import pluggdapps.docroot   # Application to serve static files.
 
 # Initialize plugin data structures
 pluggdapps.plugin.plugin_init()

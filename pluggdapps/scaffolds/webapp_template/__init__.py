@@ -7,7 +7,8 @@
 # - Import necessary modules from {webapp_name!r} web-application so as to load
 #   their plugins and interfaces during pluggdapps-bootup.
 
-import router
-import resource
-import view
-import interfaces
+import {webapp_name}.{webapp_name}
+import {webapp_name}.router
+import {webapp_name}.resource
+import {webapp_name}.view
+import {webapp_name}.interfaces

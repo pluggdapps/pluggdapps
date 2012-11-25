@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from   pluggdapps.web.matchrouter import MatchRouter
-from   view                       import SplashPage
+from   docroot.view               import SplashPage
 
 class docrootRouter( MatchRouter ):
 

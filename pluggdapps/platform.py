@@ -424,7 +424,7 @@ class Webapps( Pluggdapps ):
         from pluggdapps.web.webapp import WebApp
 
         if isinstance( plugin, WebApp ) : # Ought to be IWebApp plugin
-            appsec, t, mountname, config = webapp
+            appsec, netpath, config = webapp
             plugin._settngx.update( args[0][ appsec ] )
             plugin.webapp = plugin
             args = args[1:]
@@ -495,7 +495,7 @@ class Webapps( Pluggdapps ):
             if not isfile( configini ) :
                 raise Exception("configuration file %r not present"%configini )
 
-            mountls.append( (appsec,netpath,instconfig) )
+            mountls.append( (appsec,netpath,configini) )
 
         # Load application configuration from instance configuration file.
         appsettings = {}

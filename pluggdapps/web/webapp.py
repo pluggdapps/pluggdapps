@@ -8,7 +8,7 @@ from   urllib.parse import urljoin
 
 from   pluggdapps.plugin            import implements, Plugin
 from   pluggdapps.interfaces        import IWebApp
-from   pluggdapps.web.webinterfaces import IHTTPView, IHTTPRouter
+from   pluggdapps.web.webinterfaces import IHTTPView, IHTTPRouter, IHTTPCookie
 import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
@@ -85,7 +85,7 @@ class WebApp( Plugin ):
     def startapp( self ):
         """Inheriting plugins should not forget to call its super() method."""
         self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
-        self.cookie = self.query_plugin( IHTTPRouter, self['IHTTPCookie'] )
+        self.cookie = self.query_plugin( IHTTPCookie, self['IHTTPCookie'] )
         self.router.onboot()
 
     def dorequest( self, request, body=None, chunk=None, trailers=None ):
