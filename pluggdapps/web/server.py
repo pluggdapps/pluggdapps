@@ -782,10 +782,8 @@ class HTTPConnection( Plugin ):
 
         # Fresh request, resolve application.
         try :
-            uriparts, mountedat = self.pa.resolveapp( uri, headers )
-            if mountedat :
-                webapp = mountedat[2]
-            else :
+            uriparts, webapp = self.pa.resolveapp( uri, headers )
+            if webapp == None :
                 self.pa.logerror(
                     "Unable to resolve request for apps. (%s)" % uri )
                 return

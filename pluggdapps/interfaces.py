@@ -41,7 +41,7 @@ class IWebApp( Interface ):
     of configuration parameters implementing one or more interface
     specification. Note that application plugins are singletons are the first
     ones to be instantiated along with platform singleton. Attributes,
-        `script`, `subdomain`, `instkey`, `router`
+        `netpath`, `instkey`, `router`
     are initialized by platform initialization code. 
 
     There is a base class :class:`WebApp` which implements this interface
@@ -49,19 +49,15 @@ class IWebApp( Interface ):
     Therefore application plugins must derive from this base class.
     """
     instkey = Attribute(
-        "Index into global settings"
+        "A tuple of (appsec, netpath, configini)"
     )
     appsetting = Attribute(
         "Optional Read only copy of application's settings."
         # TODO : Make this as read only copy.
     )
-    script = Attribute(
-        "The script name on which the application will be mounted. If "
-        "application is mounted on a sub-domain this will be ``None``"
-    )
-    subdomain = Attribute(
-        "The subdomain name on which the application will be mounted. If "
-        "application is mounted on a script name this will be ``None``"
+    netpath = Attribute(
+        "Net location and script-path on which the instance of webapp plugin "
+        "is mounted."
     )
     baseurl = Attribute(
         "Computed base url for web application."

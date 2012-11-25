@@ -235,6 +235,14 @@ def compare_url( url1, url2 ):
     if x.fragment != y.fragment : return False
     return True
 
+def parse_netpath( netpath ):
+    """Parse `netpath` string containing host-name and script-path into a
+    tuple of (netloc, script-path). If script-path is absent, return
+    (netloc, '')."""
+    parts = netpath.split('/', 1)
+    netloc = parts.pop( 0 )
+    script = parts.pop( 0 ) if netloc else ''
+    return netloc, script 
 
 def parse_formbody( content_type, body ):
     """HTML form values can be submited via POST or PUT methods, in which

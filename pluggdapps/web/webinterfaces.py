@@ -380,10 +380,11 @@ class IHTTPRequest( Interface ):
 
     def appurl( instkey, name, **matchdict ) :
         """Generate url for a different web-application identified by
-        ``webapp``. Typically uses webapp.appurl().
+        ``instkey``. Typically uses webapp.appurl().
         
-        ``webapp``,
-            :class:`IWebApp` plugin instance.
+        ``instkey``,
+            A tuple of (appsec, netpath, configini) indexes into platform's 
+            `webapps` attribute
         """
 
 

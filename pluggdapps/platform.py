@@ -55,7 +55,7 @@ configuration sections including plugins and refered configuration files.
 [pluggdapps] special section, settings that are applicable to pluggdapps
 platform typically handled by :class:`Pluggdapps`.
 
-[webmounts] special section, is specific to web-framework (explained below)
+[mountloc] special section, is specific to web-framework (explained below)
 that is built on top of pluggdapps system. Provides configuration settings on
 how to mount web-applications on web-url. Typically handled by
 :class:`Webapps`.
@@ -67,25 +67,27 @@ Can host any number web-application, and/or instance of same web-application,
 in a single python environment. Every web-application is a plugin implementing
 :class:`IWebApp` interface.
 
-Web-applications can be mounted as sub-domain to host or as SCRIPT_PATH. This
-is configured under [webmounts] special section. While mounting
-web-applications under [webmounts] additional configuration files, exclusive
+Web-applications can be mounted, hosted, on a netlocation and script-path.
+This is configured under [mountloc] special section. While mounting
+web-applications under [mountloc] additional configuration files, exclusive
 to the scope of mounted webapp, can be referred as well.
 
 :class:`Webapps` provides the necessary logic. 
 
-Example [webmounts] section
+Example [mountloc] section
 
-  [webmounts]
+  [mountloc]
+  pluggdapps.com/issues = <appname>, <ini-file>
+  tayra.pluggdapps.com/issues = <appname>, <ini-file>
+  tayra.pluggdapps.com/source = <appname>, <ini-file>
 
 """
 
 from   configparser          import SafeConfigParser
-from   os.path               import dirname
+from   os.path               import dirname, isfile
 from   copy                  import deepcopy
 
-from   pluggdapps.const      import MOUNT_SUBDOMAIN, MOUNT_SCRIPT, MOUNT_TYPES,\
-                                    SPECIAL_SECS, URLSEP
+from   pluggdapps.const      import SPECIAL_SECS, URLSEP
 from   pluggdapps.interfaces import IWebApp
 import pluggdapps.utils      as h
 
@@ -349,18 +351,15 @@ class Pluggdapps( object ):
 class Webapps( Pluggdapps ):
     """Configuration for web-application plugins."""
 
-    m_subdomains = {}
-    """Mapping urls to applications based on subdomain."""
-
-    m_scripts = {}
-    """Mapping url to application based on script."""
-
     webapps = {}
     """Instances of :class:`WebApp` plugin."""
 
     appurls = {}
     """A dictionary map of webapp's instkey and its base-url -  scheme, netloc,
     scriptname."""
+
+    app_resolve_cache = {}
+    """A dictionary map of (netloc, script-path) to Web-application object."""
 
     def __init__( self, *args, **kwargs ):
         super().__init__( *args, **kwargs )
@@ -373,32 +372,28 @@ class Webapps( Pluggdapps ):
         Return a new instance of this class object.
         """
         pa = super().boot( baseini, *args, **kwargs )
-        pa.m_subdomains = {}
-        pa.m_scripts = {}
         pa.webapps = {}
         pa.appurls = {}
 
-        appsettings = pa.webmounts()
+        appsettings = pa.mountapps()
 
         # Mount webapp instances for subdomains and scripts.
         for instkey, appsett in appsettings.items() :
-            appsec, mtype, mountname, config = instkey
+            appsec, netpath, config = instkey
 
             # Instantiate the IWebAPP plugin here for each `instkey`
             appname = h.sec2plugin( appsec )
             webapp = pa.query_plugin( pa, instkey, IWebApp, appname, appsett )
             webapp.appsetting = appsett
-            webapp.instkey, webapp.subdomain, webapp.script = instkey,None,None
+            webapp.instkey, webapp.netpath = instkey, None
             pa.webapps[ instkey ] = webapp
             pa.appurls[ instkey ] = webapp.baseurl = pa.make_appurl( instkey )
 
+            pa.app_resolve_cache[ h.parse_netpath( netpath ) ] = webapp
+
             # Resolution mapping for web-applications
-            if mtype == MOUNT_SUBDOMAIN :
-                pa.m_subdomains.setdefault( mountname, webapp )
-                webapp.subdomain = mountname
-            elif mtype == MOUNT_SCRIPT :
-                pa.m_scripts.setdefault( mountname, webapp )
-                webapp.script = mountname
+            webapp.netpath = netpath
+
         return pa
 
     def start( self ):
@@ -408,8 +403,8 @@ class Webapps( Pluggdapps ):
         super().start()
         appnames = []
         for instkey, webapp in self.webapps.items() :
-            appsec, t, mountname, config = instkey
-            self.loginfo( "Booting application %r ..." % (instkey,) )
+            appsec, netpath, configini = instkey
+            self.loginfo( "Booting application %r ..." % netpath )
             webapp.startapp()
             appnames.append( h.sec2plugin( appsec ))
         return appnames
@@ -461,9 +456,9 @@ class Webapps( Pluggdapps ):
 
     #---- Internal methods
 
-    def webmounts( self ):
+    def mountapps( self ):
         """Create application wise settings, using special section
-        [webmounts], if any. Also parse referred configuration files."""
+        [mountloc], if any. Also parse referred configuration files."""
         from pluggdapps.plugin import pluginnames, applications
 
         settings = self.settings
@@ -472,60 +467,44 @@ class Webapps( Pluggdapps ):
         _vars = { 'here' : dirname(self.inifile) }
 
 
-        # Fetch special section [webmounts]. And override them with [DEFAULT]
+        # Fetch special section [mountloc]. And override them with [DEFAULT]
         # settings.
         cp = SafeConfigParser()
         cp.read( self.inifile )
-        if cp.has_section('webmounts') :
-            webmounts = cp.items( 'webmounts', vars=_vars )
+        if cp.has_section('mountloc') :
+            mountloc = cp.items( 'mountloc', vars=_vars )
         else :
-            webmounts = []
-        settings['webmounts'] = dict( webmounts )
+            mountloc = []
+        settings['mountloc'] = dict( mountloc )
 
         # Parse mount configuration.
+        
         appsecs = list( map( h.plugin2sec, applications() ))
-        defaultmounts = appsecs[:]
         mountls = []
         _skipopts = list(_vars.keys()) + list(settings['DEFAULT'].keys())
-        for name, val in webmounts :
-            if name in _skipopts : continue
+        for netpath, mounton in mountloc :
+            if netpath in _skipopts : continue
 
-            appsec = h.plugin2sec( name )
-            if appsec not in appsecs : 
-                self.logwarn(
-                    "In [webmounts]: %r web-app (plugin) not found."%appsec )
-                continue
+            parts = mounton.split(',', 1)
+            appname = parts.pop(0).strip()
+            configini = parts.pop(0).strip() if parts else None
+            appsec = h.plugin2sec( appname )
 
-            # Parse mount values and validate them.
-            y = [ x.strip() for x in val.split(',') ]
-            try :
-                mtype, mountname, instconfig = y
-            except :
-                try :
-                    mtype, mountname, instconfig = y + [None]
-                except :
-                    raise Exception("Invalid mount configuration %r" % val)
+            if appsec not in appsecs :
+                raise Exception("%r application not found." % appname )
+            if not isfile( configini ) :
+                raise Exception("configuration file %r not present"%configini )
 
-            if mtype not in MOUNT_TYPES :
-                err = "%r for %r is not a valid mount type" % (mtype, name)
-                raise Exception( err )
-            
-            mountls.append( (appsec,mtype,mountname,instconfig) )
-            defaultmounts.remove( appsec )
-
-        # Configure default mount points for remaining applications.
-        [ mountls.append(
-            (appsec, MOUNT_SCRIPT, URLSEP+h.sec2plugin(appsec), None)
-          ) for appsec in defaultmounts ]
+            mountls.append( (appsec,netpath,instconfig) )
 
         # Load application configuration from instance configuration file.
         appsettings = {}
-        for appsec, t, mountname, instconfig in mountls :
+        for appsec, netpath, instconfig in mountls :
             appsett = deepcopy( settings )
             [ appsett.pop(k) for k in SPECIAL_SECS ]
             if instconfig :
                 self.loadinstance( appsett, instconfig )
-            appsettings[ (appsec,t,mountname,instconfig) ] = appsett
+            appsettings[ (appsec,netpath,instconfig) ] = appsett
         return appsettings
 
 
@@ -563,14 +542,15 @@ class Webapps( Pluggdapps ):
         host = self.settings['pluggdapps']['host']
         port = self.settings['pluggdapps']['port']
         scheme = self.settings['pluggdapps']['scheme']
-        appsec, typ, mountname, config = instkey
+        appsec, netpath, config = instkey
+        netloc, script = h.parse_netpath( netpath )
+        if not netloc.endswith( host ) :
+            raise Exception(
+                "Mount location's netloc does not match with host config." )
+
         # Prefix scheme
-        appurl = scheme + '://'
-        # Prefix hostname
-        if typ == MOUNT_SUBDOMAIN :
-            appurl += mountname + '.' + host
-        else :
-            appurl += host
+        appurl = scheme + '://' + netloc
+
         # prefix port
         if port :
             if (scheme, port) in [ ('http', 80), ('https', 443) ] :
@@ -578,9 +558,10 @@ class Webapps( Pluggdapps ):
             else :
                 port = str(port)
             appurl += ':' + port
+
         # Prefix SCRIPT-NAME, mountname is already prefixed with URLSEP
-        if typ == MOUNT_SCRIPT :
-            appurl += mountname
+        appurl += script
+
         return appurl
 
     #---- Query APIs
@@ -636,27 +617,16 @@ class Webapps( Pluggdapps ):
             (type, mountname, webapp-instance)
         """
         uriparts = h.parse_url( uri, host=hdrs.get('host', None) )
-        doms = uriparts['hostname'].split( b'.' )
-        doms = doms[1:] if doms[0] == 'www' else doms
-        # A subdomain available ?
-        subdomain = doms[0] if len(doms) > 2 else None
-
-        mountedat = ()
-        if subdomain :
-            for mountname, webapp in self.m_subdomains.items() :
-                if mountname == subdomain :
-                    mountedat = (MOUNT_SUBDOMAIN, mountname, webapp)
-                    break
-
-        if not mountedat :
-            for mountname, webapp in self.m_scripts.items() :
-                if uriparts['path'][1:].startswith( mountname[1:] ) :
-                    uriparts['script'] = mountname
-                    uriparts['path'] = uriparts['path'][len(mountname):]
-                    mountedat = (MOUNT_SCRIPT, mountname, webapp)
-                    break
-
-        return uriparts, mountedat
+        h = uriparts['hostname']
+        netloc = h[3:] if h.startswith('www') else h
+        for key, webapp in self.app_resolve_cache.items() :
+            netloc, script = key
+            if ( netloc == uriparts['hostname'] and 
+                    uriparts['path'].startswith( script ) ):
+                uriparts['script'] = script
+                uriparts['path'] = uriparts['path'][len(script):]
+                return uriparts, webapp
+        return uriparts, None
 
     #---- ISettings interface methods
 

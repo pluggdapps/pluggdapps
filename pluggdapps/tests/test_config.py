@@ -44,7 +44,7 @@ class TestConfig( unittest.TestCase ):
     def test_loadsettings( self ):
         from  pluggdapps.platform import settings
         assert 'pluggdapps' in settings
-        assert 'webmounts' in settings
+        assert 'mountloc' in settings
         assert 'plugin:baseresource' in settings
         assert 'plugin:commandcommands' in settings
         assert 'plugin:commandconfig' in settings
@@ -66,7 +66,7 @@ class TestConfig( unittest.TestCase ):
         assert webappsett
         assert rootappsett
 
-        assert settings['webmounts']['test'] == 'this'
+        assert settings['mountloc']['test'] == 'this'
         assert settings['pluggdapps']['test'] == 'that'
         assert settings['plugin:httprequest']['IHTTPCookie'] == 'httpcookie'
         assert settings['plugin:httpresponse']['IHTTPCookie'] == 'newcookie'

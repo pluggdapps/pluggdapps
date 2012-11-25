@@ -23,12 +23,16 @@ class CommandWebApp( Plugin ):
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
+        self.subparser.add_argument( "-t", dest="target_dir",
+                                     default=None,
+                                     help="Target directory location for web "
+                                          "application")
         self.subparser.add_argument( 'name',
                                      help="Web application name" )
         return parser
 
     def handle( self, args ):
-        sett = { 'target_dir'  : os.getcwd(),
+        sett = { 'target_dir'  : args.target_dir or os.getcwd(),
                  'webapp_name' : args.name }
 
         scaff = self.query_plugin( 

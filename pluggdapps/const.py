@@ -14,8 +14,6 @@ __all__ = [
     'DEFAULT_ENCODING', # Default encoding to convert between bytes and string
     'URLSEP',           # URL separater character
     'ROUTE_PATH_SUFFIX',# Prefix for route configuration
-    'MOUNT_SUBDOMAIN',  # Token to mount application on subdomain
-    'MOUNT_SCRIPT',     # Token to mount application on subdomain
     'MOUNT_TYPES',      # List of mount type tokens
     'SPECIAL_SECS',     # List of special sections in configuration file
 ]
@@ -25,7 +23,4 @@ DEFAULT_ENCODING = 'utf8'
 DEBUG       = False
 URLSEP      = '/'
 ROUTE_PATH_SUFFIX = 'remains'
-MOUNT_SUBDOMAIN = 'subdomain'
-MOUNT_SCRIPT = 'script'
-MOUNT_TYPES = [ MOUNT_SUBDOMAIN, MOUNT_SCRIPT ]
-SPECIAL_SECS = [ 'pluggdapps', 'webmounts' ]
+SPECIAL_SECS = [ 'pluggdapps', 'mountloc' ]

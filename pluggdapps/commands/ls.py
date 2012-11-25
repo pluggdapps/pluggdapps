@@ -106,7 +106,7 @@ class CommandLs( Plugin ):
         elif args.ls_settings.startswith('wa') and args.plugin :
             webapps = getattr( self.pa, 'webapps', {} )
             for instkey, webapp in webapps.items() :
-                appsec, t, moutname, instconfig = instkey
+                appsec, netpath, instconfig = instkey
                 if h.sec2plugin( appsec ) == args.plugin :
                     print( "Settings for %r" % (instkey,) )
                     pprint( webapp.appsetting, indent=2 )
@@ -145,25 +145,22 @@ class CommandLs( Plugin ):
     def ls_plugin( self, args ):
         from  pluggdapps.web.webapp import WebApp
         for instkey, webapp in self.pa.webapps.items() :
-            appsec, t, mountname, config = instkey
+            appsec, netpath, config = instkey
             if h.sec2plugin( appsec ) == args.plugin :
                 print("Mounted app %r" % appsec )
                 print("  Instkey   : ", end='')
                 pprint( webapp.instkey, indent=4 )
-                print("  Script    : ", webapp.script )
-                print("  Subdomain : ", webapp.subdomain )
+                print("  Subdomain : ", webapp.netpath )
                 print("  Router    : ", webapp.router )
                 print("Application settings")
                 pprint( webapp.appsetting, indent=4 )
                 print()
 
     def ls_webapps( self, args ):
-        print( "[webmounts]")
+        print( "[mountloc]")
         pprint( self.pa.webapps, indent=2 )
-        print( "\nWeb-apps mounted as script" )
-        pprint( self.pa.m_scripts, indent=2 )
-        print( "\nWeb-apps mounted as subdomain" )
-        pprint( self.pa.m_subdomains, indent=2 )
+        print( "\nWeb-apps mounted" )
+        pprint( list( self.pa.webapps.keys() ), indent=2 )
 
     def ls_packages( self, args ):
         import pluggdapps

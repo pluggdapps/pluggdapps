@@ -182,9 +182,7 @@ handlerd = {
 #---- Applied methods,
 
 def loadconfig( erlport, *args, **kwargs ):
-    msubdomains = { str(k) : v.appname for k,v in pa.m_subdomains.items() }
-    mscripts = { str(k) : v.appname for k,v in pa.m_scripts.items() }
-    return (ATOM_OK, (pa.settings, msubdomains, mscripts))
+    pass
 
 
 def bootapps( erlport, *args, **kwargs ) :
