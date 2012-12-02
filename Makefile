@@ -35,7 +35,7 @@ push-bitbucket:
 	hg push https://prataprc@bitbucket.org/prataprc/pluggdapps
 
 push-github:
-	hg bookmark -r default master
+	hg bookmark -f -r default master
 	hg push git+ssh://git@github.com:prataprc/pluggdapps.git
 
 cleanall : clean cleandoc
