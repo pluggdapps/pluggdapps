@@ -21,11 +21,23 @@ sphinx-doc :
 	cp README.rst sphinxdoc/source/
 	cp CHANGELOG.rst sphinxdoc/source/
 	make -C sphinxdoc html
-
+	cd sphinxdoc/build/html; zip -r pluggdapps.sphinxdoc.zip ./
 
 upload :
-	python ./setup.py sdist register -r http://www.python.org/pypi upload -r http://www.python.org/pypi --show-response 
+	python ./setup.py sdist register -r http://www.python.org/pypi upload -r http://www.python.org/pypi
 	
+pushcode: push-googlecode push-bitbucket push-github 
+
+push-googlecode:
+	hg push https://prataprc@code.google.com/p/pluggdapps/
+
+push-bitbucket:
+	hg push https://prataprc@bitbucket.org/prataprc/pluggdapps
+
+push-github:
+	hg bookmark -r default master
+	hg push git+ssh://git@github.com:prataprc/pluggdapps.git
+
 cleanall : clean cleandoc
 	rm -rf pa-env
 

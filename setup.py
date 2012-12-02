@@ -7,7 +7,10 @@ from   setuptools import setup, find_packages
 from   os.path    import abspath, dirname, join
 
 here = abspath( dirname(__file__) )
-LONG_DESCRIPTION = open( join( here, 'README' )).read()
+LONG_DESCRIPTION = open( join( here, 'README.rst' )).read(
+                       ).replace(':class:`', '`'
+                                ).replace(':mod:`', '`'
+                                         ).replace(':meth:`', '`')
 
 version = re.compile( 
             r".*__version__[ ]*=[ ]*'(.*?)'",
