@@ -41,14 +41,13 @@ Release check-list
   documented.
 
 * Change the release version in 
-    ./CHANGELOG,
+    ./CHANGELOG.rst,
     ./Makefile
     ./pluggdapps/__init__.py
     ./sphinxdoc/source/conf.py
 
 * Sphinx documentation,
     update APIDOC_EXCLUDE_PATH in Makefile
-    update conf.py
   before executing `make html`
 
 * Update setup.py and MANIFEST.in for release
