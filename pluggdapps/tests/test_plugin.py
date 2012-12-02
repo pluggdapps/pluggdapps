@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+
+# This file is subject to the terms and conditions defined in
+# file 'LICENSE', which is part of this source code package.
+#       Copyright (c) 2011 R Pratap Chakravarthy
+
 import unittest
 from   random import choice
 
@@ -73,8 +79,8 @@ class TestPlugin( unittest.TestCase ):
         assert pluginclass( ICommand, 'commandls' ) == CommandLs
 
     def test_applications( self ):
-        assert 'webapp' in applications()
-        assert 'rootapp' in applications()
+        assert 'webapp' in webapps()
+        assert 'docroot' in webapps()
 
     def test_plugins( self ):
         plugins_ = plugins()

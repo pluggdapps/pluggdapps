@@ -2,7 +2,8 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
+
 
 import http.client, itertools
 import datetime as dt
@@ -25,12 +26,14 @@ _default_settings.__doc__ = (
     "interface." )
 
 class HTTPResponse( Plugin ):
+    """Reponse plugin."""
+
     implements( IHTTPResponse )
 
     start_response = False
     """Response headers are already sent on the connection."""
 
-    write_buffers = None
+    write_buffer = []
     """Either a list of byte-string buffered by write() method. Or a generator
     function created via chunk_generator() method."""
 
@@ -42,8 +45,8 @@ class HTTPResponse( Plugin ):
 
     finished = False
     """A request is considered finished when there is no more response data to
-    be sent for the on-going request. This is typically indicated by calling
-    finish() method on the response."""
+    be sent for the on-going request. This is typically indicated by flushing
+    the response with finishing=True argument."""
 
     def __init__( self, request ):
         # Plugin attributes
@@ -61,47 +64,72 @@ class HTTPResponse( Plugin ):
         self.httpconn = request.httpconn
         self.encoding = self.webapp['encoding']
         self.start_response = False
-        self.write_buffers = None
+        self.write_buffer = []
         self.finished = False
         self.flush_callback = None
         self.finish_callback = None
 
     #---- IHTTPResponse APIs
 
+    def set_status( self, code ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_status`
+        interface method."""
+        if isinstance(code, int) :
+            self.statuscode = str(code).encode( self.encoding )
+        elif isinstance(code, str) :
+            self.statuscode = code.encode( self.encoding )
+        else :
+            self.statuscode = code
+        return self.statuscode
+
     def set_header( self, name, value ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_header`
+        interface method."""
         value = value if isinstance( value, bytes ) \
                       else str( value ).encode( self.encoding )
         self.headers[ name ] = value
         return value
 
     def add_header( self, name, value ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.add_header`
+        interface method."""
         value = value if isinstance( value, bytes ) \
                       else str( value ).encode( self.encoding )
         self.headers[ name ] = b','.join( self.headers.get( name, b'' ), value )
         return self.headers[name]
 
     def set_trailer( self, name, value ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_trailer`
+        interface method."""
         value = value if isinstance( value, bytes ) \
                       else str( value ).encode( self.encoding )
         self.trailers[name] = value
         return value
 
     def add_trailer( self, name, value ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.add_trailer`
+        interface method."""
         value = value if isinstance( value, bytes ) \
                       else str( value ).encode( self.encoding )
         self.trailers[name] = b','.join( self.trailers.get( name, b'' ), value )
         return self.trailers[name]
 
     def set_cookie( self, name, value, **kwargs ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_cookie`
+        interface method."""
         return self.request.cookie.set_cookie(
                     self.setcookies, name, value, **kwargs )
 
     def set_secure_cookie( self, name, value, expires_days=30, **kwargs ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_secure_cookie`
+        interface method."""
         cookie = self.request.cookie
         value = cookie.create_signed_value(name, value)
         return cookie.set_cookie( self.setcookies, name, value, **kwargs )
 
     def clear_cookie( self, name, path="/", domain=None ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.clear_cookie`
+        interface method."""
         value = self.setcookies[ name ]
         expires = dt.datetime.utcnow() - dt.timedelta(days=365)
         self.request.cookie.set_cookie( 
@@ -110,62 +138,89 @@ class HTTPResponse( Plugin ):
         return value
 
     def clear_all_cookies(self):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.clear_all_cookies`
+        interface method."""
         map( self.clear_cookie, self.setcookies.keys() )
         return None
 
     def set_finish_callback(self, callback):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_finish_callback`
+        interface method."""
         self.finish_callback = callback
 
     def has_finished( self ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.has_finished`
+        interface method."""
         return self.finished
 
     def ischunked( self ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.ischunked`
+        interface method."""
         x = h.parse_transfer_encoding( 
-                self.headers.get( 'transfer-encoding', None ))
+                self.headers.get( 'transfer_encoding', None ))
         return x and x[0][0] == 'chunked'
 
     def write( self, data ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.write`
+        interface method."""
         if self.has_finished() :
-            raise Exception( "Cannot write() after finish()." )
+            raise Exception( "Cannot write() after the response is finished." )
 
         data = data.encode(self.encoding) if isinstance(data, str) else data
-        self.write_buffers = self.write_buffers or []
-        self.write_buffers.append( data )
+        self.write_buffer = self.write_buffer or []
+        self.write_buffer.append( data )
 
-    def flush( self, finishing=True, callback=None ):
+    def flush( self, finishing=False, callback=None ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.flush`
+        interface method."""
         if callback :
             self.flush_callback = callback
 
         self.finished = finishing
 
-        if callable( self.write_buffers ) :
-            self.add_headers( 'transfer-encoding', 'chunked' )
-            chunk = self.write_buffers( self.request, self.c )
-            self.try_start_headers( finishing=finishing )
+        if callable( self.write_buffer ) :
+            self.add_headers( 'transfer_encoding', 'chunked' )
+            data = self._try_start_headers( finishing=finishing )
+            chunk = self.write_buffer( self.request, self.c )
+            data += ( hex(len(chunk)).encode( self.encoding ) + b'\r\n' +
+                      chunk + b'\r\n' )
             if finishing and self.trailers :
-                data = self.header_data( self.trailers )
-                self.httpconn.write( data, self.headers, onflush )
+                data += b'0\r\n' + chunk + b'\r\n'
+                data += self._header_data( self.trailers )
+                self.httpconn.write( data, callback=self._onflush )
+            elif finishing and chunk :
+                data += b'0\r\n' + chunk + b'\r\n'
+                self.httpconn.write( data, callback=self._onflush )
+            else :
+                self.httpconn.write( data )
 
         else :
-            data = b''.join( self.write_buffers )
+            respdata = b''.join( self.write_buffer )
             if finishing == True :
-                if "Content-Length" not in self.headers :
-                    self.set_header( "Content-Length", len( data ) )
-            self.try_start_headers( finishing=finishing )
+                if "content_length" not in self.headers :
+                    self.set_header( "content_length", len( respdata ) )
+            data = self._try_start_headers( finishing=finishing )
+            data += respdata
             if data and self.request.method not in [ b'HEAD' ] :
-                self.httpconn.write( data, callback=self.onflush )
+                self.httpconn.write( data, callback=self._onflush )
 
-            self.write_buffers = None
+            self.write_buffer = []
 
     def httperror( self, statuscode=500, message=b'' ):
-        self.set_status( statuscode )
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.httperror`
+        interface method."""
+        self.statuscode = statuscode
         self.write( message ) if message else None
-        self.flush( finished=True )
+        self.flush( finishing=True )
 
     def render( self, *args, **kwargs ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.render`
+        interface method."""
         self.request.view
 
     def chunk_generator( self, callback, request, c ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.chunk_generator`
+        interface method."""
 
         class ChunkGenerator( object ):
 
@@ -180,69 +235,73 @@ class HTTPResponse( Plugin ):
 
     #---- Local functions
 
-    def try_start_headers( self, finishing=True ) :
-        """Generate default headers for this response. This can be overriden
+    def _try_start_headers( self, finishing=True ) :
+        """Generate default headers for this response. And return the
+        byte-string of response header to write. This can be overriden
         by view callable attributes."""
-        if self.start_response : return True
+        if self.start_response : return b''
 
-        self.set_header( 'Date', h.http_fromdate( dt.datetime.now() ))
-        self.set_header( 'Server', self.httpconn.product )
+        self.set_header( 'date', h.http_fromdate( dt.datetime.now() ))
+        self.set_header( 'server', self.httpconn.product )
 
         # Automatically support ETags and add the Content-Length header of
         # non-chunked transfer-coding.
         if ( self.ischunked() == False and
              self.statuscode == b'200' and
              self.request.method in ("GET", "HEAD") ) :
-            if "Etag" not in self.headers :
+            if "etag" not in self.headers :
                 etagv = self.etag.compute( self ) if self.etag else None
                 if etagv :
-                    self.set_header( "Etag", etag )
-                    inm = self.request.headers.get( "if-none-match" )
+                    self.set_header( "etag", etag )
+                    inm = self.request.headers.get( "if_none_match" )
                     if inm and inm.find( etag ) != -1:
-                        self.write_buffers = None
-                        self.set_status( b'304' )
+                        self.write_buffer = None
+                        self.statuscode= b'304'
 
         # For HTTP/1.1 connection can be kept alive across multiple request
         # and response.
         if not self.request.supports_http_1_1() :
-            if self.request.headers.get( "Connection", None ) == "Keep-Alive" :
-                self.set_header( "Connection", "Keep-Alive" )
+            if self.request.headers.get( "connection", None ) == b"Keep-Alive" :
+                self.set_header( "connection", b"Keep-Alive" )
 
         self.start_response = True
-        data = self.header_data( self.headers )
-        self.httpconn.write( data, self.headers )
+        return self._header_data( self.headers )
 
-    def header_data( self, headers ):
+    def _header_data( self, headers ):
         # TODO : 3 header field types are specifically prohibited from
         # appearing as a trailer field: Transfer-Encoding, Content-Length and
         # Trailer.
 
         code = self.statuscode
-        reason = http.client.responses[ code ].encode( self.encoding )
+        reason = http.client.responses[ int(code) ].encode( self.encoding )
         lines = [ b' '.join([ self.version, code, reason ]) ]
 
-        [ lines.append( h.hdr_camelcase[n] + b': ' + v ) for n, v in headers ]
+        [ lines.append( h.hdr_str2camelcase[n] + b': ' + v )
+                for n, v in headers.items() ]
 
         [ lines.append( b"Set-Cookie: " + cookie.OutputString() )
           for c in self.setcookies.values() ]
 
         return b"\r\n".join(lines) + b"\r\n\r\n"
 
-    def onflush( self ):
+    def _onflush( self ):
         if self.flush_callback :
             callback, self.flush_callback = self.flush_callback, None
             callback()
 
-        if self.has_finished() : self.onfinish()
+        if self.has_finished() : self._onfinish()
 
-    def onfinish( self ):
-        callback, self.finish_callback = self.finish_callback, None
-        callback()
-        self.request.onfinish()
+    def _onfinish( self ):
+        if self.finish_callback :
+            callback, self.finish_callback = self.finish_callback, None
+            callback()
+        self.request._onfinish()
 
     #---- ISettings interface methods
 
     @classmethod
     def default_settings( cls ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.add_header`
+        interface method."""
         return _default_settings
 

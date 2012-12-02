@@ -1,9 +1,0 @@
-include README.rst
-include docs/AUTHORS
-include docs/CHANGELOG
-include docs/LICENSE
-include docs/README
-include docs/ROADMAP
-
-recursive-include pluggdapps *.etx *.css *.js
-recursive-include docs *.etx

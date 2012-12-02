@@ -2,17 +2,16 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
 
 """Core module for pluggdapps plugin framework. It uses metaclassing to
 automagically register and load plugins into query-able classes. Developers can create plugin by deriving their class from :class:`Plugin`. A plugin is expected
-to implement, by calling :meth:`implement`, one or more interfaces inside their
-plugin class' scope.
-
-The base class :class:`Plugin` itself is a plugin implementing
-:class:`ISettings` interface, thus all configuration related methods are
-auto-magically added to the plugin. To provide configurable plugins, authors
-need to override methods from :class:`ISettings` interface.
+to implement, by calling :meth:`implement()` function, one or more interfaces 
+inside their plugin class' scope. The base class :class:`Plugin` itself is a
+plugin implementing :class:`ISettings` interface, thus all configuration
+related methods are automatically added to the plugin. To provide
+configurable plugins, authors need to override methods from :class:`ISettings`
+interface.
 
 There is also a :class:`Singleton` base class available for plugin authors to
 create singleton plugins. A singleton plugin is created only once for the
@@ -35,15 +34,15 @@ Deriving a plugin from another plugin class
 
 It is also possible to create a plugin by deriving from another plugin class.
 Remember that a plugin class is any class that derives from the
-:class:`Plugin`. For example,
+:class:`Plugin`. For example,::
 
-class YourPlugin( Plugin ):
-    def __init__( self, arg2, arg3 ):
-        pass
+  class YourPlugin( Plugin ):
+      def __init__( self, arg2, arg3 ):
+          pass
 
-class MyPlugin( YourPlugin ):
-    def __init__( self, arg1, arg2, arg3 ):
-        self._super_init( __class__, arg2, arg3 )
+  class MyPlugin( YourPlugin ):
+      def __init__( self, arg1, arg2, arg3 ):
+          self._super_init( __class__, arg2, arg3 )
 
 `YourPlugin` is a plugin class (since it derives from :class:`Plugin`) with
 accepts two constructor arguments.
@@ -69,7 +68,7 @@ __all__ = [
     'ISettings',
     # API functions
     'isimplement', 'interfaces', 'interface', 'plugin_info', 'interface_info',
-    'pluginnames', 'pluginname', 'pluginclass', 'applications', 'whichmodule',
+    'pluginnames', 'pluginname', 'pluginclass', 'webapps', 'whichmodule',
     'plugin_init', 
 ]
 
@@ -198,17 +197,17 @@ class PluginMeta( type ):
             'cls' : newcls,
             'name' : name,
             'file' : clsmod.__file__ if clsmod else '',
-            'attributes' : {},  # Map of attribute names and Attribute() object
+            'attributes' : {},  # Map of attribute names and its value
             'methods' : {},     # Map of method names and method object
         }
 
         # Collect attributes and methods specified by `interface` class.
         for k in vars(newcls) :
             v = getattr(newcls, k)
-            if isinstance(v, Attribute) :
-                info['attributes'][k] = v
-            elif callable(v) :
+            if callable(v) :
                 info['methods'][k] = v
+            else :
+                info['attributes'][k] = v
         return info
 
     @classmethod
@@ -230,6 +229,20 @@ class PluginMeta( type ):
 def isimplement( plugin, interface ):
     """Check whether `plugin` implements the interface `interface`."""
     return interface in  plugin._interfs
+
+def isplugin( plugin ):
+    """Return True if `plugin` is a plugin-object."""
+    return pluginname(plugin) in PluginMeta._pluginmap
+
+def plugincall( obj, fn ):
+    """If ``obj`` string is a plugin name, then call ``fn`` and return its
+    value. Other wise import obj."""
+    if isinstance(obj, str) and isplugin(obj) :
+        return fn()
+    elif isinstance(obj, str) :
+        return h.string_import( obj )
+    else :
+        return obj
 
 def interfaces():
     """Return a complete list of interface classes defined in this
@@ -298,7 +311,7 @@ def pluginclass( interface, name ):
     nm = pluginname( name )
     return PluginMeta._implementers.get( interface, {} ).get( nm, None )
 
-def applications():
+def webapps():
     """Return a list of application names (which are actually plugins
     implementing :class:`IWebApp` interface."""
     from pluggdapps.interfaces import IWebApp
@@ -382,10 +395,9 @@ class ISettings( Interface ):
     initialised by :class:`PluginMeta`.
     """
 
-    pa = Attribute(
-        "Platfrom plugin instance of :class:`Pluggdapps` or one of its "
-        "derivatives."
-    )
+    pa = None
+    """Platfrom plugin instance of :class:`Pluggdapps` or one of its 
+    derivatives."""
 
     @classmethod
     def default_settings():
@@ -447,10 +459,10 @@ class Plugin( PluginBase ):     # Plugin base class implementing ISettings
     the order of decreasing priority, and made available as a dictionary of 
     key,value pairs on plugin instance.
 
-    Important Note :
-    * All plugin classes must be defined at module top-level.
-    * For the plugins to be automatically available for querying, make sure to
-      import the module implementing the plugin inside <package>/__init.py
+    **Important Note**
+      * All plugin classes must be defined at module top-level.
+      * For the plugins to be automatically available for querying, make sure to
+        import the module implementing the plugin inside <package>/__init.py
 
     Similarly to facilitate meth:`query_plugins`, interfaces implemented by a
     plugin class (and all of its base classes) are saved under the plugin class

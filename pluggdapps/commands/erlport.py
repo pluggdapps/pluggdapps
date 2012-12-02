@@ -1,31 +1,35 @@
+# -*- coding: utf-8 -*-
+
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-# -*- coding: utf-8 -*-
-
 """Python side port handler that bridges with erlang's port interface. After
 the pluggdapps instance is launched, by executing erlmain.py, this module is
-the entry point for every REQUEST / RESPONSE from erlang side.
+the entry point for all messages from erlang's netscale / OTP system.
 
-Data Path:
-----------
+**IMPORTANT : This part is under work and shall go through heavy design
+changes.**
 
-                     RESPONSE
-        *----------------------------------*
-        |                                  |
-        V       REQUEST                    |
-      netscale ---------> pluggdapps       |
-         |^                   |            |
-         ||                   |            |
-         || REQUEST           V            |
-         |*------------ process REQUEST ---*
-         *------------>  in pluggdapps
-            RESPONSE
+**data path** ::
+
+    |                  RESPONSE
+    |   *----------------------------------*
+    |   |                                  |
+    |   V       REQUEST                    |
+    | netscale ---------> pluggdapps       |
+    |    |^                   |            |
+    |    ||                   |            |
+    |    || REQUEST           V            |
+    |    |*--------------- process --------*
+    |    *----------->  in pluggdapps
+    |       RESPONSE
+
+**Notes**
 
   * For every pluggdapps port that is spawned using open_port() there will be
     one and only one erlang process that is connected to that port. It is the
-    procs reponsibility to serialize messages to its port.
+    proc's reponsibility to serialize messages to its port.
 
   * At any given time, there can be only one on-going request to the port.
     Next request is sent only after the connected process recieves a response.
@@ -38,23 +42,26 @@ Data Path:
 REQUEST message:
 ----------------
   
-    { Method, Args }
+  **Format : { Method, Args }**
 
-`Method`,
+``Method``,
     Denotes the type of request. Methods are explained below.
-`Args`,
+
+``Args``,
     List of arguments that are semantically related to `Method`.
-`KWargs`,
+
+``KWargs``,
     Property-list, list of key,value pairs, that are semantically related to
     `Method`.
 
 RESPONSE message:
 -----------------
-    { Data }
 
-  Since requests are serialized, any message that does not have an arity of 2
-  and a valid Method as its first element should be considered as response
-  tuple. Which contains a single term.
+  **Format : { Data } **
+
+Since requests are serialized, any message that does not have an arity of 2
+and a valid Method as its first element should be considered as response
+tuple. Which contains a single term.
 
 Request method:
 ---------------

@@ -2,9 +2,9 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
 
-import os, fcntl, signal, sys, time, threading, imp
+import os, fcntl, signal, sys, time, threading, imp, signal
 
 from   pluggdapps.plugin        import implements, ISettings, Singleton, \
                                        pluginname
@@ -19,7 +19,7 @@ _default_settings.__doc__ = (
 _default_settings['IHTTPServer'] = {
     'default' : 'httpepollserver',
     'types'   : (str,),
-    'help'    : "Name of HTTP server to start."
+    'help'    : "Plugin name implementing :class:`IHTTPServer`."
 }
 _default_settings['reload'] = {
     'default' : False,
@@ -53,7 +53,7 @@ _default_settings['reload.poll_interval'] = {
 }
 
 class CommandServe( Singleton ):
-    """Sub command that starts a web server (using epoll) for pluggdapps."""
+    """Sub-command to starts a web server (using epoll) for pluggdapps."""
 
     implements( ICommand )
 
@@ -62,7 +62,10 @@ class CommandServe( Singleton ):
     def __init__( self, *args, **kwargs ):
         self.module_mtimes = {}
 
+    #---- ICommand API methods
+
     def subparser( self, parser, subparsers ):
+        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface method."""
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
@@ -72,7 +75,10 @@ class CommandServe( Singleton ):
         return parser
 
     def handle( self, args ):
+        """:meth:`pluggdapps.interfaces.ICommand.handle` interface method."""
         self.fork_and_monitor( args ) if args.monitor else self.gemini( args )
+
+    #---- Local function.
 
     def gemini( self, args ):
         """If reload is enabled, then create a thread to poll for changing
@@ -110,9 +116,12 @@ class CommandServe( Singleton ):
                 # self._watch_files( args )
                 # self.gemini( args )
             else :          # parent 
-                pid, status = os.wait()
-                if status & 0xFF00 != 0x300 :
-                    sys.exit( status )
+                try :
+                    pid, status = os.wait()
+                    if status & 0xFF00 != 0x300 :
+                        sys.exit( status )
+                except KeyboardInterrupt :
+                    sys.exit(0)
                     
 
     def pollthread( self, args ):
@@ -159,10 +168,14 @@ class CommandServe( Singleton ):
 
     @classmethod
     def default_settings( cls ):
+        """:meth:`pluggdapps.plugin.ISettings.default_settings` interface 
+        method."""
         return _default_settings
 
     @classmethod
     def normalize_settings( cls, sett ):
+        """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface 
+        method."""
         sett['reload'] = h.asbool( sett['reload'] )
         sett['reload.config'] = h.asbool( sett['reload.config'] )
         sett['reload.poll_interval'] = h.asbool( sett['reload.poll_interval'] )
@@ -182,7 +195,7 @@ class CommandServe( Singleton ):
         # finally blocks, flush open files, etc.  In otherwords, it is rude.
         os._exit(3)
 
-    watch_flag = fcntl.DN_MODIFY | fcntl.DN_CREATE | fcntl.DN_MULTISHOT
+    _watch_flag = fcntl.DN_MODIFY | fcntl.DN_CREATE | fcntl.DN_MULTISHOT
     def _watch_files( self, args ):
         filenames = [args.config] if args.config else []
         filenames.extend(
@@ -192,5 +205,8 @@ class CommandServe( Singleton ):
         for filename in filenames :
             fd = os.open( filename, os.O_RDONLY )
             fcntl.fcntl( fd, fcntl.F_SETSIG, 0 )
-            fcntl.fcntl( fd, fcntl.F_NOTIFY, self.watch_flag )
+            fcntl.fcntl( fd, fcntl.F_NOTIFY, self._watch_flag )
 
+def SIGINT_handler( signal, frame ):
+    print( 'You pressed Ctrl+C!' )
+    sys.exit(0)

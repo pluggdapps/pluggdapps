@@ -1,3 +1,6 @@
+Copying and license
+===================
+
 /*************************************************************************
  * Pluggdapps plugin framework and web backend.
  * Copyright (C) 2011 R Pratap Chakravarthy

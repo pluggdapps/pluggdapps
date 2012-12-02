@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from   pluggdapps.web.webapp        import WebApp
-from   pluggdapps.web.webinterfaces import IHTTPView, IHTTPRouter
+from   pluggdapps.web.webinterfaces import IHTTPRouter
 import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
@@ -20,14 +20,6 @@ _default_settings['IHTTPRouter']  = {{
     'help'    : "Name of the plugin implementing :class:`IHTTPRouter` "
                 "interface. A request is resolved for a view-callable by this "
                 "router plugin."
-}}
-_default_settings['IHTTPResource']  = {{
-    'default' : '{webapp_name}resource',
-    'types'   : (str,),
-    'help'    : ":class:`IHTTPResource` plugin common to all requests routed "
-                "via this IHTTPRouter plugin. View specific IHTTPResource "
-                "plugins configured via add_view() are used after resolving "
-                "the request to a view-callable."
 }}
 _default_settings['IHTTPCookie']  = {{
     'default' : 'httpcookie',
@@ -62,6 +54,15 @@ _default_settings['IHTTPResponse']  = {{
     'types'   : (str,),
     'help'    : "Name of the plugin to encapsulate HTTP response."
 }}
+_default_settings['resource']  = {{
+    'default' : '{webapp_name}resource',
+    'types'   : (str,),
+    'help'    : "Plugin name implementing :class:`IHTTPResource` interface. "
+                "Or, a callable object or string that imports a callable "
+                "object. This resource will be called for all requests that "
+                "are routed through this application. View specific resource "
+                "calls can be configured via add_view()."
+}}
 
 class {webapp_name}( WebApp ):
 
@@ -69,16 +70,16 @@ class {webapp_name}( WebApp ):
         super().startapp()
 
     def dorequest( self, request, body=None, chunk=None, trailers=None ):
-        super().dorequest()
+        super().dorequest( request, body=body, chunk=chunk, trailers=trailers )
 
     def dochunk( self, request, chunk=None, trailers=None ):
-        super().dorequest()
+        super().dochunk( request, chunk=chunk, trailers=trailers )
 
     def onfinish( self, request ):
-        super().dorequest()
+        super().onfinish( request )
 
     def shutdown( self ):
-        super().dorequest()
+        super().shutdown()
 
 
     #---- ISettings interface methods

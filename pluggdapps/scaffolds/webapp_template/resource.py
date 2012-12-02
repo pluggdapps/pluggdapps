@@ -7,5 +7,5 @@ from   pluggdapps.web.webinterfaces import IHTTPResource
 class {webapp_name}Resource( Plugin ):
     implements( IHTTPResource )
 
-    def __call__( request, c ):
+    def __call__( self, request, c ):
         pass

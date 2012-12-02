@@ -1,5 +1,15 @@
 # -*- coding: utf-8 -*-
 
+# This file is subject to the terms and conditions defined in
+# file 'LICENSE', which is part of this source code package.
+#       Copyright (c) 2011 R Pratap Chakravarthy
+
+"""Utility functions to parse and locate file assets using
+asset-specification.
+
+    TODO : Document asset specification in detail.
+"""
+
 import pkg_resources
 from   os.path  import isabs, sep
 
@@ -11,8 +21,7 @@ __all__ = [
 
 def parse_assetspec( spec, pname ):
     """Parse the asset specification ``spec`` in the context of package name
-    ``pname``. If pname is package object, it is resolved as pname.__name__.
-
+    ``pname``. If pname is package object, it is resolved as pname.__name__.  
     Return a tuple of (packagename, filename), where packagename is the name
     of the package relative to which the file asset ``filename`` is located."""
 
@@ -42,7 +51,7 @@ def asset_spec_from_abspath( abspath, package ):
 
 def abspath_from_asset_spec( spec, pname='' ):
     """Convert assert sepcification into absolute path. if ``pname`` is
-    supplied it will be used to parse the asset-spec"""
+    supplied, it will be used to parse the asset-spec"""
     if pname is None :
         return spec
     pname, filename = parse_assetspec( spec, pname )

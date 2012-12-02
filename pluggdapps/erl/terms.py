@@ -1,9 +1,8 @@
+# -*- coding: utf-8 -*-
+
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
-
-# -*- coding: utf-8 -*-
-
 
 __all__ = [ 'Atom','BitString', 'Reference', 'Port', 'Pid', 
             # Standar atoms used for marshaling request.
@@ -17,7 +16,7 @@ class Atom( str ):
     """Erlang's atom term represented in python."""
 
     def __new__( cls, s ):
-        assert_true( len(s) <= 255 )
+        assert len(s) <= 255
         return super().__new__( cls, s )
 
     def __repr__( self ):

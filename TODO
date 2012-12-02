@@ -26,3 +26,39 @@
   predicate. We need a logic in routing code which used Accept request header
   field to choose the highest priority media_type based on qvalue.
 
+* Sphinx documentation, once the modules have stabilised, fix the
+  documentation to specifically include classes and functions.
+
+Release check-list 
+------------------
+
+* Sphinx doc quick-start, one time activity.
+    sphinx-apidoc -f -d 2 -T -o  \
+                  sphinxdoc/source/ pluggdapps \
+                  $(APIDOC_EXCLUDE_PATH)"
+
+* Make sure that sphinxdoc/modules/ has all the modules that need to be
+  documented.
+
+* Change the release version in 
+    ./CHANGELOG,
+    ./Makefile
+    ./pluggdapps/__init__.py
+    ./sphinxdoc/source/conf.py
+
+* Sphinx documentation,
+    update APIDOC_EXCLUDE_PATH in Makefile
+    update conf.py
+  before executing `make html`
+
+* Update setup.py and MANIFEST.in for release
+
+* Create a tag and push the tagged branch to 
+    code.google.com 
+    bitbucket.com
+    github.com
+
+* Upload the source into pypi.
+    make upload
+
+* After making the release, taging the branch, increment the version number.

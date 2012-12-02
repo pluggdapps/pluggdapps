@@ -2,11 +2,8 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""Cookie handling API. Basic cookie processing functions are available from
-its standard library http.cookies. This plugin implements :class:`IHTTPCookie`
-interface."""
 
 import hmac, hashlib, base64, re, calendar, email, time
 from   http.cookies import CookieError, SimpleCookie
@@ -40,9 +37,16 @@ _default_settings['max_age_seconds']  = {
 }
 
 class HTTPCookie( Plugin ):
+    """Cookie handling plugin. This plugin uses python standard library's
+    http.cookies module to process request and response cookies."""
+
     implements( IHTTPCookie )
 
+    #-- IHTTPCookie interface methods.
+
     def parse_cookies( self, headers ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.parse_cookies` 
+        interface method."""
         cookies = SimpleCookie()
         cookie = headers.get( 'cookie', '' )
         try    : 
@@ -53,6 +57,8 @@ class HTTPCookie( Plugin ):
             return None
 
     def set_cookie( self, cookies, name, value, **kwargs ) :
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.set_cookie`
+        interface method."""
         if re.search( r"[\x00-\x20]", name + value ):
             # Don't let us accidentally inject bad stuff
             raise ValueError("Invalid cookie %r: %r" % (name, value))
@@ -84,6 +90,8 @@ class HTTPCookie( Plugin ):
         return cookies
 
     def create_signed_value( self, name, value ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.set_cookie`
+        interface method."""
         encoding = self.webapp['encoding']
         parts = [ self['secret'], name, value, str( int( time.time() )) ]
         parts = [ x.encode( encoding ) for x in parts ]
@@ -93,6 +101,8 @@ class HTTPCookie( Plugin ):
         return signedval.decode( self['value_encoding'] )
 
     def decode_signed_value( self, name, signedval ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.set_cookie`
+        interface method."""
         if not signedval : return None
 
 
@@ -151,10 +161,14 @@ class HTTPCookie( Plugin ):
 
     @classmethod
     def default_settings( cls ):
+        """:meth:`pluggdapps.plugin.ISettings.default_settings interface
+        method."""
         return _default_settings
 
     @classmethod
     def normalize_settings( cls, sett ):
+        """:meth:`pluggdapps.plugin.ISettings.normalize_settings interface
+        method."""
         sett['max_age_seconds'] = h.asint( sett['max_age_seconds'] )
         return sett
 

@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
+# This file is subject to the terms and conditions defined in
+# file 'LICENSE', which is part of this source code package.
+#       Copyright (c) 2011 R Pratap Chakravarthy
+
 import pluggdapps.utils             as h
 
-
-def SplashPage( request, c ):
-    res = request.response
-    res.write( "hello world" )
-    res.flush( finished=True )

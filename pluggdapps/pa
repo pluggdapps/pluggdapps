@@ -4,10 +4,11 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""Most of the time expect pluggdapps-environment to be loaded via this
-script. Use --help to learn more about each command and its options."""
+"""Command line program to work with pluggdapps-platform. Use --help to learn
+more about each sub-command and its options.
+"""
 
 import sys
 from   argparse     import ArgumentParser

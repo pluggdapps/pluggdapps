@@ -2,9 +2,9 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""HTTP utility functions."""
+"""Utility functions to parse and manipulate HTTP messages."""
 
 import re, sys, calendar, email
 from   collections  import UserDict
@@ -13,7 +13,6 @@ from   urllib.parse import urlsplit, unquote, parse_qs, urlunsplit, quote, \
                            urlencode, urljoin
 import urllib.request, urllib.error
 
-from pluggdapps.utils.exc import Error
 from pluggdapps.utils.lib import parsecsv
 
 strptime = dt.datetime.strptime
@@ -22,14 +21,17 @@ strftime = dt.datetime.strftime
 DEFAULT_QVALUE = 1.0
 
 __all__ = [
+    #-- Attributes
+    'hdr_str2camelcase', 'hdr_camelcase2str',
+    #-- Functions
     'port_for_scheme', 'parse_startline', 'parse_url', 'make_url',
-    'parse_netpath', 'parse_formbody',
-    #---
-    'connection', 'parse_date', 'parse_trailer', 'parse_transfer_encoding',
-    'accept', 'accept_charset', 'accept_encoding', 'parse_content_length',
-    'parse_content_type', 'parse_content_disposition',
-    #---
-    'HTTPHeaders', 'url_concat',
+    'compare_url', 'parse_netpath', 'parse_formbody',
+    'connection', 'parse_date', 'http_fromdate', 'http_todate',
+    'parse_trailer', 'parse_transfer_encoding', 'accept', 'accept_charset',
+    'accept_encoding', 'parse_content_length', 'parse_content_type',
+    'parse_content_disposition',
+    #-- Classes
+    'HTTPHeaders',
 ]
 
 re_OCTET  = r"*"
@@ -76,59 +78,126 @@ re_dirtive= ( r"(" + re_token + r")" +
               r"(=" +
               r"(" + re_quote + r"|" + re_token + r"))?" )
 
-hdr_camelcase = {
+hdr_str2camelcase = {
     # request headers
-    'accept'              'Accept',
-    'accept_charset'      'Accept-Charset',
-    'accept_encoding'     'Accept-Encoding',
-    'accept_language'     'Accept-Language',
-    'authorization'       'Authorization',
-    'expect'              'Expect',
-    'from'                'From',
-    'host'                'Host',
-    'if_match'            'If-Match',
-    'if_modified_since'   'If-Modified-Since',
-    'if_none_match'       'If-None-Match',
-    'if_range'            'If-Range',
-    'if_unmodified_since' 'If-Unmodified-Since',
-    'max_forwards'        'Max-Forwards',
-    'proxy_authorization' 'Proxy-Authorization',
-    'range'               'Range',
-    'referer'             'Referer',
-    'te'                  'TE',
-    'user_agent'          'User-Agent',
-    # response headers    # response headers
-    'accept_ranges'       'Accept-Ranges',
-    'age'                 'Age',
-    'etag'                'Etag',
-    'location'            'Location',
-    'proxy_authenticate'  'Proxy-Authenticate',
-    'retry_after'         'Retry-After',
-    'server'              'Server',
-    'vary'                'Vary',
-    'www_authenticate'    'WWW-Authenticate',
-    # entity headers      # entity headers
-    'allow'               'Allow',
-    'content_encoding'    'Content-Encoding',
-    'content_language'    'Content-Language',
-    'content_length'      'Content-Length',
-    'content_location'    'Content-Location',
-    'content_md5'         'Content-MD5',
-    'content_range'       'Content-Range',
-    'content_type'        'Content-Type',
-    'expires'             'Expires',
-    'last_modified'       'Last-Modified',
+    'accept'              : b'Accept',
+    'accept_charset'      : b'Accept-Charset',
+    'accept_encoding'     : b'Accept-Encoding',
+    'accept_language'     : b'Accept-Language',
+    'authorization'       : b'Authorization',
+    'expect'              : b'Expect',
+    'from'                : b'From',
+    'host'                : b'Host',
+    'if_match'            : b'If-Match',
+    'if_modified_since'   : b'If-Modified-Since',
+    'if_none_match'       : b'If-None-Match',
+    'if_range'            : b'If-Range',
+    'if_unmodified_since' : b'If-Unmodified-Since',
+    'max_forwards'        : b'Max-Forwards',
+    'proxy_authorization' : b'Proxy-Authorization',
+    'range'               : b'Range',
+    'referer'             : b'Referer',
+    'te'                  : b'TE',
+    'user_agent'          : b'User-Agent',
+    # response headers
+    'accept_ranges'       : b'Accept-Ranges',
+    'age'                 : b'Age',
+    'etag'                : b'Etag',
+    'location'            : b'Location',
+    'proxy_authenticate'  : b'Proxy-Authenticate',
+    'retry_after'         : b'Retry-After',
+    'server'              : b'Server',
+    'vary'                : b'Vary',
+    'www_authenticate'    : b'WWW-Authenticate',
+    # entity headers
+    'allow'               : b'Allow',
+    'content_encoding'    : b'Content-Encoding',
+    'content_language'    : b'Content-Language',
+    'content_length'      : b'Content-Length',
+    'content_location'    : b'Content-Location',
+    'content_md5'         : b'Content-MD5',
+    'content_range'       : b'Content-Range',
+    'content_type'        : b'Content-Type',
+    'expires'             : b'Expires',
+    'last_modified'       : b'Last-Modified',
+
+    'cache_control'       : b'Cache-Control',
+    'connection'          : b'Connection',
+    'date'                : b'Date',
+    'etag'                : b'ETag',
+    'pragma'              : b'Pragma',
+    'referer'             : b'Referer',
+    'trailer'             : b'Trailer',
+    'transfer_encoding'   : b'Transfer-Encoding',
+    'upgrade'             : b'Upgrade',
+    'via'                 : b'Via',
+    'warning'             : b'Warning',
+}
+
+hdr_camelcase2str = {
+    # request headers
+    b'Accept'               : 'accept',
+    b'Accept-Charset'       : 'accept_charset',
+    b'Accept-Encoding'      : 'accept_encoding',
+    b'Accept-Language'      : 'accept_language',
+    b'Authorization'        : 'authorization',
+    b'Expect'               : 'expect',
+    b'From'                 : 'from',
+    b'Host'                 : 'host',
+    b'If-Match'             : 'if_match',
+    b'If-Modified-Since'    : 'if_modified_since',
+    b'If-None-Match'        : 'if_none_match',
+    b'If-Range'             : 'if_range',
+    b'If-Unmodified-Since'  : 'if_unmodified_since',
+    b'Max-Forwards'         : 'max_forwards',
+    b'Proxy-Authorization'  : 'proxy_authorization',
+    b'Range'                : 'range',
+    b'Referer'              : 'referer',
+    b'TE'                   : 'te',
+    b'User-Agent'           : 'user_agent',
+    # response headers
+    b'Accept-Ranges'        : 'accept_ranges',
+    b'Age'                  : 'age',
+    b'Etag'                 : 'etag',
+    b'Location'             : 'location',
+    b'Proxy-Authenticate'   : 'proxy_authenticate',
+    b'Retry-After'          : 'retry_after',
+    b'Server'               : 'server',
+    b'Vary'                 : 'vary',
+    b'WWW-Authenticate'     : 'www_authenticate',
+    # entity headers
+    b'Allow'                : 'allow',
+    b'Content-Encoding'     : 'content_encoding',
+    b'Content-Language'     : 'content_language',
+    b'Content-Length'       : 'content_length',
+    b'Content-Location'     : 'content_location',
+    b'Content-MD5'          : 'content_md5',
+    b'Content-Range'        : 'content_range',
+    b'Content-Type'         : 'content_type',
+    b'Expires'              : 'expires',
+    b'Last-Modified'        : 'last_modified',
+
+    b'Cache-Control'        : 'cache_control',
+    b'Connection'           : 'connection',
+    b'Date'                 : 'date',
+    b'ETag'                 : 'etag',
+    b'Pragma'               : 'pragma',
+    b'Referer'              : 'referer',
+    b'Trailer'              : 'trailer',
+    b'Transfer-Encoding'    : 'transfer_encoding',
+    b'Upgrade'              : 'upgrade',
+    b'Via'                  : 'via',
+    b'Warning'              : 'warning',
 }
 
 #---- Map response code to response message
 
 def port_for_scheme( scheme ):
-    """Calculate port based on `scheme` name. If scheme and port matches, port
-    is left empty. Otherwise `port` is explicitly set to port number and
+    """Calculate port based on ``scheme`` name. If scheme and port matches,
+    port is left empty. Otherwise `port` is explicitly set to port number and
     returned as a string.
     
-    ``scheme``,
-        byte-string.
+    ``scheme``, byte-string.
     """
     if scheme == b'http' : return 80
     elif scheme == b'https' : return 443
@@ -137,7 +206,7 @@ def port_for_scheme( scheme ):
 def parse_startline( startline ):
     """Every HTTP request starts with a start line specifying method, uri and
     version. Parse them and return a tuple of (method, uri, version). All
-    elements in the return tuple will be available as strings."""
+    elements in the return tuple will be available as byte-strings."""
     return [ x.strip( b' \t' ) for x in startline.split(b' ') ]
 
 
@@ -163,14 +232,11 @@ def parse_url( uri, host=None, scheme=None ):
         port, script
 
     Among these key values,
-
-    * `path` value will be unquoted using urllib.parse.unquote()
-
-    * `query` value will be unquoted using urllib.parse.parse_qs()
-
-    * and, all values are available as strings.
+      * `path` value will be unquoted using urllib.parse.unquote()
+      * `query` value will be unquoted using urllib.parse.parse_qs()
+      * and, all values are available as strings.
     
-    Refer to Section 5.2 in RFC 2616.txt 
+    `Refer to Section 5.2 in RFC 2616.txt`.
     """
     host = host.strip() if host else host
     try :
@@ -178,14 +244,20 @@ def parse_url( uri, host=None, scheme=None ):
     except :
         host, port = host, None
     r = urlsplit( uri )
-    host = r.hostname or host
-    port = r.port or port
-    scheme = r.scheme or scheme
-    path = unquote( r.path.decode('utf8') )  # With default encoding
-    query = parse_qs( r.query ) # With default encoding
-    r = UserDict( scheme=scheme, netloc=r.netloc, path=path, query=query,
-                  fragment=r.fragment, username=r.username, 
-                  password=r.password, hostname=host, port=port, script=b'' )
+    fn = lambda x : (x[0], (x[1].decode('utf8') if x[1] else x[1]))
+    kwargs = { 'scheme' : r.scheme or scheme,
+               'netloc' : r.netloc,
+               'host'   : r.hostname or host,
+               'port'   : r.port or port,
+               'username' : r.username,
+               'password' : r.password,
+               'fragment' : r.fragment,
+               'script' : b'',
+             }
+    kwargs = dict( map( fn, kwargs.items() ))
+    kwargs['path'] = unquote( r.path.decode('utf8') )  # With default encoding
+    kwargs['query'] = parse_qs( r.query ) # With default encoding
+    r = UserDict( **kwargs )
     return r
 
 def make_url( baseurl, path, query, fragment ):
@@ -194,7 +266,7 @@ def make_url( baseurl, path, query, fragment ):
     and interpreted by Clients.
     
     ``baseurl``,
-        byte-string of base-url with scheme and netlocation. Otherwise None,
+        string of base-url with scheme and netlocation. Otherwise None,
         in which case relative-url is returned.
 
     ``path``,
@@ -206,14 +278,14 @@ def make_url( baseurl, path, query, fragment ):
         Will be encoded using urllib.parse.urlencode()
 
     ``fragment``,
-        byte-string of fragment portion of the url.
+        string of fragment portion of the url.
 
-    Return relative-url or absolute-url as a byte-string.
+    Return relative-url or absolute-url as a string.
     """
-    path = quote( path ) if path else b''
-    query = urlencode( query ) if query else b''
-    fragment = fragment if fragment else b''
-    relurl = urlunsplit( b'', b'', path, query, fragment )
+    path = quote( path ) if path else ''
+    query = urlencode( query ) if query else ''
+    fragment = fragment if fragment else ''
+    relurl = urlunsplit( '', '', path, query, fragment )
     return urljoin( baseurl, relurl ) if baseurl else relurl
 
 scheme2ports = {
@@ -221,6 +293,8 @@ scheme2ports = {
     'https' : '443',
 }
 def compare_url( url1, url2 ):
+    """Compare two URLs ``url1`` and ``url2`` based on RFC2616
+    specification."""
     x = urlsplit( url1 )
     y = urlsplit( url2 )
     scheme1 = x.scheme.lower() or b'http'
@@ -236,26 +310,23 @@ def compare_url( url1, url2 ):
     return True
 
 def parse_netpath( netpath ):
-    """Parse `netpath` string containing host-name and script-path into a
-    tuple of (netloc, script-path). If script-path is absent, return
-    (netloc, '')."""
+    """Parse ``netpath`` string containing host-name and script-path into a
+    tuple of ``(netloc, script-path)``. If script-path is absent, return
+    ``(netloc, '')``."""
     parts = netpath.split('/', 1)
     netloc = parts.pop( 0 )
-    script = parts.pop( 0 ) if parts else ''
+    script = '/' + (parts.pop( 0 ) if parts else '')
     return netloc, script 
 
 def parse_formbody( content_type, body ):
     """HTML form values can be submited via POST or PUT methods, in which
     case, request Content-Type will be appropriately set. This function
-    support,
-        application/x-www-form-urlencoded
-        multipart/form-data
+    supports, ``application/x-www-form-urlencoded``, ``multipart/form-data``
     media-types. Note that files are submitted using multipart/form-data
-    media-type.
+    media-type.  Returns a dictionary of arguments.
 
-    `content_type`, return value from parse_content_type().
-
-    Returns a dictionary of arguments.
+    ``content_type``,
+        Value as return from parse_content_type().
     """
 
     arguments, multiparts = {}, {}
@@ -351,13 +422,10 @@ def parse_multipart( content_type, data ):
 #---- Logic to parse HTTP headers
 
 class HTTPHeaders( dict ):
-    """Dictionary of HTTP headers for both request and response.
-
-    Value of each key, lower-cased string, is represented as list of
-    byte-string. If a header field occur in a request only once, then list
-    of values will have only one element.
-
-    Refer RFC2616 for more information.
+    """Dictionary of HTTP headers for both request and response. Value of each
+    key, lower-cased string, is represented as list of byte-string. If a
+    header field occur in a request only once, then list of values will have
+    only one element. `Refer RFC2616 for more information`.
     """
 
     @classmethod
@@ -365,9 +433,9 @@ class HTTPHeaders( dict ):
         """Returns HTTPHeaders object."""
         def consume( obj, line ):
             name, value = line.split( b":", 1 )
-            name = name.strip().decode('utf8').lower()
+            name = hdr_camelcase2str[ name.strip() ]
             pvalue = obj.get( name, None )
-            obj[ name ] = value if pvalue == None else (pvalue+', '+value)
+            obj[ name ] = value if pvalue == None else (pvalue+b', '+value)
 
         obj, prev_line = cls(), b''
         for line in hdrdata.splitlines() :
@@ -384,7 +452,7 @@ class HTTPHeaders( dict ):
         return obj
 
 
-def parameters( ps=None, params=[] ):
+def parameters( ps=None, params=None ):
     """Parse parameter from list of byte-string `s`, 
 
     ``ps``,
@@ -412,7 +480,7 @@ def parameters( ps=None, params=[] ):
     elif params :
         return b';'.join( attr + '=' + val for attr, val in params )
 
-def directives( ds=b'', tokens=[] ):
+def directives( ds=b'', tokens=None ):
     """Parse directives from list of byte-string `ds`,
 
     ``ds``,
@@ -422,18 +490,18 @@ def directives( ds=b'', tokens=[] ):
         a single set of directives, separated by ';'.
     """
     if ds :
-        ts = []
+        tokens = []
         for d in ds :
             a,b,c = re.match( re_dirtive, d ).groups()
-            ts.append( (a, b or c) if (b or c) else a )
-        return ts
+            tokens.append( (a, b or c) if (b or c) else a )
+        return tokens
     elif tokens :
         return b';'.join( 
                     ( t[0] + b'=' + t[1] if isinstance(t, tuple) else t )
                     for t in tokens 
                )
 
-def rules( s=None, rs=[] ):
+def rules( s=None, rs=None ):
     """Parse comma seperated rules from `s`.
          ( *LWS element *( *LWS "," *LWS element ))
 
@@ -445,7 +513,7 @@ def rules( s=None, rs=[] ):
     to contstruct a rule string, pass a list of byte-string in `rs` kwarg.
     """
     if s :
-        return [ x.strip(b' \r\n\t') for x in s.split(b',', s) ]
+        return [ x.strip(b' \r\n\t') for x in s.split(b',') ]
     elif rs :
         return b', '.join( rs )
 
@@ -498,15 +566,17 @@ def make_simplevalue_q( tokenrules ):
 #---- Generic headers
 
 def connection( value ):
+    """Return a list of lowercased token values from Connection-header-value.
+    """
     if value == None : return None
-    return rules( value )
+    return list( map( lambda x : x.lower(), rules( value )))
 
 rfc1123_format = "%a, %d %b %Y %H:%M:%S %Z"
 rfc1036_format = "%A, %d-%b-%y %H:%M:%S %Z"
 asctime_format = "%a %b %d %H:%M:%S %Y"
 def parse_date( value ):
     """HTTP applications have historically allowed three different formats
-    for the representation of date/time stamps:
+    for the representation of date/time stamps::
 
       Sun, 06 Nov 1994 08:49:37 GMT  ; RFC 822, updated by RFC 1123
       Sunday, 06-Nov-94 08:49:37 GMT ; RFC 850, obsoleted by RFC 1036
@@ -514,9 +584,7 @@ def parse_date( value ):
 
     The first format is preferred as an Internet standard. This function
     heuristically parses the date format (from request header) and changes the
-    format to RFC 1123 format.
-
-    Returns `datetime` object
+    format to RFC 1123 format.  Returns ``datetime`` object
     """
     for fmt in [ rfc1123_format, rfc1036_format, asctime_format ] :
         try :
@@ -539,37 +607,37 @@ def http_fromdate( dtime ):
 
 def parse_trailer( value ):
     if value == None : return None
-
     return rules( value )
 
 def parse_transfer_encoding( value=b'', tokenrules=[], prefix=b'' ):
-    """Parse Transfer-Encoding header value,
+    """
+    Parse Transfer-Encoding header value,::
+
+      transfer-coding         = "chunked" | transfer-extension
+      transfer-extension      = token *( ";" parameter )
 
     ``value``,
         byte-string of Transfer-Encoding header value to parse.
+
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
         this function for parsing Transfer-Encoding header value.
+
     ``prefix``,
         While making value byte-string from tokens, if this kwarg is present,
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    transfer-coding         = "chunked" | transfer-extension
-    transfer-extension      = token *( ";" parameter )
-
-    Returns
-        [ ( token, [ param ] ), ... ]
-
-      where,
-        param is either a token or a tuple of (attr, value).
+    Returns ``[ ( token, [ param ] ), ... ]``, where, ``param`` is either a
+    token or a tuple of ``(attr, value)``.
     """
     if value :
         tokenrules = []
         for rule in rules(value) :
             parts = value.split( b';' )
+            params = parameters( parts[1:] ) if parts[1:] else []
             tokenrules.append(
-              (parts[0].lower(), tuple( filter( None, parameters( parts[1:]))))
+              ( parts[0].lower(), tuple( filter( None, params )))
             )
         return tokenrules
 
@@ -582,33 +650,34 @@ def parse_transfer_encoding( value=b'', tokenrules=[], prefix=b'' ):
 #---- Request headers
 
 def accept( value=b'', tokenrules=[], prefix=b'' ):
-    """Parse Accept header value,
+    """
+    Parse Accept header value,::
+
+      Accept         = "Accept" ":"
+                          #( media-range [ accept-params ] )
+
+      media-range    = ( "*/*"
+                       | ( type "/" "*" )
+                       | ( type "/" subtype )
+                       ) *( ";" parameter )
+      accept-params  = ";" "q" "=" qvalue *( accept-extension )
+      accept-extension = ";" token [ "=" ( token | quoted-string ) ]
 
     ``value``,
         byte-string of Accept header value to parse.
+
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
         this function for parsing Accept header value.
+
     ``prefix``,
         While making value byte-string from tokens, if this kwarg is present,
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Accept         = "Accept" ":"
-                        #( media-range [ accept-params ] )
-
-    media-range    = ( "*/*"
-                     | ( type "/" "*" )
-                     | ( type "/" subtype )
-                     ) *( ";" parameter )
-    accept-params  = ";" "q" "=" qvalue *( accept-extension )
-    accept-extension = ";" token [ "=" ( token | quoted-string ) ]
-
-    Returns
-        [ ( type, subtype, [ param ] ), ... ]
-      where,
-        param is either a token or a tuple of (attr, value). And the [ param ]
-        list is sorted by q-value.
+    Returns ``[ ( type, subtype, [ param ] ), ... ]``, where, ``param`` is
+    either a token or a tuple of ``(attr, value)``. And the [ param ] list is
+    sorted by q-value.
     """
     if value :
         mranges = []
@@ -649,25 +718,25 @@ def accept( value=b'', tokenrules=[], prefix=b'' ):
     return None
 
 def accept_charset( value=b'', tokenrules=[], prefix=b'' ):
-    """Parse Accept-Charset header value,
+    """
+    Parse Accept-Charset header value,::
+
+      Accept-Charset = "Accept-Charset" ":"
+                1#( ( charset | "*" )[ ";" "q" "=" qvalue ] )
 
     ``value``,
         byte-string of Accept-Charset header value to parse.
+
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
         this function for parsing Accept-Charset header value.
+
     ``prefix``,
         While making value byte-string from tokens, if this kwarg is present,
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Accept-Charset = "Accept-Charset" ":"
-              1#( ( charset | "*" )[ ";" "q" "=" qvalue ] )
-
-    Returns,
-        [ (charset, qvalue), ... ]
-    where,
-        qvalue is in float.
+    Returns, ``[ (charset, qvalue), ... ]``, where, ``qvalue`` is in float.
     """
     lowercase = lambda x : x[0].lower(), x[1]
     if value :
@@ -678,24 +747,26 @@ def accept_charset( value=b'', tokenrules=[], prefix=b'' ):
 
 
 def accept_encoding( value, tokenrules=[], prefix=b'' ):
-    """Parse Accept-Encoding header value,
+    """
+    Parse Accept-Encoding header value,::
+
+      Accept-Encoding  = "Accept-Encoding" ":"
+                            1#( codings [ ";" "q" "=" qvalue ] )
+      codings          = ( content-coding | "*" )
 
     ``value``,
         byte-string of Accept-Encoding header value to parse.
+
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
         this function for parsing Accept-Encoding header value.
+
     ``prefix``,
         While making value byte-string from tokens, if this kwarg is present,
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Accept-Encoding  = "Accept-Encoding" ":"
-                          1#( codings [ ";" "q" "=" qvalue ] )
-    codings          = ( content-coding | "*" )
-
-    Returns,
-        [ (content-coding, qvalue), ... ]
+    Returns, ``[ (content-coding, qvalue), ... ]``
     """
     lowercase = lambda x : x[0].lower(), x[1]
     if value :
@@ -713,41 +784,45 @@ def parse_content_length( value ):
     return int(value) if value else value
 
 def parse_content_type( value ):
-    """
-    Content-Type   = "Content-Type" ":" media-type
-    media-type     = type "/" subtype *( ";" parameter )
-    type           = token
-    subtype        = token
-    parameter      = attribute "=" value
-    attribute      = token
-    value          = token | quoted-string
+    """Parse content type using grammar,::
 
-    Returns,
-        [ type, subtype, [ (attr, value), ... ]
+      Content-Type   = "Content-Type" ":" media-type
+      media-type     = type "/" subtype *( ";" parameter )
+      type           = token
+      subtype        = token
+      parameter      = attribute "=" value
+      attribute      = token
+      value          = token | quoted-string
+
+    Returns, ``[ type, subtype, [ (attr, value), ... ]``
     """
-    parts = value.split( b';' )
+    if value == None : return value
+
+    parts = value.lstrip().split( b';' )
     typ, subtype = parts[0].split( b'/' )
-    return typ, subtype, filter( None, parameters( parts[1:] ))
+    params = parameters( parts[1:] ) if parts[1:] else []
+    return typ, subtype, filter( None, params )
 
 #---- additional features
 
 def parse_content_disposition( value ):
-    """
-    content-disposition = "Content-Disposition" ":"
-                          disposition-type *( ";" disposition-parm )
-    disposition-type = "attachment" | disp-extension-token
-    disposition-parm = filename-parm | disp-extension-parm
-    filename-parm = "filename" "=" quoted-string
-    disp-extension-token = token
-    disp-extension-parm = token "=" ( token | quoted-string )
+    """Parse content disposition using grammar,::
 
-    Returns,
-        ( token, [ (attr, value), ... ] )
+      content-disposition = "Content-Disposition" ":"
+                            disposition-type *( ";" disposition-parm )
+      disposition-type = "attachment" | disp-extension-token
+      disposition-parm = filename-parm | disp-extension-parm
+      filename-parm = "filename" "=" quoted-string
+      disp-extension-token = token
+      disp-extension-parm = token "=" ( token | quoted-string )
+
+    Returns, ``( token, [ (attr, value), ... ] )``
     """
     if not value : return value
 
     ps = value.split( b';' )
-    return ps[0].lower(), filter( None, parameters( ps[1:] ))
+    params = parameters( parts[1:] ) if parts[1:] else []
+    return ps[0].lower(), filter( None, params )
 
 #---- Yet to be cleaned up.
 

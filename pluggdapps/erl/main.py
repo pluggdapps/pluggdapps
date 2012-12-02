@@ -1,10 +1,10 @@
 #! /usr/bin/env python3.2
 
+# -*- coding: utf-8 -*-
+
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
-
-# -*- coding: utf-8 -*-
 
 """
 Executable for netscale cloud platform to dispatch pluggdapps plugin requests.

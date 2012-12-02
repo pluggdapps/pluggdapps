@@ -4,17 +4,21 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
+"""Utility functions and classes to describe configuration settings for
+plugins and process them.
+"""
+
 __all__ = [ 'ConfigDict', 'settingsfor', 'sec2plugin', 'plugin2sec',
             'is_plugin_section' ]
 
 class ConfigDict( dict ):
     """A collection of configuration settings. When a fresh key, a.k.a 
     configuration parameter is added to this dictionary, it can be provided
-    as `ConfigItem` object or as a dictionary containing key,value pairs
-    supported by ConfigItem.
+    as :class:`ConfigItem` object or as a dictionary containing key,value pairs
+    similar to ConfigItem.
 
     Used as return type for default_settings() method specified in 
-    :class:`ISettings`
+    :class:`pluggdapps.plugin.ISettings`
     """
     def __init__( self, *args, **kwargs ):
         self._spec = {}
@@ -50,8 +54,7 @@ class ConfigItem( dict ):
         Compulsory field.
     ``types``,
         Either a tuple of valid types, or a string of comma separated values.
-        Allowed types are,
-            str, int, bool, csv.
+        Allowed types are, ``str``, ``int``, ``bool``, ``csv``.
         Compulsory field.
     ``help``,
         Help string describing the purpose and scope of settings parameter.
@@ -89,18 +92,25 @@ class ConfigItem( dict ):
 
 
 def settingsfor( prefix, sett ):
-    """Parse `settings` keys starting with `prefix` and return a dictionary of
-    corresponding options."""
+    """Filter settings keys ``sett.keys()`` starting with ``prefix`` and return
+    a dictionary of corresponding options. Prefix is pruned of from returned
+    settings' keys."""
     l = len(prefix)
     return { k[l:] : sett[k] for k in sett if k.startswith(prefix) }
 
 
 def plugin2sec( pluginname ):
+    """Convert ``pluginname`` to plugin section name in ini-file. For Eg,
+    for plugin-name ``httpepollserver``, will return
+    ``plugin:httpepollserver``.
+    """
     return 'plugin:' + pluginname
 
 def sec2plugin( secname ):
+    """Reverse of :meth:`plugin2sec`."""
     return secname[7:]
 
 def is_plugin_section( secname ):
+    """Check whether ``secname`` starts with ``plugin:``."""
     return secname.startswith('plugin:')
 

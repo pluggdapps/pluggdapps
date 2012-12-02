@@ -1,8 +1,8 @@
+# -*- coding: utf-8 -*-
+
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
-
-# -*- coding: utf-8 -*-
 
 """Erlang external term format.
     Refer : http://www.erlang.org/doc/apps/erts/erl_ext_dist.html
@@ -72,31 +72,6 @@ def encode( term, compressed=False ):
 
 
 #---- Decoder
-
-decoders = {
-    82  : decode_atom_cacheref, # ATOM_CACHE_REFERENCE, not supported
-    97  : decode_smallint,      # SMALL_INTEGER_EXT
-    98  : decode_int,           # INTEGER_EXT
-    99  : decode_float,         # FLOAT_EXT
-    100 : decode_atom,          # ATOM_EXT
-    101 : decode_reference,     # REFERENCE_EXT, not supported
-    102 : decode_port,          # PORT_EXT
-    103 : decode_pid,           # PID_EXT
-    104 : decode_smalltuple,    # SMALL_TUPLE_EXT, also handles string
-    105 : decode_largetuple,    # LARGE_TUPLE_EXT
-    106 : decode_nil,           # NIL_EXT
-    107 : decode_string,        # STRING_EXT
-    108 : decode_list,          # LIST_EXT
-    109 : decode_binary,        # BINARY_EXT
-    110 : decode_smallbig,      # SMALL_BIG_EXT
-    111 : decode_largebig,      # LARGE_BIG_EXT
-    114 : decode_reference_new, # REFERENCE_NEW_EXT
-    115 : decode_atom_small,    # SMALL_ATOM
-    70  : decode_newfloat,      # NEW_FLOAT_EXT
-    77  : decode_bitstring,     # BIT_BINARY_EXT
-}
-
-
 
 def decode_term( termbin ):
     return decoders.get( termbin[0], invalid_tag )( termbin[1:] )
@@ -357,26 +332,30 @@ def decode_bitstring( b ):
     return BitString( b[5:5+l], bits ), data[5+l:]
 
 
-#---- Encoder
-
-encoders = {
-    int       : encode_int,           # SMALL_INTEGER_EXT, INTEGER_EXT,
-                                      # SMALL_BIG_EXT, LARGE_BIG_EXT
-    float     : encode_float,         # NEW_FLOAT_EXT
-    Atom      : encode_atom,          # ATOM_EXT, SMALL_ATOM_EXT
-    None      : encode_none,          # ATOM_EXT
-    bool      : encode_bool,          # SMALL_ATOM_EXT
-    Reference : encode_reference_new, # REFERENCE_NEW_EXT
-    Port      : encode_port,          # PORT_EXT
-    Pid       : encode_pid,           # PID_EXT
-    tuple     : encode_tuple,         # SMALL_TUPLE_EXT, LARGE_TUPLE_EXT
-    list      : encode_list,          # LIST_EXT, NIL_EXT
-    str       : encode_string,        # { nstr, <binary> } encoded in utf8
-                                      # STRING_EXT for latin1
-    bytes     : encode_bytes,         # BINARY_EXT
-    BitString : encode_bitstring,     # BIT_BINARY_EXT
-    dict      : encode_dict           # LIST_EXT
+decoders = {
+    82  : decode_atom_cacheref, # ATOM_CACHE_REFERENCE, not supported
+    97  : decode_smallint,      # SMALL_INTEGER_EXT
+    98  : decode_int,           # INTEGER_EXT
+    99  : decode_float,         # FLOAT_EXT
+    100 : decode_atom,          # ATOM_EXT
+    101 : decode_reference,     # REFERENCE_EXT, not supported
+    102 : decode_port,          # PORT_EXT
+    103 : decode_pid,           # PID_EXT
+    104 : decode_smalltuple,    # SMALL_TUPLE_EXT, also handles string
+    105 : decode_largetuple,    # LARGE_TUPLE_EXT
+    106 : decode_nil,           # NIL_EXT
+    107 : decode_string,        # STRING_EXT
+    108 : decode_list,          # LIST_EXT
+    109 : decode_binary,        # BINARY_EXT
+    110 : decode_smallbig,      # SMALL_BIG_EXT
+    111 : decode_largebig,      # LARGE_BIG_EXT
+    114 : decode_reference_new, # REFERENCE_NEW_EXT
+    115 : decode_atom_small,    # SMALL_ATOM
+    70  : decode_newfloat,      # NEW_FLOAT_EXT
+    77  : decode_bitstring,     # BIT_BINARY_EXT
 }
+
+#---- Encoder
 
 def invalid_type( typ ) : 
     raise Exception( "Invalid python type when marshalling to erl: %r" % typ )
@@ -509,4 +488,23 @@ def encode_bitstring( val ):
 def encode_dict( val ):
     """Encode python's dictionary type to erlang term LIST_EXT."""
     return encode_term( sorted( list ( val.items() )))
+
+encoders = {
+    int       : encode_int,           # SMALL_INTEGER_EXT, INTEGER_EXT,
+                                      # SMALL_BIG_EXT, LARGE_BIG_EXT
+    float     : encode_float,         # NEW_FLOAT_EXT
+    Atom      : encode_atom,          # ATOM_EXT, SMALL_ATOM_EXT
+    None      : encode_none,          # ATOM_EXT
+    bool      : encode_bool,          # SMALL_ATOM_EXT
+    Reference : encode_reference_new, # REFERENCE_NEW_EXT
+    Port      : encode_port,          # PORT_EXT
+    Pid       : encode_pid,           # PID_EXT
+    tuple     : encode_tuple,         # SMALL_TUPLE_EXT, LARGE_TUPLE_EXT
+    list      : encode_list,          # LIST_EXT, NIL_EXT
+    str       : encode_string,        # { nstr, <binary> } encoded in utf8
+                                      # STRING_EXT for latin1
+    bytes     : encode_bytes,         # BINARY_EXT
+    BitString : encode_bitstring,     # BIT_BINARY_EXT
+    dict      : encode_dict           # LIST_EXT
+}
 

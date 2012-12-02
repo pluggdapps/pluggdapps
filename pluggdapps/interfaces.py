@@ -4,20 +4,27 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
+"""Collection of interface specifications used by pluggdapps platform."""
+
 import socket
 
-from pluggdapps.plugin import Interface, Attribute
+from pluggdapps.plugin import Interface
 
 __all__ = [ 'ICommand', 'IWebApp', 'IHTTPServer', 'IHTTPConnection' ]
 
 class ICommand( Interface ):
-    """Handle sub-commands issued from command line script. The general
-    purpose is to parse the command line string arguments into `options` and
-    `arguments` and handle sub-commands as pluggable functions."""
+    """Handle sub-commands issued from command line script. Plugins are
+    expected to parse the command line string arguments into ``options`` and
+    ``arguments`` and handle the sub-commands."""
 
-    description = Attribute( "Text to display before the argument help." )
-    usage = Attribute( "String describing the program usage" )
-    cmd = Attribute( "Name of the command" )
+    description = ''
+    """Text to display --help."""
+
+    usage = ''
+    """String describing the program usage"""
+
+    cmd = ''
+    """Name of the command"""
 
     def subparser( parser, subparsers ):
         """Use ``subparsers`` to create a sub-command parser. The `subparsers`
@@ -27,180 +34,68 @@ class ICommand( Interface ):
     def handle( args ):
         """While :meth:`subparser` is invoked, the sub-command plugin can 
         use set_default() method on subparser to set `handler` attribute to
-        this method.
-
-        So that this handler will automatically be invoked if the sub-command
-        is used on the command line.
+        this method so that this handler will automatically be invoked if the
+        sub-command is used on the command line.
 
         ``args``,
             parsed args from ArgumentParser's parse_args() method.
         """
 
-class IWebApp( Interface ):
-    """In pluggdapps, Web-Application is a plugin, whereby, a plugin is a bunch
-    of configuration parameters implementing one or more interface
-    specification. Note that application plugins are singletons are the first
-    ones to be instantiated along with platform singleton. Attributes,
-        `netpath`, `instkey`, `router`
-    are initialized by platform initialization code. 
-
-    There is a base class :class:`WebApp` which implements this interface
-    and provides necessary support functions for application creators.
-    Therefore application plugins must derive from this base class.
-    """
-    instkey = Attribute(
-        "A tuple of (appsec, netpath, configini)"
-    )
-    appsetting = Attribute(
-        "Optional Read only copy of application's settings."
-        # TODO : Make this as read only copy.
-    )
-    netpath = Attribute(
-        "Net location and script-path on which the instance of webapp plugin "
-        "is mounted."
-    )
-    baseurl = Attribute(
-        "Computed base url for web application."
-    )
-    router = Attribute(
-        "Plugin instance implementing :class:`IHTTPRouter` interface. This is "
-        "the root router using which request urls will be resolved to a view "
-        "callable. Should be instantiated during boot time inside "
-        ":meth:`startapp` method."
-    )
-    cookie = Attribute(
-        "Plugin instance implementing IHTTPCookie interface spec. Methods "
-        "from this plugin will be used to process both request cookies "
-        "and response cookies. This can be overriden at corresponding "
-        "request / response plugin settings."
-    )
-
-    def startapp():
-        """Boot this applications. Called at platform boot-time. 
-        Instantiate :attr:`router` attribute."""
-
-    def dorequest( request, body=None, chunk=None, trailers=None ):
-        """`request` was resolved for this application. Request handling
-        callback for application. The callback will be issued when,
-            * A new request without body is received, where the request
-              data is available in `request`.
-            * A new request with a body is received, in which case kwarg
-              `body` gives the request body as byte-string.
-        """
- 
-    def dochunk( request, chunk=None, trailers=None ):
-        """`request` was resolved for this application. Request handling
-        callback for application. The callback will be issued when,
-            * A new request with a chunk is received, in which case kwarg
-              `chunks` gives a single element list with received chunk as,
-                ( chunk_size, chunk_ext, chunk_data ) 
-            * A request is being received in chunked mode and a request chunk
-              just received, in which case `chunk` is a tuple of,
-                ( chunk_size, chunk_ext, chunk_data )
-            * The last chunk of the request is received without a trailer.
-            * The last chunk of the request is received with a trailer.
-        """
- 
-    def onfinish( request ):
-        """When a finish is called on the response. And this call back is 
-        issued beginning a finish sequence for this ``request`` in the 
-        application's context. Plugin's implementing this method must call
-        request.onfinish()."""
-
-    def shutdown():
-        """Shutdown this application. Reverse of :meth:`startapp`."""
-
-    def urlfor( request, name, **matchdict ):
-        """Generate url (full url) identified by routing-name `name`. Use
-        `pathfor` method to generate the relative url and join the result
-        with the web-application's `base_url`. To know more about method
-        arguments refer pathfor() interface method.
-        """
-
-    def pathfor( request, name, **matchdict ):
-        """Generate relative url for request using route definitions.
-
-        ``name``,
-            Name of the route definition to use. Previously added via
-            add_view() interface method.
-
-        ``request``,
-            The :class:`IHTTPRequest` object for which url is generated.
-
-        ``matchdict``,
-            A dictionary of variables in url-patterns and their corresponding
-            value string. Every route definition will have variable (aka
-            dynamic components in path segments) that will be matched with
-            url. If matchdict contains the following keys,
-
-            `_query`, its value, which must be a dictionary similar to 
-            :attr:`IHTTPRequest.getparams`, will be interpreted as query
-            parameters and encoded to query string.
-
-            `_anchor`, its value will be attached at the end of the url as
-            "#<_anchor>".
-        """
-
 class IHTTPServer( Interface ):
-    """Interface to bind and listen for accept HTTP connections."""
+    """Interface to bind and listen for accept HTTP client connections."""
 
-    sockets = Attribute(
-        "Dictionary of listening sockets."
-    )
-    connections = Attribute(
-        "List of accepted connections. Each connection is a plugin "
-        "implementing :class:`IConnection` interface."
-    )
-    version = Attribute(
-        "HTTP Version supported by this server."
-    )
+    sockets = {}
+    """Mapping of socket (file-descriptor) listening for new connection and
+    the socket object."""
+
+    connections = []
+    """List of accepted and active connections. Each connection is a plugin
+    implementing :class:`IHTTPConnection` interface."""
+
+    version = b''
+    """HTTP Version supported by this server."""
 
     def start( *args, **kwargs ):
         """Starts this server and returns a server object."""
 
     def stop():
-        """Stops listening for new connections.
-
-        Requests currently in progress may still continue after the
-        server is stopped.
+        """Stops listening for new connections. Requests currently in progress
+        may still continue after the server is stopped.
         """
 
 class IHTTPConnection( Interface ):
     """Interface for handling HTTP connections accepted by IHTTPServer.
     Received request are dispatched using :class:`IHTTPRequest` plugin."""
 
-    conn = Attribute(
-        "Accepted connection object."
-    )
-    address = Attribute(
-       "Client's IP address and port number. If running behind a "
-       "load-balancer or a proxy, the real IP address provided by a load "
-       "balancer will be passed in the ``X-Real-Ip`` header."
-    )
-    server = Attribute(
-        ":class:`IHTTPServer` plugin"
-    )
-    product = Attribute(
-        "HTTP product string (byte-string) for this server. Typically sent "
-        "with HTTP `Server` Reponse header."
-    )
-    version = Attribute(
-        "HTTP Version supported by this connection."
-    )
-    request = Attribute(
-        ":class:`IHTTPResource` plugin instance for current on-going request."
-    )
+    conn = None
+    """Accepted connection object."""
+
+    address = tuple()
+    """Client's IP address and port number."""
+
+    server = None
+    """:class:`IHTTPServer` plugin"""
+
+    product = b''
+    """HTTP product string (byte-string) for this server. Typically sent with
+    HTTP `Server` Reponse header."""
+
+    version = b''
+    """HTTP Version supported by this connection."""
+
+    request = None
+    """:class:`IHTTPResource` plugin instance for current on-going request."""
 
     def __init__( self, conn, addr, server, version ):
-        """Positional arguments:
+        """Positional arguments,
 
-        `conn`,
+        ``conn``,
             Accepted connection object.
 
-        `addr`,
+        ``addr``,
             Accepted client's address.
 
-        `server`
+        ``server``,
             :class:`IHTTPServer` plugin object.
         """
 
@@ -208,12 +103,12 @@ class IHTTPConnection( Interface ):
         """In case of SSL traffic, return SSL certifacte."""
 
     def set_close_callback( callback ):
-        """Subscribe a `callback` function, to be called when this connection
+        """Subscribe a ``callback`` function, to be called when this connection
         closed."""
 
     def set_finish_callback( callback ):
-        """Subscribe a `callback` function, to be called when an on-going
-        request/response if finished."""
+        """Subscribe a ``callback` function, to be called when an on-going
+        request/response is finished."""
 
     def handle_request( method, uri, version, headers, body=None, chunk=None,
                         trailers=None ):
@@ -270,28 +165,123 @@ class IHTTPConnection( Interface ):
         """
 
     def write( chunk, callback=None ):
-        """Write the `chunk` of data (bytes) to the connection and optionally
-        subscribe a `callback` function to be called when data is successfully
-        transfered."""
+        """Write the ``chunk`` of data (bytes) to the connection and optionally
+        subscribe a ``callback`` function to be called when data is successfully
+        transfered.
+        
+        ``chunk``
+            Chunk of data in byte-string to buffer and send.
 
-    def finish( callback=None ) :
-        """Call this method when there is no more response to send back for
-        the on-going request. To know when the response is done, which is when
-        the last byte is sent on the wire, subscribe a `callback` to be 
-        called on finishing the response.
+        ``callback``
+            Handler to callback when data is written to the socket.
         """
 
     def close():
         """Close this connection."""
 
 
+class IWebApp( Interface ):
+    """In pluggdapps, a web-Application is a plugin, whereby, a plugin is a
+    bunch of configuration parameters implementing one or more interface
+    specification. For this interface to be relevant,
+    :class:`pluggdapps.platform.Webapps` must be used to boot the platform.
+    There is also a base class :class:`WebApp` which implements this interface
+    and provides necessary support functions for application creators.
+    Therefore application plugins must derive from this base class.
+    """
+    instkey = tuple()
+    """A tuple of (appsec, netpath, configini)"""
+
+    # TODO : Make this as read only copy.
+    appsetting = {}
+    """Optional read only copy of application's settings."""
+
+    netpath = ''
+    """Net location and script-path on which the instance of webapp plugin is 
+    mounted. This is obtained from configuration settings."""
+
+    baseurl = ''
+    """Computed string of base url for web application."""
+
+    router = None
+    """Plugin instance implementing :class:`IHTTPRouter` interface. This is
+    the root router using which request urls will be resolved to a view
+    callable. Must be instantiated during boot time inside :meth:`startapp`
+    method."""
+
+    cookie = None
+    """Plugin instance implementing IHTTPCookie interface spec. Methods "
+    from this plugin will be used to process both request cookies and response
+    cookies."""
+
+
+    def startapp():
+        """Boot this applications. Called at platform boot-time."""
+
+    def dorequest( request, body=None, chunk=None, trailers=None ):
+        """This method is called after a new request is resolved to an
+        application, typically by :class:`IHTTPConnection` plugin. The 
+        callback will be issued when,
+          * A new request without body is received, where the request
+            data is available in ``request``.
+          * A new request with a body is received, in which case kwarg
+            ``body`` gives the request body as byte-string.
+        """
+ 
+    def dochunk( request, chunk=None, trailers=None ):
+        """This method is called for a new request (of type chunked encoding)
+        is resolved to an application. Otherwise it is called for an on-going
+        chunked request, for every chunk of the request, in which case the
+        web-application and related framework instances are preserved across
+        the chunks. This is typically done by :class:`IHTTPConnection`.
+        The callback will be issued when,
+          * A new request with a chunk is received, in which case kwarg
+            `chunks` gives a single element list with received chunk as,
+            ``(chunk_size, chunk_ext, chunk_data)``.
+          * A request is being received in chunked mode and a request chunk
+            just received, in which case `chunk` is a tuple of,
+            ``(chunk_size, chunk_ext, chunk_data)``.
+          * The last chunk of the request is received without a trailer.
+          * The last chunk of the request is received with a trailer.
+        """
+ 
+    def onfinish( request ):
+        """When a finish is called on the :attr:`request.response`, by calling
+        a ``flush( finished=True )``, onfinish() callbacks will be issued by
+        the :class:`pluggdapps.web.webinterfaces.IHTTPResponse`."""
+
+    def shutdown():
+        """Shutdown this application. Reverse of :meth:`startapp`."""
+
+    def urlfor( request, *args, **kwargs ):
+        """Generate url (full url) for request using ``args`` and ``kwargs``.
+        Typically, :meth:`pathfor` method shall be used to generate the
+        relative url and join the result with the web-application's
+        :attr:`webapp.base_url`. To know more about method arguments refer 
+        corresponding router's :meth:`urlpath` interface method. Returns an
+        absolute-URL as string.
+
+        ``request``,
+            The :class:`IHTTPRequest` object for which url is generated.
+        """
+
+    def pathfor( request, *args, **matchdict ):
+        """Generate relative url for request using route definitions, using
+        ``args`` and ``kwargs``. To learn more about ``args`` and ``kwargs``,
+        refer corresponding router's :meth:`pathfor` interface method. Returns
+        a URL path as string.
+
+        ``request``,
+            The :class:`IHTTPRequest` object for which url is generated.
+        """
+
+
 class IScaffold( Interface ):
     """Interface specification for automatically creating scaffolding logic
     based on collection of user-fed variables and a source-template."""
 
-    description = Attribute(
-        "One line description of scaffolding logic."
-    )
+    description = ''
+    """One line description of scaffolding logic."""
 
     def __init__( settings={} ):
         """Initialize interface attributes with ``settings`` parameter.

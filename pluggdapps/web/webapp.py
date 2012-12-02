@@ -2,13 +2,15 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
 
 from   urllib.parse import urljoin
 
-from   pluggdapps.plugin            import implements, Plugin
+from   pluggdapps.plugin            import implements, Plugin, plugincall
 from   pluggdapps.interfaces        import IWebApp
-from   pluggdapps.web.webinterfaces import IHTTPView, IHTTPRouter, IHTTPCookie
+from   pluggdapps.web.webinterfaces import IHTTPRouter, IHTTPCookie, \
+                                           IHTTPResponse, IHTTPResource, \
+                                           IHTTPSession, IHTTPEtag
 import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
@@ -56,22 +58,19 @@ _default_settings['IHTTPRequest']  = {
     'types'   : (str,),
     'help'    : "Name of the plugin to encapsulate HTTP request. "
 }
-_default_settings['IHTTPResource']  = {
-    'default' : 'httpresource',
-    'types'   : (str,),
-    'help'    : "A plugin name or plugin instance implementing "
-                ":class:`IHTTPResource` interface, or just a plain python "
-                "callable. What ever the case, please do go through the "
-                ":class:`IHTTPResource` interface specification before "
-                "authoring a resource-callable."
-                "View specific IHTTPResource plugins configured via "
-                "add_view() are used after resolving the request to a "
-                "view-callable."
-}
 _default_settings['IHTTPResponse']  = {
     'default' : 'httpresponse',
     'types'   : (str,),
     'help'    : "Name of the plugin to encapsulate HTTP response."
+}
+_default_settings['resource']  = {
+    'default' : 'httpresource',
+    'types'   : (str,),
+    'help'    : "Plugin name implementing :class:`IHTTPResource` interface. "
+                "Or, a callable object or string that imports a callable "
+                "object. This resource will be called for all requests that "
+                "are routed through this application. View specific resource "
+                "calls can be configured via add_view()."
 }
 
 class WebApp( Plugin ):
@@ -83,67 +82,73 @@ class WebApp( Plugin ):
         self.router = None  # TODO : Make this into default router
 
     def startapp( self ):
-        """Inheriting plugins should not forget to call its super() method."""
+        """:meth:`pluggdapps.interfaces.IWebApps.startapp` interface method."""
         self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
         self.cookie = self.query_plugin( IHTTPCookie, self['IHTTPCookie'] )
         self.router.onboot()
 
     def dorequest( self, request, body=None, chunk=None, trailers=None ):
+        """:meth:`pluggdapps.interfaces.IWebApps.dorequest` interface method."""
         request.router = self.router
         request.cookie = self.cookie
 
         request.handle( body=body, chunk=chunk, trailers=trailers )
 
         request.response = response = self.query_plugin(
-                            IHTTPResponse, webapp['IHTTPResponse'], request )
-        request.session = self.query_plugin(
-                            IHTTPSession, webapp['IHTTPSession'] )
-        response.etag = self.query_plugin( IHTTPEtag, webapp['IHTTPEtag'] )
+                            IHTTPResponse, self['IHTTPResponse'], request )
+        # request.session = self.query_plugin(
+        #                     IHTTPSession, self['IHTTPSession'] )
+        response.etag = self.query_plugin( IHTTPEtag, self['IHTTPEtag'] )
         response.context = c = h.Context()
 
 
         # Call IHTTPResource plugin configured for `webapp`.
-        if isinstance( webapp['IHTTPResource'], str ):
-            resc = self.query_plugin( IHTTPResource, webapp['IHTTPResource'] )
-        resc( request, c ) if resc else None
+        res = self['resource']
+        res = plugincall( res, lambda : self.query_plugin(IHTTPResource, res) )
+        res( request, c ) if res else None
 
         self.router.route( request, c )
 
     def dochunk( self, request, chunk=None, trailers=None ):
+        """:meth:`pluggdapps.interfaces.IWebApps.dochunk` interface method."""
         request.handle( chunk=chunk, trailers=trailers )
 
         # Call IHTTPResource plugin configured for `webapp`.
-        if isinstance( webapp['IHTTPResource'], str ):
-            resc = self.query_plugin( IHTTPResource, webapp['IHTTPResource'] )
-        resc( request, c ) if resc else None
+        res = self['resource']
+        res = plugincall( res, lambda : self.query_plugin(IHTTPResource, res) )
+        res( request, c ) if res else None
 
         self.router.route( request, c )
 
     def onfinish( self, request ):
+        """:meth:`pluggdapps.interfaces.IWebApps.onfinish` interface method."""
         pass
 
     def shutdown( self ):
+        """:meth:`pluggdapps.interfaces.IWebApps.shutdown` interface method."""
         self.router = None
         self.cookie = None
 
-    def urlfor( self, request, name, **matchdict ):
-        return urljoin( self.baseurl.encode('utf8'),
-                        self.pathfor(request, name, **matchdict) )
+    def urlfor( self, request, *args, **kwargs ):
+        """:meth:`pluggdapps.interfaces.IWebApps.urlfor` interface method."""
+        return urljoin( self.baseurl, self.pathfor(request, *args, **kwargs) )
 
-    def pathfor( self, request, name, **matchdict ):
-        query = matchdict.pop( '_query', None )
-        fragment = matchdict.pop( '_anchor', None ).encode('utf8')
-        path = self.router.urlpath( request, name, **matchdict )
-        return h.make_url( None, path, query, fragment )
+    def pathfor( self, request, *args, **kwargs ):
+        """:meth:`pluggdapps.interfaces.IWebApps.pathfor` interface method."""
+        return self.router.urlpath( request, *args, **kwargs )
 
 
     #---- ISettings interface methods
 
     @classmethod
     def default_settings( cls ):
+        """:meth:`pluggdapps.plugin.ISettings.default_settings` interface
+        method."""
         return _default_settings
 
     @classmethod
     def normalize_settings( cls, sett ):
+        """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
+        method."""
         sett['encoding'] = sett['encoding'].lower()
         return sett

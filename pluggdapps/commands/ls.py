@@ -2,27 +2,27 @@
 
 # This file is subject to the terms and conditions defined in
 # file 'LICENSE', which is part of this source code package.
-#       Copyright (c) 2011 Netscale Computing
+#       Copyright (c) 2011 R Pratap Chakravarthy
 
 from   pprint import pprint
 from   copy   import deepcopy
 
 from   pluggdapps.const      import SPECIAL_SECS
-from   pluggdapps.plugin     import PluginMeta, implements, Plugin, \
-                                    applications
+from   pluggdapps.plugin     import PluginMeta, implements, Singleton, webapps
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
-class CommandLs( Plugin ):
+class CommandLs( Singleton ):
     """Subcommand for pa-script to list various information about pluggdapps
     environment."""
     implements( ICommand )
 
-    description = "list various information about Pluggdapps environment."
+    description = 'list various information about Pluggdapps environment.'
     cmd = 'ls'
 
     #---- ICommand API
     def subparser( self, parser, subparsers ):
+        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface method."""
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
@@ -63,21 +63,22 @@ class CommandLs( Plugin ):
         return parser
 
     def handle( self, args ):
+        """:meth:`pluggdapps.interfaces.ICommand.handle` interface method."""
         opts = [ 'ls_summary', 'ls_settings', 'ls_plugins', 'ls_interfaces',
                  'ls_webapps', 'ls_packages', 'ls_implementers',
                  'ls_implementers_r' ]
         for opt in opts :
             if getattr( args, opt, False ) :
-                getattr( self, opt )( args )
+                getattr( self, '_'+opt )( args )
                 break
         else :
             if args.interface :
-                self.ls_interface( args )
+                self._ls_interface( args )
             elif args.plugin :
-                self.ls_plugin( args )
+                self._ls_plugin( args )
 
     #---- Internal functions
-    def ls_summary( self, args ):
+    def _ls_summary( self, args ):
         import pluggdapps
 
         webapps = getattr( self.pa, 'webapps', {} ).keys()
@@ -87,11 +88,11 @@ class CommandLs( Plugin ):
         print( "  Loaded packages    : %s" % len(pluggdapps.packages) )
         print( "  Interfaces defined : %s" % len(PluginMeta._interfmap) )
         print( "  Plugins loaded     : %s" % len(PluginMeta._pluginmap) )
-        print( "  Applications loaded: %s" % len(applications()) )
+        print( "  Applications loaded: %s" % len(webapps()) )
         print( "Web-application instances")
         pprint( list(webapps), indent=2 )
 
-    def ls_settings( self, args ):
+    def _ls_settings( self, args ):
         sett = deepcopy( self.pa.settings )
         if args.ls_settings.startswith('spec') :
             print( "Special sections" )
@@ -117,18 +118,18 @@ class CommandLs( Plugin ):
             pprint( defaultsett().get( h.plugin2sec(args.plugin), {} ),
                     indent=2 )
 
-    def ls_plugins( self, args ):
+    def _ls_plugins( self, args ):
         l = sorted( list( PluginMeta._pluginmap.items() ))
         for pname, info in l :
             print(( "  %-15s in %r" % ( pname, info['file']) ))
 
 
-    def ls_interfaces( self, args ):
+    def _ls_interfaces( self, args ):
         l = sorted( list( PluginMeta._interfmap.items() ))
         for iname, info in l :
             print(( "  %-15s in %r" % (iname, info['file']) ))
 
-    def ls_interface( self, args ):
+    def _ls_interface( self, args ):
         nm = args.interface
         info = PluginMeta._interfmap.get( nm, None )
         if info == None :
@@ -142,7 +143,7 @@ class CommandLs( Plugin ):
             plugins = PluginMeta._implementers.get( info['cls'], {} )
             pprint( plugins, indent=4 )
 
-    def ls_plugin( self, args ):
+    def _ls_plugin( self, args ):
         from  pluggdapps.web.webapp import WebApp
         for instkey, webapp in self.pa.webapps.items() :
             appsec, netpath, config = instkey
@@ -156,25 +157,25 @@ class CommandLs( Plugin ):
                 pprint( webapp.appsetting, indent=4 )
                 print()
 
-    def ls_webapps( self, args ):
+    def _ls_webapps( self, args ):
         print( "[mountloc]")
         pprint( self.pa.webapps, indent=2 )
         print( "\nWeb-apps mounted" )
         pprint( list( self.pa.webapps.keys() ), indent=2 )
 
-    def ls_packages( self, args ):
+    def _ls_packages( self, args ):
         import pluggdapps
         print( "List of loaded packages" )
         pprint( pluggdapps.packages, indent=2 )
 
-    def ls_implementers( self, args ):
+    def _ls_implementers( self, args ):
         print("List of interfaces and plugins implementing them")
         print()
         for i, pmap in PluginMeta._implementers.items() :
             print( "  %-15s" % i.__name__, end='' )
             pprint( list( pmap.keys() ), indent=8 )
 
-    def ls_implementers_r( self, args ):
+    def _ls_implementers_r( self, args ):
         print("List of plugins and interfaces implemented by them")
         for name, info in PluginMeta._pluginmap.items() :
             intrfs = list( map( lambda x : x.__name__, info['cls']._interfs ))

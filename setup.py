@@ -7,15 +7,15 @@ from   setuptools import setup, find_packages
 from   os.path    import abspath, dirname, join
 
 here = abspath( dirname(__file__) )
-LONG_DESCRIPTION = open( join( here, 'README.rst' )).read()
+LONG_DESCRIPTION = open( join( here, 'README' )).read()
 
 version = re.compile( 
             r".*__version__[ ]*=[ ]*'(.*?)'",
             re.S 
-          ).match( open( join( here, 'pluggdapps', '__init__.py' )).read()
-                 ).group(1)
+          ).match( 
+            open( join( here, 'pluggdapps', '__init__.py' )).read()).group(1)
 
-description='A plugin / web platform'
+description='Pluggdapps component architecture, web framework'
 
 classifiers = [
 'Development Status :: 4 - Beta',
