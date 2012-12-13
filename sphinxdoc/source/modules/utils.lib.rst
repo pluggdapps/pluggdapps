@@ -30,5 +30,4 @@ Module contents
 .. autofunction:: eval_import
 .. autofunction:: string_import
 .. autofunction:: str2module
-.. autofunction:: callcallable
  

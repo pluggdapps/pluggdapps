@@ -18,11 +18,11 @@ Module contents
 .. autofunction:: parse_date
 .. autofunction:: http_fromdate
 .. autofunction:: http_todate
-.. autofunction:: parse_trailer
-.. autofunction:: parse_transfer_encoding
+.. autofunction:: trailer
+.. autofunction:: transfer_encoding
 .. autofunction:: accept
 .. autofunction:: accept_charset
 .. autofunction:: accept_encoding
-.. autofunction:: parse_content_length
+.. autofunction:: content_length
 .. autofunction:: parse_content_type
 .. autofunction:: parse_content_disposition

@@ -20,6 +20,7 @@ sdist :
 sphinx-doc :
 	cp README.rst sphinxdoc/source/
 	cp CHANGELOG.rst sphinxdoc/source/
+	rm -rf sphinxdoc/build/html/
 	make -C sphinxdoc html
 	cd sphinxdoc/build/html; zip -r pluggdapps.sphinxdoc.zip ./
 
