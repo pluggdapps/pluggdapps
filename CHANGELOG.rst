@@ -5,11 +5,12 @@ Release changes
 ------
 
 First release. Provides,
-  * Component architecture using python meta-classing, a plugin system using 
-    interface specifications and a wonderful configuration system.
-  * Pluggable sub-commands accessible via `pa` script.
-  * Web-framework to host more than one application in the same environment.
-  * Documentation available using sphinx.
+
+* Component architecture using python meta-classing, a plugin system using 
+  interface specifications and a wonderful configuration system.
+* Pluggable sub-commands accessible via `pa` script.
+* Web-framework to host more than one application in the same environment.
+* Documentation available using sphinx.
 
 0.2dev
 ------
