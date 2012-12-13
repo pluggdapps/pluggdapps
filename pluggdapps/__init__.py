@@ -63,7 +63,7 @@ import pluggdapps.plugin
 import pluggdapps.platform
 import pluggdapps.interfaces
 
-__version__ = '0.1dev'
+__version__ = '0.2dev'
 
 def package() :
     """Entry point that returns a dictionary of key,value details about the
