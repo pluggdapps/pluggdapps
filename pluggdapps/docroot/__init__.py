@@ -5,7 +5,10 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 
-"""'docroot' web-application"""
+"""Web-application to host static web documents like HTML, CSS,
+JavaScript and various image files. All of these files are static content and
+subjected to content negotiation.
+"""
 
 # - Make sure that to import this package in parent package's __init__ 
 #   module.
