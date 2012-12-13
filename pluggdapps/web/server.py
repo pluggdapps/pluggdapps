@@ -10,7 +10,7 @@ schedule time-based events.
 """
 
 import sys, datetime, errno, heapq, time, os, select, socket, re, \
-       collections, http.client
+       collections, http.client, traceback
 
 import ssl  # Python 2.6+
 
@@ -37,7 +37,7 @@ _ds1['scheme'] = {
                  "used."
 }
 _ds1['host']  = {
-    'default' : 'localhost',
+    'default' : '',
     'types'   : (str,),
     'help'    : "Address may be either an IP address or hostname.  If it's a "
                 "hostname, the server will listen on all IP addresses "
@@ -126,7 +126,7 @@ def run_callback( server, callback, *args, **kwargs ):
     try:
         callback( *args, **kwargs )
     except Exception:
-        server.pa.logerror( "Exception in callback %r" % callback )
+        server.pa.logerror( "In callback %r" % callback )
         if server['debug'] : raise
 
 class HTTPEPollServer( Plugin ):
@@ -171,10 +171,8 @@ class HTTPEPollServer( Plugin ):
         except KeyboardInterrupt :
             self.stop()
         except :
-            typ, val, tb = sys.exc_info()
-            h.print_exc( typ, val, tb )
+            self.pa.logdebug( h.print_exc() )
             self.stop()
-            if self['debug'] : raise
         self.ioloop.close()
         if self.connections : 
             addrs = tuple( map( lambda c : c.address, self.connections ))
@@ -199,7 +197,7 @@ class HTTPEPollServer( Plugin ):
         """Close a client connection `httpconn` which is
         :class:`IHTTPConnection` plugin."""
         if httpconn in self.connections :
-            self.pa.loginfo("Closing connection %r ..."%(httpconn.address,))
+            self.pa.logdebug("Closing connection %r ..."%(httpconn.address,))
             self.connections.remove( httpconn )
 
     def listen( self ):
@@ -307,11 +305,10 @@ class HTTPEPollServer( Plugin ):
                 if hasattr(socket, "IPPROTO_IPV6"):
                     sock.setsockopt( 
                             socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1 )
-            self.pa.loginfo( "Set server socket to non-blocking mode ..." )
+            self.pa.logdebug( "Set server socket to non-blocking mode ..." )
             sock.setblocking(0) # Set to non-blocking.
             sock.bind( sockaddr )
-            self.pa.loginfo( 
-                    "Server listening with a backlog of %s" % backlog )
+            self.pa.loginfo( "Server listening with backlog %s" % backlog )
             sock.listen( backlog )
             sockets.append( sock )
         return sockets
@@ -355,10 +352,10 @@ def add_accept_handler( server, sock, callback, ioloop ):
             except socket.error as e:
                 if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                     return
-                server.pa.loginfo( "Unable to accept connection." )
+                server.pa.logdebug( "Unable to accept connection." )
                 if self['debug'] : raise
 
-            server.pa.loginfo( "Accepting new connection from %r"%(address,) )
+            server.pa.logdebug( "Accepting new connection from %r"%(address,) )
             callback( connection, address )
 
     ioloop.add_handler( sock.fileno(), accept_handler, IOLoop.READ )
@@ -432,7 +429,7 @@ class IOLoop( object ):
         self._stopped = False
 
         if self.debug :
-            server.pa.loginfo( "Adding poll-loop waker ..." )
+            server.pa.logdebug( "Adding poll-loop waker ..." )
 
         self.add_handler( self._waker.fileno(), 
                           lambda fd, events: self._waker.consume(), # handler
@@ -453,7 +450,7 @@ class IOLoop( object ):
                 "Polled descriptors exceeded threshold" % self.poll_threshold
             )
         if self.debug :
-            self.server.pa.loginfo(
+            self.server.pa.logdebug(
                 "Add descriptor to epoll : %s" % list( self._handlers.keys() )
             )
 
@@ -461,21 +458,18 @@ class IOLoop( object ):
         """Changes the events we listen for fd."""
         self._evpoll.modify( fd, events | self.ERROR )
         if self.debug :
-            self.server.pa.loginfo(
+            self.server.pa.logdebug(
                 "Updating descriptor : (%s, %s)" % (fd, events)
             )
 
     def remove_handler( self, fd ):
         """Stop listening for events on fd."""
-        if self.debug :
-            self.server.pa.loginfo("Remove descriptor from epoll : %s:" % fd)
-
-        self._handlers.pop(fd, None)
-        self._events.pop(fd, None)
-        try:
-            self._evpoll.unregister(fd)
-        except (OSError, IOError):
-            self.server.pa.logwarn( "Error deleting fd from epoll" )
+        if self._handlers.pop(fd, None) or self._events.pop(fd, None) :
+            self.server.pa.logdebug("Remove descriptor from epoll : %s:" % fd)
+            try:
+                self._evpoll.unregister(fd)
+            except (OSError, IOError):
+                self.server.pa.logwarn( "Error deleting fd from epoll" )
 
     #---- Manage timeout handlers on this epoll using heap queue.
 
@@ -542,8 +536,7 @@ class IOLoop( object ):
             for callback in callbacks :
                 try    : callback()
                 except :
-                    err = "Exception in callback %r" % callback
-                    self.server.pa.logerror( err )
+                    self.server.pa.logerror( "In callback %r" % callback )
                     if self.debug : raise
 
             # Handle timeouts
@@ -557,8 +550,7 @@ class IOLoop( object ):
                         timeout = heapq.heappop( self._timeouts )
                         try    : timeout.callback()
                         except :
-                            err = "Exception in callback %r" % timeout
-                            self.server.pa.logerror( err )
+                            self.server.pa.logerror("In timeout %r" % timeout)
                             if self.debug : raise
 
                     else : # Adjust poll-timeout
@@ -597,8 +589,7 @@ class IOLoop( object ):
                 callback = self._handlers.get( fd, None )
                 try : callback( fd, events ) if callback else None
                 except :
-                    err = "Exception in socket callback %r" % callback
-                    self.server.pa.logerror( err )
+                    self.server.pa.logerror("In socket callback %r"%callback)
                     if self.server['debug'] : raise
 
         # reset the stopped flag so another start/stop pair can be issued
@@ -615,7 +606,7 @@ class IOLoop( object ):
         stopped until `self.start()` has also returned.
         """
         # Close listening sockets and remove them from IOLoop
-        self.server.pa.loginfo( "Stopping poll loop ..." )
+        self.server.pa.logdebug( "Stopping poll loop ..." )
         self.remove_handler( self._waker.fileno() )
 
         fds = list( self._handlers.keys() )
@@ -788,18 +779,11 @@ class HTTPConnection( Plugin ):
         interface method."""
 
         # Fresh request, resolve application.
-        try :
-            uriparts, webapp = self.pa.resolveapp( uri, headers )
-            if webapp == None :
-                self.pa.logerror(
-                    "Unable to resolve request for apps. (%s)" % uri )
-                self.write( self.NOT_FOUND, force=True )
-                self.tryclose( disconnect=True )
-                return
-        except :
-            self.write( self.NOT_FOUND, force=True )
-            self.tryclose( disconnect=True )
-            if self['debug'] : raise
+        uriparts, webapp = self.pa.resolveapp( uri, headers )
+        if webapp == None :
+            self.pa.logerror(
+                "Unable to resolve request for apps. (%s)" % uri )
+            self.write_error( self.NOT_FOUND )
             return
 
         try :
@@ -807,13 +791,10 @@ class HTTPConnection( Plugin ):
             # of a webapp, use `webapp` plugin to query for IHTTPRequest.
             request = webapp.query_plugin(
                             IHTTPRequest, webapp['IHTTPRequest'],
-                            self, method, uriparts, version, headers )
+                            self, method, uri, version, headers )
         except :
-            self.pa.logerror(
-                "Application %r cannot handle request %r" % (webapp, uri) )
-            self.write( self.NOT_FOUND, force=True )
-            self.tryclose( disconnect=True )
-            if self['debug'] : raise
+            h.print_exc()
+            self.write_error( self.INTERNAL_ERROR )
             return
 
         self.request = request
@@ -827,29 +808,21 @@ class HTTPConnection( Plugin ):
         interface method."""
         self.request.webapp.dochunk( request, chunk=chunk, trailers=trailers )
 
-    def write( self, data, callback=None, force=False ):
+    def write( self, data, callback=None ):
         """:meth:`pluggdapps.interfaces.IHTTPConnection.write`
-        interface method. Write a data to socket. ``force`` is a non-standard
-        kwarg for this API method.
+        interface method. Write a data to socket.
         """
         response = getattr( self.request, 'response', None )
-        if force == False and self.request == None :
-            msg = "Request is not yet received."
-            self.pa.logerror( msg )
-            return
-        elif force == False and response == None :
-            msg = "Writing on connection without a response object"
-            self.pa.logerror( msg )
+        if self.request == None :
+            self.pa.logerror( "Request is not yet received." )
             return
 
         if self.stream and self.stream.closed() :
-            self.pa.logwarn( 
-                    "Cannot write to closed stream %r" % (self.address,) )
+            self.pa.logwarn("Cannot write to closed stream %r"%(self.address,))
             return
 
         self.write_callback = callback
         self.stream.write( data, self.on_write_complete )
-
         return
 
     def close( self ):
@@ -859,26 +832,19 @@ class HTTPConnection( Plugin ):
 
     #---- Internal methods
 
+    def write_error( self, rawdata ):
+        """Write raw data as response and close the connection."""
+        if self.stream and self.stream.closed() :
+            self.pa.logwarn("Cannot write to closed stream %r"%(self.address,))
+            return
+        self.stream.write( rawdata, self.tryclose )
+        return
+
     def supports_http_1_1( self ):
         """Check whether the client support HTTP 1.1"""
         if self.reqdata :
             return self.reqdata[2] == b'HTTP/1.1'
         return False
-
-    def dofinish( self ):
-        """Mark that response is sent and close the connection if required,
-        before subscribing to request-handler."""
-        disconnect = self.tryclose()
-
-        if self.finish_callback :
-            callback, self.finish_callback = self.finish_callback, None
-            callback()
-
-        self.request = None
-
-        if ( disconnect == False and self.stream and 
-             self.stream.closed() == False ) :
-            self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
 
     def tryclose( self, disconnect=False ):
         """Try to close this connection. If `disconnect` is True,
@@ -892,9 +858,6 @@ class HTTPConnection( Plugin ):
         if disconnect == True :
             self.server.ioloop.remove_timeout( self.iotimeout )
             self.stream.close()
-            if self.finish_callback :
-                callback, self.finish_callback = self.finish_callback, None
-                callback()
             if self.close_callback :
                 callback, self.close_callback = self.close_callback, None
                 callback()
@@ -915,16 +878,23 @@ class HTTPConnection( Plugin ):
             callback()
 
         if self.request and self.request.has_finished() :
-            self.dofinish()
+            # Mark that response is sent and close the connection if required,
+            # before subscribing to request-handler.
+            disconnect = self.tryclose()
+
+            if self.finish_callback :
+                callback, self.finish_callback = self.finish_callback, None
+                callback()
+            self.request = None
+            if ( disconnect == False and self.stream and 
+                 self.stream.closed() == False ) :
+                self.stream.read_until( b"\r\n\r\n", self.on_request_headers )
 
     def on_request_headers( self, data ):
         """A request has started. Parse `data` for startline and headers."""
         if self.request != None :
-            self.write( self.INTERNAL_ERROR, force=True )
-            self.tryclose()
-            self.pa.logerror(
-                "Cannot start a new request when there is on-going request.." )
-            if self['debug'] : raise
+            h.print_exc()
+            self.write_error( self.INTERNAL_ERROR )
             return
 
         # Remove empty-lines (CRLFs) prefixed to request message
@@ -942,8 +912,7 @@ class HTTPConnection( Plugin ):
 
             method, uri, version = h.parse_startline( startline )
             if version != b"HTTP/1.1" :
-                self.write( self.BAD_REQUEST, force=True )
-                self.tryclose( disconnect=True )
+                self.write_error( self.BAD_REQUEST )
                 return
 
             hdrs = h.HTTPHeaders.parse( hdrdata ) if hdrdata else []
@@ -952,8 +921,8 @@ class HTTPConnection( Plugin ):
             # The presence of a message-body in a request is signaled by the
             # inclusion of a Content-Length or Transfer-Encoding header field
             # in the request's message-headers.
-            clen = h.parse_content_length( hdrs.get( "content_length", None))
-            transenc = h.parse_transfer_encoding( 
+            clen = h.content_length( hdrs.get( "content_length", None ))
+            transenc = h.transfer_encoding( 
                             hdrs.get( 'transfer_encoding', None ))
 
             if transenc and transenc[0][0] == b'chunked' :
@@ -961,13 +930,13 @@ class HTTPConnection( Plugin ):
                 self.stream.read_until( b"\r\n", self.on_request_chunk_line )
 
             elif clen :
-                expect = h.parse_expect( hdrs.get( "expect", None ))
+                expect = hdrs.get( "expect", '' ).strip()
                 if clen > self['max_buffer_size'] :
-                    self.write( self.ENTITY_LARGE, force=True )
+                    self.write_error( self.ENTITY_LARGE )
                     self.stream.read_bytes( clen, self.on_skip_request )
 
                 elif expect == "100-continue" :
-                    self.write( b"HTTP/1.1 100 (Continue)\r\n\r\n",force=True )
+                    self.stream.write( b"HTTP/1.1 100 (Continue)\r\n\r\n" )
                     self.stream.read_bytes( clen, self.on_request_body )
 
                 else :
@@ -979,13 +948,9 @@ class HTTPConnection( Plugin ):
                     self.stream.read_until(
                             b"\r\n\r\n", self.on_request_headers )
 
-        except h.Error as e:
-            self.pa.logerror( "Malformed request ..." )
-            self.write( self.BAD_REQUEST, force=True )
-            self.tryclose( disconnect=True )
-            if self['debug'] : raise
-            return
-
+        except :
+            h.print_exc()
+            self.write_error( self.BAD_REQUEST )
         return
 
     def on_skip_request( self, data ):
@@ -1013,7 +978,7 @@ class HTTPConnection( Plugin ):
 
         if chunk_size == 0 :    # last_chunk
             self.chunk = (chunk_size, chunk_ext, None)
-            if h.parse_trailer( hdrs.get( 'trailer', None )) :# Trailer present
+            if h.trailer( hdrs.get( 'trailer', None )) :# Trailer present
                 self.stream.read_until( b"\r\n\r\n", self.on_request_trailer )
             else :
                 self.stream.read_until( b"\r\n", self.on_request_chunks_done )
@@ -1059,7 +1024,7 @@ class HTTPConnection( Plugin ):
     def on_timeout( self ):
         """The connection was idle and a timeout has occured. Close the
         connection."""
-        self.pa.loginfo( "Connection %r timed-out" % (self.address,) )
+        self.pa.logdebug( "Connection %r timed-out" % (self.address,) )
         self.tryclose( disconnect=True )
 
     def on_connection_close( self ):
@@ -1166,7 +1131,7 @@ class IOStream( object ):
     """Event loop for epoll service."""
 
     server = None
-    """Server plugin instance."""
+    """:class:`IHTTPServer` plugin instance."""
 
     _read_buffer = None
     """A collection object to buffer read bytes from socket."""
@@ -1194,10 +1159,6 @@ class IOStream( object ):
 
     _read_callback = None
     """Call back for one of the read*() APIs."""
-
-    _streaming_callback = None
-    """In case of reading specified number of bytes or read until close, this 
-    callback is called for every chunk that are read."""
 
     _write_callback = None
     """Call back for one of the write*() APIs."""
@@ -1227,14 +1188,16 @@ class IOStream( object ):
         self._write_buffer = collections.deque()
         self._read_buffer_size = 0
         self._write_buffer_frozen = False
+
         self._read_delimiter = None
         self._read_regex = None
         self._read_bytes = None
         self._read_until_close = False
+
         self._read_callback = None
-        self._streaming_callback = None
         self._write_callback = None
         self._close_callback = None
+
         self._state = None
         self._pending_callbacks = 0
 
@@ -1243,14 +1206,14 @@ class IOStream( object ):
     def read_until_regex(self, regex, callback):
         """Call callback when we read the given regex pattern. Callback
         is passed with binary data."""
-        self.set_read_callback( callback )
+        self._read_callback = callback
         self._read_regex = re.compile( regex )
         self.tryread()
 
     def read_until(self, delimiter, callback):
         """Call callback when we read the given delimiter. Callback is passed
         with binary data."""
-        self.set_read_callback( callback )
+        self._read_callback = callback
         self._read_delimiter = delimiter
         self.tryread()
 
@@ -1262,31 +1225,9 @@ class IOStream( object ):
         of data as they become available, and the argument to the final
         ``callback`` will be empty.
         """
-        self.set_read_callback( callback )
+        self._read_callback = callback
         self._read_bytes = num_bytes
-        self._streaming_callback = streaming_callback
         self.tryread()
-
-    def read_until_close( self, callback, streaming_callback=None ):
-        """Reads all data from the socket until it is closed. Callback is
-        passed with binary data.
-
-        If a ``streaming_callback`` is given, it will be called with chunks
-        of data as they become available, and the argument to the final
-        ``callback`` will be empty.
-
-        Subject to ``max_buffer_size`` limit if a ``streaming_callback`` is 
-        not used.
-        """
-        self.set_read_callback(callback)
-
-        if self.closed() : # Already closed.
-            self.docallback( self._read_buffer_size, callback )
-            return
-
-        self._read_until_close = True
-        self._streaming_callback = streaming_callback
-        self.add_io_state( self.ioloop.READ )
 
     def write( self, data, callback=None ):
         """Write the given data to this stream. `data` is expected to be in
@@ -1314,10 +1255,7 @@ class IOStream( object ):
 
     def close( self ):
         """Close this stream."""
-        if self.server['debug'] == True :
-            self.server.pa.loginfo(
-                    "Closing the stream for %r" % (self.address,) )
-
+        self.server.pa.logdebug("Closing the stream for %r" % (self.address,))
         if self.conn :
             if self._read_until_close :
                 self.docallback( self._read_buffer_size, self._read_callback )
@@ -1328,10 +1266,15 @@ class IOStream( object ):
             self.try_close_callback()
 
         self.httpconn = self.conn = None
+
+        self._read_delimiter = self._read_regex = self._read_bytes = None
+        self._read_until_close = False
+
         self._read_callback = None
-        self._streaming_callback = None
         self._write_callback = None
         self._close_callback = None
+
+        self._state = None
 
     def reading(self):
         """Returns true if we are currently reading from the stream."""
@@ -1347,172 +1290,34 @@ class IOStream( object ):
 
     #---- Local methods.
 
-    def try_close_callback(self):
-        """If a close-callback is subscribed, try calling back.  If there are
-        pending callbacks, don't run the close callback until they're done
-        (see _maybe_add_error_handler)."""
-        if ( self.conn is None and self._close_callback and
-             self._pending_callbacks == 0 ):
-
-            cb = self._close_callback
-            self._close_callback = None
-            run_callback( self.server, cb )
-
-    def docallback( self, consume_bytes, callback ):
-        """There can be only one callback subscribed on a read. Either for 
-             read_bytes(), read_until(), read_until_regex(),
-             read_until_close()
+    def tryread(self):
+        """Attempt to complete the current read operation from buffered data.
+        If the read can be completed without blocking, schedules the
+        read callback on the next IOLoop iteration; otherwise starts
+        listening for reads on the socket.
         """
-        self._read_bytes = None
-        self._read_delimiter = None
-        self._read_regex = None
-        self._read_until_close = False
+        # See if we've already got the data from a previous read
+        if self.try_read_buffer() : return
 
-        self._read_callback = None
-        self._streaming_callback = None
-
-        data = self.consume( consume_bytes )
-        run_callback( self.server, callback, data )
-
-    def on_epoll_event( self, fd, events ):
-        """Callback for this socket's (conn's) events monitored by an EPoll."""
-
-        if not self.conn:
-            self.server.pa.logwarn( "Got events for closed stream %d" % fd )
-            return
-
-        try:
-            if events & self.ioloop.READ :
-                self.handle_read()
-            if not self.conn : return
-
-            if events & self.ioloop.WRITE :
-                self.handle_write()
-            if not self.conn: return
-
-            if events & self.ioloop.ERROR:
-                # We may have queued up a user callback in handle_read or
-                # handle_write, so don't close the HTTPIOStream until those
-                # callbacks have had a chance to run.
-                self.ioloop.add_callback( self.close )
-                return
-
-            state = self.ioloop.ERROR
-            if self.reading() :
-                state |= self.ioloop.READ
-            if self.writing() :
-                state |= self.ioloop.WRITE
-            if state == self.ioloop.ERROR :
-                state |= self.ioloop.READ
-
-            if state != self._state:
-                if self._state is not None :
-                    raise Exception( 
-                            "shouldn't happen: on_epoll_event without _state" )
-                self._state = state
-                self.ioloop.update_handler( self.conn.fileno(), self._state )
-        except Exception :
-            self.server.pa.logerror( "Exception while handling %r socket" )
+        # If the socket is not closed, then try reading from the socket.
+        try :
+            while self.read_to_buffer() : pass
+        except :
+            self.server.pa.logdebug( h.print_exc() )
             self.close()
-            if self.server['debug'] : raise
 
-    def handle_read( self ):
-        try:
-            try:
-                # Pretend to have a pending callback so that an EOF in
-                # read_to_buffer() doesn't trigger an immediate close
-                # callback.  At the end of this method we'll either
-                # estabilsh a real pending callback via # read_from_buffer or
-                # run the close callback
-                
-                # We need two try statements here so that
-                # pending_callbacks is decremented before the `except`
-                # clause below (which calls `close` and does need to
-                # trigger the callback)
-                self._pending_callbacks += 1
-                while True:
-                    # Read from the socket until we get EWOULDBLOCK or
-                    # equivalent. SSL sockets do some internal buffering, and
-                    # if the data is sitting in the SSL object's buffer
-                    # select() and friends can't see it; the only way to find
-                    # out if it's there is to try to read it.
-                    if self.read_to_buffer() == 0:
-                        break
-            finally:
-                self._pending_callbacks -= 1
-        except Exception:
-            self.server.pa.logwarn( "error on read" )
-            self.close()
-            if self['debug'] : raise
-            return
+        # And see if we've already got the data from this read
+        if self.try_read_buffer(): return
 
-        if self.read_from_buffer() :
-            return
-        else:
-            self.try_close_callback()
+        self.add_io_state( self.ioloop.READ )
 
-    def read_from_socket( self ):
-        """Attempts to read from the socket.
-        Returns the data read or None if there is nothing to read.
-        """
-        try:
-            chunk = self.conn.recv( self.read_chunk_size )
-        except socket.error as e:
-            if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
-                return None
-            raise
-        # if not chunk : # May be the remote end closed
-        #     self.close()
-        #     return None
-        return chunk
-
-    def read_to_buffer(self):
-        """Reads from the socket and appends the result to the read buffer.
-
-        Returns the number of bytes read.  Returns 0 if there is nothing
-        to read (i.e. the read returns EWOULDBLOCK or equivalent).  On
-        error closes the socket and raises an exception.
-        """
-        try:
-            chunk = self.read_from_socket()
-        except socket.error as e:
-            # ssl.SSLError is a subclass of socket.error
-            err = "Read error on %d: %s" % (self.conn.fileno(), e)
-            self.server.pa.logwarn( err )
-            self.close()
-            if self['debug'] : raise
-
-        if chunk is None: return 0
-
-        self._read_buffer.append( chunk )
-        self._read_buffer_size += len(chunk)
-        if self._read_buffer_size >= self.max_buffer_size :
-            err = "Reached maximum read buffer size"
-            self.close()
-            self.server.pa.logerror( err )
-            raise IOError( err )
-
-        return len(chunk)
-
-    def read_from_buffer(self):
+    def try_read_buffer(self):
         """Attempts to complete the currently-pending read from the buffer.
-
-        Returns True if the read was completed and the callback registered via
-        on of the API is issued and returned.
+        Returns True if read was completed and the callback registered via
+        one of the API is issued and the callback return.
         """
-
-        # Do streaming callback, in case of read_bytes() API, for chunked
-        # read.
-        if self._streaming_callback is not None and self._read_buffer_size :
-            bytes_to_consume = self._read_buffer_size
-            if self._read_bytes is not None :
-                bytes_to_consume = min(self._read_bytes, bytes_to_consume)
-                self._read_bytes -= bytes_to_consume
-            data = self.consume( bytes_to_consume )
-            self.run_callback( self.server, self._streaming_callback, data )
-
         # For read_bytes() API
-        if ( self._read_bytes != None and 
+        if ( self._read_bytes != None and
                 self._read_buffer_size >= self._read_bytes ) :
 
             self.docallback( self._read_bytes, self._read_callback )
@@ -1556,29 +1361,128 @@ class IOStream( object ):
 
         return False
 
-    def set_read_callback(self, callback):
-        self._read_callback = callback
+    def try_close_callback(self):
+        """If a close-callback is subscribed, try calling back.  If there are
+        pending callbacks, don't run the close callback until they're done
+        (see _maybe_add_error_handler)."""
+        if self.conn is None and self._close_callback :
+            cb = self._close_callback
+            self._close_callback = None
+            run_callback( self.server, cb )
 
-    def tryread(self):
-        """Attempt to complete the current read operation from buffered data.
-
-        If the read can be completed without blocking, schedules the
-        read callback on the next IOLoop iteration; otherwise starts
-        listening for reads on the socket.
+    def docallback( self, consume_bytes, callback ):
+        """There can be only one callback subscribed on a read. Either for 
+             read_bytes(), read_until(), read_until_regex()
         """
-        # See if we've already got the data from a previous read
-        if self.read_from_buffer() : return
+        self._read_bytes = None
+        self._read_delimiter = None
+        self._read_regex = None
+        self._read_until_close = False
 
-        # If the socket is not closed, then try reading from the socket.
-        self.check_closed()
-        while True :
-            if self.read_to_buffer() == 0 : break
+        self._read_callback = None
+
+        data = self.consume( consume_bytes )
+        run_callback( self.server, callback, data )
+
+    def consume( self, loc ):
+        if loc == 0:
+            return b""
+        self.merge_prefix( self._read_buffer, loc )
+        self._read_buffer_size -= loc
+        return self._read_buffer.popleft()
+
+    def on_epoll_event( self, fd, events ):
+        """Callback for this socket's (conn's) events monitored by an EPoll."""
+
+        if not self.conn:
+            self.server.pa.logwarn( "Got events for closed stream %d" % fd )
+            return
+
+        try:
+            if events & self.ioloop.READ :
+                self.handle_read()
+            if not self.conn : return
+
+            if events & self.ioloop.WRITE :
+                self.handle_write()
+            if not self.conn: return
+
+            if events & self.ioloop.ERROR:
+                # We may have queued up a user callback in handle_read or
+                # handle_write, so don't close the HTTPIOStream until those
+                # callbacks have had a chance to run.
+                self.ioloop.add_callback( self.close )
+                return
+
+            state = self.ioloop.ERROR
+            if self.reading() :
+                state |= self.ioloop.READ
+            if self.writing() :
+                state |= self.ioloop.WRITE
+            if state == self.ioloop.ERROR :
+                state |= self.ioloop.READ
+
+            if state != self._state:
+                if self._state is not None :
+                    raise Exception( 
+                            "shouldn't happen: on_epoll_event without _state" )
+                self._state = state
+                self.ioloop.update_handler( self.conn.fileno(), self._state )
+        except Exception :
+            self.server.pa.logdebug( h.print_exc() )
+            self.close()
+
+    def handle_read( self ):
+        try:
+            while True:
+                # Read from the socket until we get EWOULDBLOCK or
+                # equivalent. SSL sockets do some internal buffering, and
+                # if the data is sitting in the SSL object's buffer
+                # select() and friends can't see it; the only way to find
+                # out if it's there is to try to read it.
+                if self.read_to_buffer() == 0:
+                    break
+        except :
+            self.server.pa.logdebug( h.print_exc() )
+            self.close()
+        self.try_read_buffer()
+
+    def read_from_socket( self ):
+        """Attempts to read from the socket.
+        Returns the data read or None if there is nothing to read.
+        """
+        try:
+            chunk = self.conn.recv( self.read_chunk_size )
+        except socket.error as e:
+            if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
+                return None
+            raise
+        # May be the remote end closed
+        if not chunk :
+            raise Exception( "May be remote end %r closed" % (self.address,) )
+        return chunk
+
+    def read_to_buffer(self):
+        """Reads from the socket and appends the result to the read buffer.
+
+        Returns the number of bytes read.  Returns 0 if there is nothing
+        to read (i.e. the read returns EWOULDBLOCK or equivalent).  On
+        error closes the socket and raises an exception.
+        """
+        try:
             self.check_closed()
+            chunk = self.read_from_socket()
+        except :
+            raise
 
-        # And see if we've already got the data from this read
-        if self.read_from_buffer(): return
-
-        self.add_io_state( self.ioloop.READ )
+        chunklen = 0
+        if chunk is not None :
+            self._read_buffer.append( chunk )
+            self._read_buffer_size += len(chunk)
+            if self._read_buffer_size >= self.max_buffer_size :
+                raise IOError( "Reached maximum read buffer size" )
+            chunklen = len(chunk)
+        return chunklen
 
     def handle_write(self):
         while self._write_buffer:
@@ -1610,23 +1514,14 @@ class IOStream( object ):
                     self._write_buffer_frozen = True
                     break
                 else:
-                    err = "Write error on %d: %s" % (self.conn.fileno(), e)
-                    self.server.pa.logwarn( err )
+                    self.server.pa.logdebug( h.print_exc() )
                     self.close()
-                    if self['debug'] : raise
                     return
 
         if not self._write_buffer and self._write_callback :
             callback = self._write_callback
             self._write_callback = None
             run_callback( self.server, callback )
-
-    def consume( self, loc ):
-        if loc == 0:
-            return b""
-        self.merge_prefix( self._read_buffer, loc )
-        self._read_buffer_size -= loc
-        return self._read_buffer.popleft()
 
     def check_closed(self):
         if not self.conn: raise IOError("Stream is closed")
@@ -1797,9 +1692,7 @@ class SSLIOStream( IOStream ):
             if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                 return None
             raise
+        # May be the remote end closed
         if not chunk :
-            self.close()
-            return None
+            raise Exception( "May be remote end %r closed" % self.conn )
         return chunk
-
-

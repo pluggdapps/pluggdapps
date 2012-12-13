@@ -24,3 +24,6 @@ DEBUG       = False
 URLSEP      = '/'
 ROUTE_PATH_SUFFIX = 'remains'
 SPECIAL_SECS = [ 'pluggdapps', 'mountloc' ]
+
+CONTENT_IDENTITY = 'identity'
+CONTENT_GZIP = 'gzip'

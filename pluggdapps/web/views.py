@@ -6,22 +6,22 @@
 
 
 def HTTPNotFound( request, c ):
-    res = request.response
-    res.set_status( 404 )
-    res.flush( finishing=True )
+    resp = request.response
+    resp.set_status( b'404' )
+    resp.flush( finishing=True )
 
 def HTTPNotAcceptable( request, c ):
-    res = request.response
-    res.set_status( 406 )
-    res.flush( finishing=True )
+    resp = request.response
+    resp.set_status( b'406' )
+    resp.flush( finishing=True )
 
 def HTTPServiceUnavailable( request, c ):
-    res = request.response
-    res.set_status( 503 )
-    res.set_header( request.webapp.pa['retry_after'] )
-    res.flush( finishing=True )
+    resp = request.response
+    resp.set_status( b'503' )
+    resp.set_header( request.webapp.pa['retry_after'] )
+    resp.flush( finishing=True )
 
 def SplashPage( request, c ):
-    res = request.response
-    res.write( "hello world" )
-    res.flush( finishing=True )
+    resp = request.response
+    resp.write( "hello world" )
+    resp.flush( finishing=True )

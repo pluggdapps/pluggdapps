@@ -13,7 +13,3 @@
 #   their plugins and interfaces during pluggdapps-bootup.
 
 import pluggdapps.docroot.docroot
-import pluggdapps.docroot.view
-import pluggdapps.docroot.router
-import pluggdapps.docroot.resource
-import pluggdapps.docroot.interfaces

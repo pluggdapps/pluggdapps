@@ -1,3 +1,18 @@
+* DocRoot activities
+  * Detect MIME media_type for statically served files. If applicable add
+    webapp['encoding'] as media-type charset. Default is 'utf-8'
+
+  * Check where and all webapp['encoding'] is applied.
+
+  * Interpret `gzip` content-coding and apply gzip-plugin on outbout-message.
+
+* Single-function applications to be developed and demonstrated.
+    Publishing Static-web-site / Remote-file-explorer / Publishing repository
+    Discussion forums / Publishing version-control-systems.
+
+* Refer Apache mod_dir and mod_autoindex while developing
+  Remote-file-explorer app.
+
 * Netscale, figure out possible ways of exiting netscale platform (document
   them as well) and handle them gracefully inside pluggdapps (which
   will be executing as a separate port-process).
@@ -28,6 +43,11 @@
 
 * Sphinx documentation, once the modules have stabilised, fix the
   documentation to specifically include classes and functions.
+
+* Use Keep-Alive (deprecated header ?) to set timeout for client's keep-alive
+  connections.
+
+* Let log*() methods be available on every instantiated plugins.
 
 Release check-list 
 ------------------

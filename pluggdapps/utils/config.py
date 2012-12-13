@@ -26,7 +26,7 @@ class ConfigDict( dict ):
 
     def __setitem__( self, name, value ):
         if not isinstance( value, (ConfigItem, dict) ) :
-            raise h.Error("ConfigDict value either be `ConfigItem` or `dict`'")
+            raise Exception("ConfigDict value either be ConfigItem or dict")
 
         value = value if isinstance(value, ConfigItem) else ConfigItem(value)
         self._spec[name] = value

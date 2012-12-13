@@ -8,7 +8,7 @@
 #   their plugins and interfaces during pluggdapps-bootup.
 
 import {webapp_name}.{webapp_name}
+import {webapp_name}.view
 import {webapp_name}.router
 import {webapp_name}.resource
-import {webapp_name}.view
 import {webapp_name}.interfaces

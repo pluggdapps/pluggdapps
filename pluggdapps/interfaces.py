@@ -214,6 +214,15 @@ class IWebApp( Interface ):
     from this plugin will be used to process both request cookies and response
     cookies."""
 
+    in_transformers = []
+    """List of plugins implmenting :class:`IHTTPInBound` interface. In bound
+    requests will be passed through this list of plugins before being
+    dispatched to the router."""
+
+    out_transformers = []
+    """List of plugins implmenting :class:`IHTTPOutBound` interface. Out bound
+    responses will be passed through this list of plugins before being flushed
+    out."""
 
     def startapp():
         """Boot this applications. Called at platform boot-time."""

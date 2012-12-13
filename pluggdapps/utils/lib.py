@@ -9,7 +9,7 @@
 # TODO :
 #   * Improve function asbool() implementation.
 
-import sys, os, fcntl, time, multiprocessing, random, io, traceback
+import sys, os, fcntl, time, multiprocessing, random, io, traceback, hashlib
 import datetime as dt
 from   binascii import hexlify
 
@@ -44,7 +44,8 @@ def parsecsv( line ):
 def parsecsvlines( lines ):
     """Parse a multi-line text where each line contains comma separated values.
     """
-    return parsecsv( ', '.join(lines.splitlines()) )
+    lines = lines if isinstance(lines, list) else lines.splitlines() 
+    return parsecsv( ', '.join( lines ))
 
 
 def classof( obj ): 
@@ -138,12 +139,6 @@ def docstr( obj ):
     return getattr( obj, '__doc__', '' ) or ''
 
 
-class Context( dict ):
-    """Dictionary like context object passed to controller methods, which in
-    turn populates it with template variables, and then made available to
-    template files."""
-    pass
-
 def cpu_count():
     """Returns the number of processors on this machine."""
     return multiprocessing.cpu_count()
@@ -187,8 +182,9 @@ def dropwhile( pred, lst ):
         i += 1
     return lst[i:]
 
-def print_exc( typ, val, tb ) :
+def print_exc() :
     """Return a string representing exception info."""
+    typ, val, tb = sys.exc_info()
     f = io.StringIO()
     traceback.print_exception( typ, val, tb, file=f )
     s = f.getvalue()
@@ -241,3 +237,87 @@ def str2module( s ):
         mod = getattr(mod, part)
     return mod
 
+
+class ETag( dict ):
+    """A dictionary like object to transparently manage context information.
+    Instead of directly accessing context object to update key,value pairs,
+    one can do,::
+
+        context.etag['userinfo'] = { 'firstname' : 'bose', ... }
+      
+    **Notes**
+
+      * Passes the key,value pairs assigned or updated on this object to the
+        containing ``context`` object.
+      * All the key,value pairs assigned or updated to this object will be
+        used to compute ETag value.
+      * Optionally, programs can use :meth:`hashin` to compute resource's
+        hash-digest outside the context object, but nevertheless contribute to
+        ETag computation.
+    """
+
+    def __init__( self, context, *args, **kwargs ):
+        super().__init__( *args, **kwargs )
+        self._c = context
+        self._init()
+
+    def __setitem__( self, key, value ):
+        self._c[ key ] = value
+        return super().__setitem__( key, value )
+
+    def update( self, *args, **kwargs ):
+        self._c.update( *args, **kwargs )
+        return super().update( *args, **kwargs )
+
+    def setdefault( self, key, value=None ):
+        self._c.setdefault( key, value )
+        return super().setdefault( key, value )
+
+    def hashin( self, hashstring ):
+        """Resource objects for which etag computation and their context
+        representations are different can generate hash-digest seperately and
+        update them with rest of the hash-digest through this method."""
+        self._hashin += hashstring.encode('utf-8') \
+                            if isinstance(hashstring, str) else hashstring
+
+    def hashout( self, prefix='', joinwith='', sep=';' ):
+        """Return the hash digest so far."""
+        if self.values() or self._hashin :
+            [ self._hasher.update(
+                v if isinstance(v, bytes) else str(v).encode('utf-8') 
+              ) for v in self.values() ]
+            self._hasher.update( self._hashin ) if self._hashin else None
+            digest = prefix + self._hasher.hexdigest()
+        else :
+            digest = ''
+        return sep.join( filter( None, [joinwith, digest ]))
+
+    def clear( self ):
+        super().clear()
+        self._init()
+
+    def _init( self ):
+        self._hasher = hashlib.sha1()
+        self._hashin = b''
+
+
+class Context( dict ):
+    """Dictionary like context object passed to resource callables and view
+    callables. Use of context objects has more implications than just passing
+    around data values. Resource callables, typically identified by the
+    request-URLs, are responsible for fetching the necessary data for
+    before representing it to clients. And view callables are responsible to
+    represent the data in desired format to clients. 
+    """
+
+    _specials = ['last_modified', 'etag']
+    """Context key-values having special meanings."""
+
+    etag = {}
+    """Dictionary like object when updated with a (key,value) pair, typically
+    a resource data,  will be used to generate a hash-digest for its value.
+    The key,value pair will also be updated on this Context dictionary."""
+
+    def __init__( self, *args, **kwargs ):
+        super().__init__( *args, **kwargs )
+        self.etag = ETag( self )

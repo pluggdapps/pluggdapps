@@ -104,7 +104,7 @@ class CommandServe( Singleton ):
     def fork_and_monitor( self, args ):
         """Install the reloading monitor."""
         while True :
-            self.pa.loginfo( "Forking monitor ..." )
+            self.pa.logdebug( "Forking monitor ..." )
             pid = os.fork()
             if pid == 0 :   # child process
                 cmdargs = sys.argv[:]
@@ -126,7 +126,7 @@ class CommandServe( Singleton ):
 
     def pollthread( self, args ):
         """Thread (daemon) to monitor for changing files."""
-        self.pa.loginfo( "Periodic poll started for module reloader ..." )
+        self.pa.logdebug( "Periodic poll started for module reloader ..." )
         while True:
             if self.pollthread_checkfiles( args ) == True :
                 # use os._exit() here and not sys.exit() since within a
@@ -160,7 +160,7 @@ class CommandServe( Singleton ):
             if filename not in self.module_mtimes :
                 self.module_mtimes[filename] = mtime
             elif self.module_mtimes[filename] < mtime:
-                self.pa.loginfo( "%r changed, reloading ...\n" % filename )
+                self.pa.logdebug( "%r changed, reloading ...\n" % filename )
                 return True
         return False
 

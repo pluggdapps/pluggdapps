@@ -20,11 +20,13 @@ environment and choosen by configuration files.
 
 import pluggdapps.web.cookie
 import pluggdapps.web.errorpage
-import pluggdapps.web.httpetag
+import pluggdapps.web.gzip
 import pluggdapps.web.matchrouter
 import pluggdapps.web.request
+import pluggdapps.web.resource
 import pluggdapps.web.response
 import pluggdapps.web.server
+import pluggdapps.web.staticfile
 import pluggdapps.web.views
 import pluggdapps.web.webapp
 import pluggdapps.web.webinterfaces

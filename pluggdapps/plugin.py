@@ -67,9 +67,9 @@ __all__ = [
     # Interfaces
     'ISettings',
     # API functions
-    'isimplement', 'interfaces', 'interface', 'plugin_info', 'interface_info',
-    'pluginnames', 'pluginname', 'pluginclass', 'webapps', 'whichmodule',
-    'plugin_init', 
+    'isimplement',  'isplugin', 'plugincall', 'interfaces', 'interface',
+    'plugin_info', 'interface_info', 'pluginnames', 'pluginname', 
+    'pluginclass', 'webapps', 'whichmodule', 'plugin_init',
 ]
 
 #---- Plugin meta framework

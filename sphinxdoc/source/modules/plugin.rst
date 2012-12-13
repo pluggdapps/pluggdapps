@@ -24,7 +24,6 @@ Module contents
 .. autofunction:: implements
 .. autofunction:: isimplement
 .. autofunction:: isplugin
-.. autofunction:: plugincall
 .. autofunction:: interfaces
 .. autofunction:: interface
 .. autofunction:: plugin_info

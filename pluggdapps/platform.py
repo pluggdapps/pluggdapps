@@ -264,7 +264,7 @@ class Pluggdapps( object ):
         # [pluggdapps]
         s = deepcopy( defaultsett['pluggdapps'] )
         if cp.has_section('pluggdapps') :
-            s.update( dict( cp.items( 'pluggdapps', raw=True, vars=_vars )))
+            s.update( dict( cp.items( 'pluggdapps', vars=_vars )))
             settings['pluggdapps'] = normalize_pluggdapps( s )
 
         # Override plugin's package default settings with [DEFAULT] settings.
@@ -272,7 +272,7 @@ class Pluggdapps( object ):
             if not pluginsec.startswith( 'plugin:' ) : continue
             sett = h.mergedict( sett, settings['DEFAULT'] )
             if cp.has_section( pluginsec ) :
-                sett.update( dict( cp.items( pluginsec, raw=True, vars=_vars )))
+                sett.update( dict( cp.items( pluginsec, vars=_vars )))
             cls = plugin_info( h.sec2plugin( pluginsec ) )['cls']
             for b in reversed( cls.mro() ) :
                 if hasattr( b, 'normalize_settings' ) :
@@ -370,7 +370,7 @@ class Pluggdapps( object ):
     #---- platform logging
 
     def loginfo( self, formatstr, values=[] ):
-        """Use this method log informational messages. The log messages will
+        """Use this method to log informational messages. The log messages will
         be formated and handled based on the configuration settings from
         ``[pluggdapps]`` section.
         """
@@ -382,8 +382,24 @@ class Pluggdapps( object ):
         if 'console' in output :
             print( formatstr )
 
+    def logdebug( self, formatstr, values=[] ):
+        """Use this method to log debug messages. The log messages will
+        be formated and handled based on the configuration settings from
+        ``[pluggdapps]`` section.
+        """
+        if self.settings['DEFAULT']['debug'] != True : return
+
+        output, erlport = self.logsett['output'], self.erlport
+        formatstr = 'DEBUG: ' + formatstr
+        if 'cloud' in output and erlport :
+            self.erlport.logdebug( formatstr, values )
+        if 'file' in output and self.logsett['file'] :
+            open( self.logsett['file'], 'a' ).write( formatstr )
+        if 'console' in output :
+            print( colorize( formatstr, color='33' ))
+
     def logwarn( self, formatstr, values=[] ):
-        """Use this method log warning messages. The log messages will
+        """Use this method to log warning messages. The log messages will
         be formated and handled based on the configuration settings from
         ``[pluggdapps]`` section.
         """
@@ -397,7 +413,7 @@ class Pluggdapps( object ):
             print( colorize( formatstr, color='32' ))
 
     def logerror( self, formatstr, values=[] ):
-        """Use this method log error messages. The log messages will
+        """Use this method to log error messages. The log messages will
         be formated and handled based on the configuration settings from
         ``[pluggdapps]`` section.
         """
@@ -552,7 +568,6 @@ class Webapps( Pluggdapps ):
         settings['mountloc'] = dict( mountloc )
 
         # Parse mount configuration.
-        
         appsecs = list( map( h.plugin2sec, webapps() ))
         mountls = []
         _skipopts = list(_vars.keys()) + list(settings['DEFAULT'].keys())
@@ -597,7 +612,7 @@ class Webapps( Pluggdapps ):
         # Update plugin sections in appsett from instanceini
         for sec in cp.sections() :
             if not sec.startswith( 'plugin:' ) : continue
-            sett = dict( cp.items( sec, raw=True, vars=_vars ))
+            sett = dict( cp.items( sec, vars=_vars ))
             appsett[sec].update( sett )
             cls = plugin_info( h.sec2plugin( sec ) )['cls']
             for b in reversed( cls.mro() ) :
@@ -718,16 +733,18 @@ class Webapps( Pluggdapps ):
             (type, mountname, webapp-instance)
         """
         uriparts = h.parse_url( uri, host=hdrs.get('host', None) )
-        netloc = ( uriparts['host'][3:]
-                        if uriparts['host'].startswith('www')
-                        else uriparts['host'] )
         for key, webapp in self._app_resolve_cache.items() :
             netloc, script = key
-            if ( netloc == uriparts['host'] and 
-                    uriparts['path'].startswith( script ) ):
-                uriparts['script'] = script
-                uriparts['path'] = uriparts['path'][len(script):]
-                return uriparts, webapp
+            uri_netloc = ( uriparts['host'][3:]
+                            if uriparts['host'].startswith('www')
+                            else uriparts['host'] )
+            if netloc == uri_netloc :
+                if script in ['/', ''] :
+                    return uriparts, webapp
+                elif uriparts['path'].startswith( script ) :
+                    uriparts['script'] = script
+                    uriparts['path'] = uriparts['path'][len(script):]
+                    return uriparts, webapp
         return uriparts, None
 
     #---- ISettings interface methods
@@ -744,6 +761,16 @@ def hitch( obj, cls, function, *args, **kwargs ) :
     return fnhitched.__get__( obj, cls )
 
 def colorize( string, color, bold=False ):
+    """ Color values
+    Black       0;30     Dark Gray     1;30
+    Blue        0;34     Light Blue    1;34
+    Green       0;32     Light Green   1;32
+    Cyan        0;36     Light Cyan    1;36
+    Red         0;31     Light Red     1;31
+    Purple      0;35     Light Purple  1;35
+    Brown       0;33     Yellow        1;33
+    Light Gray  0;37     White         1;37
+    """
     attr = []
     attr.append( color )
     attr.append('1') if bold else None

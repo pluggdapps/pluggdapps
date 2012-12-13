@@ -92,11 +92,10 @@ class HTTPCookie( Plugin ):
     def create_signed_value( self, name, value ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.set_cookie`
         interface method."""
-        encoding = self.webapp['encoding']
         parts = [ self['secret'], name, value, str( int( time.time() )) ]
-        parts = [ x.encode( encoding ) for x in parts ]
+        parts = [ x.encode( 'utf-8' ) for x in parts ]
         parts[2] = base64.b64encode( parts[2] )
-        signature = self._create_signature( *parts ).encode( encoding )
+        signature = self._create_signature( *parts ).encode( 'utf-8' )
         signedval = b"|".join([ parts[2], parts[3], signature ])
         return signedval.decode( self['value_encoding'] )
 
@@ -106,9 +105,8 @@ class HTTPCookie( Plugin ):
         if not signedval : return None
 
 
-        encoding = self.webapp['encoding']
-        secret = self['secret'].encode( encoding )
-        name = name.encode( encoding )
+        secret = self['secret'].encode( 'utf-8' )
+        name = name.encode( 'utf-8' )
 
         value = signedval.encode( self['value_encoding'] )
         parts = value.split(b"|")
@@ -117,7 +115,7 @@ class HTTPCookie( Plugin ):
 
         args = [ name, val64, timestamp ]
         signature_ = self._create_signature( secret, *args )
-        signature_ = signature_.encode( encoding )
+        signature_ = signature_.encode( 'utf-8' )
 
         if not self._time_independent_equals( signature, signature_ ):
             self.pa.logwarn( "Invalid cookie signature %r" % value )
@@ -140,7 +138,7 @@ class HTTPCookie( Plugin ):
         if timestamp.startswith( b"0" ) :
             self.pa.logwarn( "Tampered cookie %r" % value )
         try:
-            return base64.b64decode( val64 ).decode( self.webapp['encoding'] )
+            return base64.b64decode( val64 ).decode( 'utf-8' )
         except Exception:
             return None
 

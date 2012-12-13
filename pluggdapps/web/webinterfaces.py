@@ -7,16 +7,17 @@
 from pluggdapps.plugin import Interface
 
 __all__ = [
-    'IHTTPResource', 'IHTTPRouter', 'IHTTPEtag', 'IHTTPCookie', 'IHTTPRequest', 
-    'IHTTPResponse', 'IHTTPView', 'IHTTPRenderer',
+    'IHTTPRouter', 'IHTTPResource', 'IHTTPRequest', 
+    'IHTTPResponse', 'IHTTPView', 'IHTTPRenderer', 'IHTTPCookie', 
 ]
 
 class IHTTPRouter( Interface ):
     """Interface specification for resolving application request to view
     callable.  An `IHTTPRouter` plugin typically compares request's url,
-    method and few other header fields with router mapping and resolves view
-    callable. The router plugin will be instantiated by the web-application
-    during boot time and re-used till the platform is shutdown."""
+    method and few other header fields with pre-configured router mapping and
+    resolves the request to view callable. The router plugin will be 
+    instantiated by the web-application during boot time and re-used till the 
+    platform is shutdown."""
     
     def onboot():
         """Chained call from :meth:`IWebApp.startapp`. Implementation 
@@ -26,6 +27,12 @@ class IHTTPRouter( Interface ):
         programatically or by parsing a mapper file. By the end of this
         method, require route-mapping must be compiled and cached for
         resolving request's view-callables."""
+
+    def add_view( *args, **kwargs ):
+        """A view is the representation of a resource. During boot-time
+        applications can add resource representation callables using this API.
+        ``args`` and ``kwargs`` specific to router plugins, for more details
+        refer to the corresponding router plugin."""
 
     def route( request, c ):
         """Resolve ``request`` view-callable. For a successful match,
@@ -41,6 +48,18 @@ class IHTTPRouter( Interface ):
             Context dictionary for response, and templates.
         """
 
+    def negotiate( request, *args, **kwargs ):
+        """When the router finds that a resource (typically indicated by the
+        request-URL) is multiple representations, each representation is
+        called a variant, it has to pick the best representation negotiated by
+        the client. Negotiation is handled through attributes like media-type,
+        language, charset and content-encoding. Returns the best matching
+        variant from ``variants``. ``args`` and ``kwargs`` are specific to
+        plugin implementation.
+
+        ``request``,
+            Plugin instance implementing :class:`IHTTPRequest` interface.
+        """
 
     def urlpath( request, *args, **kwargs ):
         """Generate path, including query and fragment (aka anchor), for
@@ -70,21 +89,6 @@ class IHTTPResource( Interface ):
            :class:`Context` dictionary to be passed on to view callables and
            eventually to view-templates.
         """
-
-
-class IHTTPEtag( Interface ):
-    """Interface specification to compute entity-tags for HTTP response
-    messages."""
-
-    def compute( response, weak=False ):
-        """Compute entity-tag for :class:`IHTTPResponse` object `response`.
-        Typically payload data will be used to compute ETAG.
-        
-        If `weak` True, compute ETAG for two entities of a resource if the
-        entities are equivalent and could be substituted for each other with
-        no significant change in semantics. Refer RFC1616 for more
-        information."""
-
 
 class IHTTPCookie( Interface ):
     """Handle HTTP cookies. This specification is compatible with IHTTPRequest
@@ -122,9 +126,9 @@ class IHTTPCookie( Interface ):
         """
 
     def create_signed_value( name, value ):
-        """Encode `name` and `value` string into byte-string using
-        webapp['encoding'] settings, convert value into base64 and return a
-        byte-string like,::
+        """Encode `name` and `value` string into byte-string using 'utf-8'
+        encoding settings, convert value into base64 and return a byte-string
+        like,::
 
           <base64-encoded-value>|<timestamp>|<signature>
 
@@ -226,7 +230,6 @@ class IHTTPRequest( Interface ):
     """Response object corresponding to this request. The object is an 
     instance of plugin implementing :class:`IHTTPResponse` interface."""
 
-
     #---- Routing attributes
     router = None
     """:class:`IHTTPRouter` plugin resolving this request."""
@@ -237,6 +240,14 @@ class IHTTPRequest( Interface ):
 
     view = None
     """A view-callable resolved for this request."""
+
+    resource = None
+    """When a view is resolved, along with that an optional resource callable
+    might be available. If so this attribute can be one of the following,
+      * plugin implementing :class:`IHTTPResource` interface.
+      * An importable string which points to a callable object.
+      * Or any python callable object.
+    """
 
     #---- Others
     receivedat = 0
@@ -302,7 +313,8 @@ class IHTTPRequest( Interface ):
 
     def handle( body=None, chunk=None, trailers=None, ):
         """Once a `request` is instantiated, this method is called before
-        resolving and dispatching it to view-callable.
+        resolving and dispatching it to view-callable. All in-bound request
+        transformer plugins are applied here.
         
         ``body``,
             Optional kwarg, if request body is present. Passed as byte-string.
@@ -312,8 +324,8 @@ class IHTTPRequest( Interface ):
             as a tuple of, ``(chunk_size, chunk_ext, chunk_data)``.
 
         ``trailers``,
-            Optional kwarg, if chunked-request is over and final trailer is
-            being received.
+            Optional kwarg, if chunked-request is over and final trailer was
+            also received.
         """
 
     def onfinish():
@@ -355,6 +367,11 @@ class IHTTPResponse( Interface ):
     body = b''
     """Response body, if present, as a byte string."""
 
+    chunks = []
+    """List of response chunks. It is the responsibility of the implementing
+    plugin to remove or keep the previous chunks in this list. For chunked
+    response atleast one chunk must be present."""
+
     chunk_generator = None
     """A python generate which returns a response chunk for every 
     iteration."""
@@ -372,12 +389,30 @@ class IHTTPResponse( Interface ):
     request = None
     """Plugin instance implementing :class:`IHTTPRequest` interface."""
 
-    etag = None
-    """class:`IHTTPEtag` plugin to be used for response Etag computation."""
-
     context = None
     """A dictionary like object that will be passed to resource objects and 
     view callables, and eventually to template code."""
+
+    #---- Content negotiated attributes
+    charset = None
+    """This attribute will be supplied from two places, webapp['encoding'],
+    and during route composition. webapp['encoding'] configuration setting
+    will be used as the default charset if ``charset`` is not supplied during
+    route composition. And charset preference from request header will be used
+    to negotiate with resource's charset variant."""
+
+    media_type = None
+    """This attribute will be supplied during route composition and
+    negotiated with client supplied request-headers."""
+
+    language = None
+    """This attribute will be supplied during route composition and
+    negotiated with client supplied request-headers."""
+
+    content_coding = None
+    """This attribute will be supplied during route composition and
+    negotiated with client supplied request-headers."""
+
 
     def __init__( request ):
         """Instantiate a response plugin for a corresponding ``request``
@@ -475,6 +510,10 @@ class IHTTPResponse( Interface ):
         """Return True if finish() method is called on :class:`IHTTPResponse`.
         """
 
+    def isstarted():
+        """For chunked-encoding, returns a boolean, if True means the response
+        has started and response headers are written."""
+
     def ischunked() :
         """Returns True if this response is transferred using `chunked`
         Transfer-Encoding.
@@ -494,9 +533,9 @@ class IHTTPResponse( Interface ):
 
         ``finishing``,
             If True, signifies that data written since the last flush() on
-            this response instance is the last chunk. In non-chunked mode, it
-            is signifies that the body is done. It will also flush the
-            trailers at the end of the chunked response.
+            this response instance is the last chunk.  It will also flush the
+            trailers at the end of the chunked response.  In non-chunked mode,
+            it is signifies that the body is done.
 
         ``callback``,
             If given, can be used for flow control it will be run when all
@@ -550,7 +589,7 @@ class IHTTPView( Interface ):
             Plugin instance implementing :class:`IHTTPRequest` interface.
 
         ``c``,
-            Dictionary like context object. Typically populated by
+            Dictionary like Context object. Typically populated by
             :class:`IHTTPResource` and view-callable. Made availabe inside 
             HTML templates.
         """
@@ -567,22 +606,47 @@ class IHTTPView( Interface ):
         """
 
 
+class IHTTPInBound( Interface ):
+    """Specification to transform response headers and body. A chain of
+    transforms can be configured on :class:`IWebApp` plugin."""
+
+    def transform( request, data, finishing=False ):
+        """Transform in-coming message entity. request will be updated in
+        place. Returns the transformed request data.
+
+        ``request``,
+            :class:`IHTTPRequest` plugin whose `request.response` attribute
+            is being transformed.
+
+        ``data``,
+            Either request body or chunk data (in case of chunked encoding)
+            in byte-string.
+
+        ``finishing``,
+            In case of chunked encoding, this denotes whether this is the last
+            chunk to be received.
+        """
+
 class IHTTPOutBound( Interface ):
     """Specification to transform response headers and body. A chain of
-    transforms can be configured with plugins implementing 
-    :class:`IHTTPResponse`."""
+    transforms can be configured on :class:`IWebApp` plugin."""
 
-    def start_transform( headers, chunk, finishing=False ):
-        """Start transformation using complete list of response headers and
-        first ``chunk`` of response body, if ``finishing`` is False. If
-        ``finishing`` is True, then ``chunk`` becomes the first and last part
-        of response body."""
+    def transform( request, data, finishing=False ):
+        """Transform out-going message entity.  ``request.response`` will be
+        updated inplace.
 
-    def transform( self, chunk, finishing=False ):
-        """Continue with the current transformation with subsequent chunks in
-        response body. If ``finishing`` is True, then ``chunk is the last chunk
-        of response body."""
+        ``request``,
+            :class:`IHTTPRequest` plugin and its `response` attribute which is
+            being transformed.
 
+        ``data``,
+            Either response body or chunk data (in case of chunked encoding)
+            in byte-string.
+
+        ``finishing``,
+            In case of chunked encoding, this denotes whether this is the last
+            chunk to be transmitted.
+        """
 
 class IHTTPRenderer( Interface ): 
     """Attributes and methods to render a page using a supplied context."""
@@ -599,3 +663,15 @@ class IHTTPRenderer( Interface ):
             :class:`IHTTPResource` and view-callable, made 
             availabe inside HTML templates.
         """
+
+class IHTTPContentNegotiation( Interface ):
+    """Interface specification to handle HTTP content negotiation. Refer
+    RFC2616.txt. Web resource can have more than one representation, and each
+    representation is called a variant of the same resource. Based on
+    media-type, language, charset and content-encoding it is possible for the
+    client to suggest the desired representation (prioritized by q-value).
+    And based on request data, plugins on the server side can provide the best
+    representation compatible with the client.
+    """
+
+    pass

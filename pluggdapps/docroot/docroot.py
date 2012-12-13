@@ -15,58 +15,30 @@ _default_settings.__doc__ = \
     "pluggdapps web-applications."
 
 _default_settings['encoding']  = {
-    'default' : 'utf8',
+    'default' : 'utf-8',
     'types'   : (str,),
-    'help'    : "Unicode/String encoding to be used.",
+    'help'    : "Default character encoding to use on HTTP response.",
 }
-_default_settings['IHTTPRouter']  = {
-    'default' : 'docrootrouter',
+_default_settings['language']  = {
+    'default' : 'en',
     'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPRouter` "
-                "interface. A request is resolved for a view-callable by this "
-                "router plugin."
+    'help'    : "Default language to use for content negotiation."
 }
-_default_settings['IHTTPCookie']  = {
-    'default' : 'httpcookie',
+_default_settings['rootloc'] = {
+    'default' : '',
     'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPCookie` "
-                "interface spec. Methods from this plugin will be used "
-                "to process both request cookies and response cookies. "
-                "This configuration can be overriden by corresponding "
-                "request / response plugin settings."
+    'help'    : "Root location containing the web-site documents."
 }
-_default_settings['IHTTPSession']  = {
-    'default' : 'httpsession',
+_default_settings['index_page'] = {
+    'default' : 'index.html',
     'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPSession` "
-                "interface spec. Will be used to handle cookie based "
-                "user-sessions."
+    'help'    : "Specify the index page for the hosted site."
 }
-_default_settings['IHTTPEtag']  = {
-    'default' : 'httpetag',
+_default_settings['favicon'] = {
+    'default' : 'favicon.ico',
     'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPEtag` "
-                "interface spec. Will be used to compute etag for response "
-                "body."
-}
-_default_settings['IHTTPRequest']  = {
-    'default' : 'httprequest',
-    'types'   : (str,),
-    'help'    : "Name of the plugin to encapsulate HTTP request. "
-}
-_default_settings['IHTTPResponse']  = {
-    'default' : 'httpresponse',
-    'types'   : (str,),
-    'help'    : "Name of the plugin to encapsulate HTTP response."
-}
-_default_settings['resource']  = {
-    'default' : 'docrootresource',
-    'types'   : (str,),
-    'help'    : "Plugin name implementing :class:`IHTTPResource` interface. "
-                "Or, a callable object or string that imports a callable "
-                "object. This resource will be called for all requests that "
-                "are routed through this application. View specific resource "
-                "calls can be configured via add_view()."
+    'help'    : "To use a different file for favorite icon, configure the "
+                "file path here. File path must be relative to ``rootloc``."
 }
 
 class docroot( WebApp ):

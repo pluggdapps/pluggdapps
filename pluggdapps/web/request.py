@@ -38,8 +38,8 @@ class HTTPRequest( Plugin ):
         self.httpconn = httpconn
         self.method, self.uri, self.version = method, uri, version
         self.headers = headers
-        self.uriparts = h.parse_url( self.uri, host=headers['Host'] 
-                                   ) if isinstance( uri, str ) else uri
+        self.uriparts = h.parse_url( uri, host=headers.get('host',None)
+                                   ) if isinstance(uri, bytes) else uri
 
         self.body = None
         self.chunks = []
@@ -66,6 +66,7 @@ class HTTPRequest( Plugin ):
             self.multiparts = {}
             self.files = {}
 
+        self.matchdict = {}
         self.receivedat = time.time()
         self.finishedat = None
 
@@ -94,7 +95,7 @@ class HTTPRequest( Plugin ):
     def has_finished( self ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.has_finished`
         interface method."""
-        return self.response.has_finished()
+        return self.response.has_finished() if self.response else True
 
     def ischunked( self ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.ischunked`
@@ -108,19 +109,27 @@ class HTTPRequest( Plugin ):
         interface method."""
         self.cookies = self.cookie.parse_cookies( self.headers )
 
+        # In case of `chunked` encoding, check whether this is the last chunk.
+        finishing = body or ( chunk and trailers and chunk[0] == 0)
+
+        # Apply IHTTPInBound transformers on this request.
+        data = body if body != None else (chunk[2] if chunk else b'')
+        if data :
+            for tr in self.webapp.in_transforms :
+                data = tr.transform( self, data, finishing=finishing )
+
+        # Update the request plugin with attributes.
         if body :
-            self.body = body
-        elif chunk and trailers and chunk[0] == 0 :
-            self.chunks.append( chunk )
-            self.trailers = trailers
+            self.body = data
         elif chunk :
-            self.chunks.append( chunk )
+            self.chunks.append( (chunk[0], chunk[1], data) )
+        self.trailers = trailers or self.trailers
 
     def onfinish( self ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.onfinish`
         interface method."""
         # Will be callbe by response.onfinish() callback.
-        self.view.onfinish() if hasattr( self.view, 'onfinish' ) else None
+        self.view.onfinish(self) if hasattr( self.view, 'onfinish' ) else None
         self.webapp.onfinish( self )
         self.finishedat = time.time()
 

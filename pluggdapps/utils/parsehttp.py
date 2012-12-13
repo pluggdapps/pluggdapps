@@ -6,14 +6,14 @@
 
 """Utility functions to parse and manipulate HTTP messages."""
 
-import re, sys, calendar, email
+import re, sys, calendar, email, time
 from   collections  import UserDict
 import datetime     as dt
 from   urllib.parse import urlsplit, unquote, parse_qs, urlunsplit, quote, \
                            urlencode, urljoin
 import urllib.request, urllib.error
 
-from pluggdapps.utils.lib import parsecsv
+from pluggdapps.utils.lib import parsecsv, print_exc
 
 strptime = dt.datetime.strptime
 strftime = dt.datetime.strftime
@@ -27,9 +27,9 @@ __all__ = [
     'port_for_scheme', 'parse_startline', 'parse_url', 'make_url',
     'compare_url', 'parse_netpath', 'parse_formbody',
     'connection', 'parse_date', 'http_fromdate', 'http_todate',
-    'parse_trailer', 'parse_transfer_encoding', 'accept', 'accept_charset',
-    'accept_encoding', 'parse_content_length', 'parse_content_type',
-    'parse_content_disposition',
+    'trailer', 'transfer_encoding', 'accept', 'accept_charset',
+    'accept_language', 'accept_encoding', 'content_length',
+    'parse_content_type', 'parse_content_disposition',
     #-- Classes
     'HTTPHeaders',
 ]
@@ -73,6 +73,8 @@ re_versn  = r"HTTP/1.1"
 re_param  = ( r"(" + re_token + r")" +
               r"=" +
               r"(" + re_quote + r"|" + re_token + r")" )
+
+re_qparam = r"q=([0-9]\.[0-9]{0,3})"
 
 re_dirtive= ( r"(" + re_token + r")" +
               r"(=" +
@@ -244,7 +246,7 @@ def parse_url( uri, host=None, scheme=None ):
     except :
         host, port = host, None
     r = urlsplit( uri )
-    fn = lambda x : (x[0], (x[1].decode('utf8') if x[1] else x[1]))
+    fn = lambda x : ( (x[0], (x[1].decode('utf8')) if x[1] else x[1]) )
     kwargs = { 'scheme' : r.scheme or scheme,
                'netloc' : r.netloc,
                'host'   : r.hostname or host,
@@ -255,7 +257,7 @@ def parse_url( uri, host=None, scheme=None ):
                'script' : b'',
              }
     kwargs = dict( map( fn, kwargs.items() ))
-    kwargs['path'] = unquote( r.path.decode('utf8') )  # With default encoding
+    kwargs['path'] = unquote( r.path.decode('utf8') )
     kwargs['query'] = parse_qs( r.query ) # With default encoding
     r = UserDict( **kwargs )
     return r
@@ -433,7 +435,8 @@ class HTTPHeaders( dict ):
         """Returns HTTPHeaders object."""
         def consume( obj, line ):
             name, value = line.split( b":", 1 )
-            name = hdr_camelcase2str[ name.strip() ]
+            name = name.strip()
+            name = hdr_camelcase2str.get(name, name.replace(b'-',b'_').lower())
             pvalue = obj.get( name, None )
             obj[ name ] = value if pvalue == None else (pvalue+b', '+value)
 
@@ -472,7 +475,7 @@ def parameters( ps=None, params=None ):
         params = []
         for p in ps :
             try :
-                attr, val = re.match( p, re_param ).groups()
+                attr, val = re.match( p, re_param.encode('utf-8') ).groups()
                 params.append( (attr.lower(), val) )
             except :
                 continue
@@ -492,7 +495,7 @@ def directives( ds=b'', tokens=None ):
     if ds :
         tokens = []
         for d in ds :
-            a,b,c = re.match( re_dirtive, d ).groups()
+            a,b,c = re.match( re_dirtive.encode('utf-8'), d ).groups()
             tokens.append( (a, b or c) if (b or c) else a )
         return tokens
     elif tokens :
@@ -545,11 +548,11 @@ def parse_simplevalue_q( value ):
         except :
             tok, qvalue = v, DEFAULT_QVALUE
         else :
-            _, qvalue = re.match( re_param, qvalue ).groups()
+            _, qvalue = re.match( re_param.encode('utf-8'), qvalue ).groups()
             qvalue = float( qvalue )
         vals.append( (tok, qvalue) )
 
-    fn = lambda tok_q : -1.0 if tok_q[0] == b'*' else tok_q[1]
+    fn = lambda tok_q : ( -1.0 if tok_q[0] == b'*' else tok_q[1] )
     return sorted( vals, key=fn, reverse=True )
 
 def make_simplevalue_q( tokenrules ):
@@ -566,7 +569,8 @@ def make_simplevalue_q( tokenrules ):
 #---- Generic headers
 
 def connection( value ):
-    """Return a list of lowercased token values from Connection-header-value.
+    """Return a list of lowercased token values, in byte-strings, from 
+    Connection header field.
     """
     if value == None : return None
     return list( map( lambda x : x.lower(), rules( value )))
@@ -588,28 +592,28 @@ def parse_date( value ):
     """
     for fmt in [ rfc1123_format, rfc1036_format, asctime_format ] :
         try :
-            dtime = strptime( datestr, fmt )
+            dtime = strptime( value, fmt )
             break
         except :
             pass
     else :
         return None
-    return dtime
+    return time.mktime( dtime.timetuple() )
 
 def http_todate( datestr ):
     """Convert date-time string, RFC 1123 normalized format, to python datetime
     object."""
     return strptime( datestr, rfc1123_format )
 
-def http_fromdate( dtime ):
-    """Convert python datetime object to RFC 1123 date format."""
-    return strftime( dtime, rfc1123_format )
+def http_fromdate( dtime, tzinfo=None ):
+    """Convert local-timestamp  to RFC 1123 UTC date format."""
+    return time.strftime( rfc1123_format, time.gmtime( dtime ))[:-3] + 'GMT'
 
-def parse_trailer( value ):
+def trailer( value ):
     if value == None : return None
     return rules( value )
 
-def parse_transfer_encoding( value=b'', tokenrules=[], prefix=b'' ):
+def transfer_encoding( value=b'', tokenrules=[], prefix=b'' ):
     """
     Parse Transfer-Encoding header value,::
 
@@ -628,23 +632,22 @@ def parse_transfer_encoding( value=b'', tokenrules=[], prefix=b'' ):
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Returns ``[ ( token, [ param ] ), ... ]``, where, ``param`` is either a
-    token or a tuple of ``(attr, value)``.
+    Returns ``[ ( token, param ), ... ]``, where, ``param`` is byte-string
+    representing encoding token's parameter spec.
     """
     if value :
         tokenrules = []
         for rule in rules(value) :
-            parts = value.split( b';' )
-            params = parameters( parts[1:] ) if parts[1:] else []
-            tokenrules.append(
-              ( parts[0].lower(), tuple( filter( None, params )))
-            )
+            try    : token, params = rule.split( b';', 1 )
+            except : token, params = rule, b''
+            tokenrules.append( token.lower().decode('utf-8'), params )
         return tokenrules
 
     elif tokenrules :
         fn = lambda r : r[0] + b';'.join( directives( tokens=r[1] ))
-        return b'Transfer-Encoding:' + \
-                        b'; '.join( prefix, rules(rs=map(fn, tokenrules)) )
+        value = b'; '.join( prefix, rules(rs=map(fn, tokenrules)) )
+        return b'Transfer-Encoding:' + value
+
     return None
 
 #---- Request headers
@@ -675,41 +678,34 @@ def accept( value=b'', tokenrules=[], prefix=b'' ):
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Returns ``[ ( type, subtype, [ param ] ), ... ]``, where, ``param`` is
-    either a token or a tuple of ``(attr, value)``. And the [ param ] list is
-    sorted by q-value.
+    Returns ``[ ( '<type>/<subtype>', q, param ), ... ]``, where, ``param`` is
+    a byte-string representing media-type parameters and ``q`` is quality
+    value in float for media-type.
     """
     if value :
         mranges = []
-        for v in rules( value ) :
-            parts = v.split( b';' )
-            try :
-                typ, subtype = parts[0].split( b'/', 1 )
-            except :
-                typ, subtype = parts[0], b'*'
-            mrange = [ typ, subtype, tuple( directives( ds=parts[1:] )) ]
-
-        # sort media-ranges based on qvalue.
         rangeq = {}
-        def quality( mrange ):
-            q = qparam( mrange[2] )
-            if mrange[0:2] == ( b'*', b'*' ) :
+        for rule in rules( value ) :
+            try    : mt, params = rule.split( b';', 1 )
+            except : mt, params = rule, b''
+            q = re.search( re_qparam.encode('utf-8'), params )
+            q = float( q.groups()[0] ) if q else None
+
+            if mt == b'*/*' :
                 rangeq.setdefault( b'*', q or DEFAULT_QVALUE )
-            elif mrange[1] == b'*' :
-                rangeq.setdefault( mrange[0], q or DEFAULT_QVALUE )
-            return (mrange, q)
+            elif mt.endswith( b'/*' ) :
+                rangeq.setdefault( mt.split(b'/',1)[0],  q or DEFAULT_QVALUE )
 
-        def quality_sort( tok_q ):
-            tok, q = tok_q
-            q = rangeq.get( tok[0], DEFAULT_QVALUE ) if q == None else q
-            key = q + len( tok )
-            if tok[0] == b'*' : 
-                key = key - 2.0
-            elif tok[0] in rangeq :
-                key = key - 1.0
-            return key
+            mranges.append( (mt.strip().decode('utf-8'), q, params) )
 
-        return sorted( map(quality, mranges), key=quality_sort, reverse=True )
+        mranges = [( mt, q or rangeq.get(mt.split('/', 1)[0], DEFAULT_QVALUE),
+                     params ) for mt, q, params in mranges ]
+
+        def quality_sort( mrange ):
+            mt, q, params = mrange
+            return q + len( params.split(b';') )
+
+        return sorted( mranges, key=quality_sort, reverse=True )
 
     elif tokenrules :
         fn = lambda r : r[0]+b'/'+r[1] + b';'.join( directives( tokens=r[2] ))
@@ -737,13 +733,15 @@ def accept_charset( value=b'', tokenrules=[], prefix=b'' ):
         `tokenrules`,
 
     Returns, ``[ (charset, qvalue), ... ]``, where, ``qvalue`` is in float.
+    The returned list is sorted by qvalue which is in float.
     """
-    lowercase = lambda x : x[0].lower(), x[1]
+    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
     if value :
         return list( map( lowercase, parse_simplevalue_q(value) ))
-    else :
-        return b'Accept-Charset:' + \
-                    b'; '.join( prefix, make_simplevalue_q( tokenrules ))
+    elif tokenrules :
+        value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
+        return b'Accept-Charset:' + value
+    return None
 
 
 def accept_encoding( value, tokenrules=[], prefix=b'' ):
@@ -766,20 +764,57 @@ def accept_encoding( value, tokenrules=[], prefix=b'' ):
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Returns, ``[ (content-coding, qvalue), ... ]``
+    Returns, ``[ (content-coding, qvalue), ... ]`` and the returned list is
+    sorted by qvalue, which is in float.
     """
-    lowercase = lambda x : x[0].lower(), x[1]
+    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
+    if value :
+        tokenrules = list( map( lowercase, parse_simplevalue_q(value) ))
+        tokens = dict(tokenrules)
+        if ('identity' not in tokens) and (tokens.get('*', 1.0) != 0.0) :
+            tokenrules.append( ('identity', 1.0) )
+        return tokenrules
+    elif tokenrules :
+        value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
+        return b'Accept-Encoding:' + value
+    return [(b'identity', 1.0)]
+
+def accept_language( value, tokenrules=[], prefix=b'' ):
+    """
+    Parse Accept-Language header value,::
+
+      Accept-Language = "Accept-Language" ":"
+                        1#( language-range [ ";" "q" "=" qvalue ] )
+      language-range  = ( ( 1*8ALPHA *( "-" 1*8ALPHA ) ) | "*" )
+
+    ``value``,
+        byte-string of Accept-Language header value to parse.
+
+    ``tokenrules``,
+        list of rules, the format of the data is the same as what is return by
+        this function for parsing Accept-Language header value.
+
+    ``prefix``,
+        While making value byte-string from tokens, if this kwarg is present,
+        as byte-string, join this with byte-string generated from
+        `tokenrules`,
+
+    Returns, ``[ (language, qvalue), ... ]`` and the returned list is
+    sorted by qvalue, which is in float.
+    """
+    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
     if value :
         return list( map( lowercase, parse_simplevalue_q(value) ))
-    else :
-        return b'Accept-Encoding:' + \
-                    b'; '.join( prefix, make_simplevalue_q( tokenrules ))
+    elif tokenrules :
+        value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
+        return b'Accept-Encoding:' + value
+    return None
 
 #---- Response headers
 
 #---- Entity headers
 
-def parse_content_length( value ):
+def content_length( value ):
     """Return length as integer type."""
     return int(value) if value else value
 

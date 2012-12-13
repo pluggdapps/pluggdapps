@@ -10,7 +10,8 @@ from   pluggdapps.plugin            import implements, Plugin, plugincall
 from   pluggdapps.interfaces        import IWebApp
 from   pluggdapps.web.webinterfaces import IHTTPRouter, IHTTPCookie, \
                                            IHTTPResponse, IHTTPResource, \
-                                           IHTTPSession, IHTTPEtag
+                                           IHTTPSession, IHTTPInBound, \
+                                           IHTTPOutBound
 import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
@@ -19,9 +20,16 @@ _default_settings.__doc__ = \
     "pluggdapps web-applications."
 
 _default_settings['encoding']  = {
-    'default' : 'utf8',
+    'default' : 'utf-8',
     'types'   : (str,),
-    'help'    : "Unicode/String encoding to be used.",
+    'help'    : "Default character encoding to use on HTTP response. This can " 
+                "be customized for each view (or resource-variant)"
+}
+_default_settings['language']  = {
+    'default' : 'en',
+    'types'   : (str,),
+    'help'    : "Default language to use for content negotiation. This can "
+                "be customized for each view (or resource-variant)"
 }
 _default_settings['IHTTPRouter']  = {
     'default' : 'matchrouter',
@@ -46,13 +54,6 @@ _default_settings['IHTTPSession']  = {
                 "interface spec. Will be used to handle cookie based "
                 "user-sessions."
 }
-_default_settings['IHTTPEtag']  = {
-    'default' : 'httpetag',
-    'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPEtag` "
-                "interface spec. Will be used to compute etag for response "
-                "body."
-}
 _default_settings['IHTTPRequest']  = {
     'default' : 'httprequest',
     'types'   : (str,),
@@ -63,15 +64,21 @@ _default_settings['IHTTPResponse']  = {
     'types'   : (str,),
     'help'    : "Name of the plugin to encapsulate HTTP response."
 }
-_default_settings['resource']  = {
-    'default' : 'httpresource',
+_default_settings['IHTTPInBound'] = {
+    'default' : '',
     'types'   : (str,),
-    'help'    : "Plugin name implementing :class:`IHTTPResource` interface. "
-                "Or, a callable object or string that imports a callable "
-                "object. This resource will be called for all requests that "
-                "are routed through this application. View specific resource "
-                "calls can be configured via add_view()."
+    'help'    : "A string of comma seperated value, where each value names a "
+                ":class:`IHTTPInBound` plugin. Transforms will be applied in "
+                "specified order."
 }
+_default_settings['IHTTPOutBound'] = {
+    'default' : 'ResponseHeaders, GZipOutBound',
+    'types'   : (str,),
+    'help'    : "A string of comma seperated value, where each value names a "
+                ":class:`IHTTPOutBound` plugin. Transforms will be applied in "
+                "specified order."
+}
+
 
 class WebApp( Plugin ):
     """Base class for all web applications."""
@@ -85,40 +92,32 @@ class WebApp( Plugin ):
         """:meth:`pluggdapps.interfaces.IWebApps.startapp` interface method."""
         self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
         self.cookie = self.query_plugin( IHTTPCookie, self['IHTTPCookie'] )
+        self.in_transformers = [
+                self.query_plugin( IHTTPInBound, name )
+                for name in self['IHTTPInBound'] ]
+        self.out_transformers = [
+                self.query_plugin( IHTTPOutBound, name )
+                for name in self['IHTTPOutBound'] ]
         self.router.onboot()
 
     def dorequest( self, request, body=None, chunk=None, trailers=None ):
         """:meth:`pluggdapps.interfaces.IWebApps.dorequest` interface method."""
+        self.pa.logdebug( 
+            "[%s] %s %s" % 
+            (request.method, request.uri, request.httpconn.address)
+        )
         request.router = self.router
         request.cookie = self.cookie
-
-        request.handle( body=body, chunk=chunk, trailers=trailers )
-
         request.response = response = self.query_plugin(
                             IHTTPResponse, self['IHTTPResponse'], request )
-        # request.session = self.query_plugin(
-        #                     IHTTPSession, self['IHTTPSession'] )
-        response.etag = self.query_plugin( IHTTPEtag, self['IHTTPEtag'] )
-        response.context = c = h.Context()
 
-
-        # Call IHTTPResource plugin configured for `webapp`.
-        res = self['resource']
-        res = plugincall( res, lambda : self.query_plugin(IHTTPResource, res) )
-        res( request, c ) if res else None
-
-        self.router.route( request, c )
+        request.handle( body=body, chunk=chunk, trailers=trailers )
+        self.router.route( request )
 
     def dochunk( self, request, chunk=None, trailers=None ):
         """:meth:`pluggdapps.interfaces.IWebApps.dochunk` interface method."""
         request.handle( chunk=chunk, trailers=trailers )
-
-        # Call IHTTPResource plugin configured for `webapp`.
-        res = self['resource']
-        res = plugincall( res, lambda : self.query_plugin(IHTTPResource, res) )
-        res( request, c ) if res else None
-
-        self.router.route( request, c )
+        self.router.route( request )
 
     def onfinish( self, request ):
         """:meth:`pluggdapps.interfaces.IWebApps.onfinish` interface method."""
@@ -128,6 +127,8 @@ class WebApp( Plugin ):
         """:meth:`pluggdapps.interfaces.IWebApps.shutdown` interface method."""
         self.router = None
         self.cookie = None
+        self.in_transformers = []
+        self.out_transformers = []
 
     def urlfor( self, request, *args, **kwargs ):
         """:meth:`pluggdapps.interfaces.IWebApps.urlfor` interface method."""
@@ -151,4 +152,7 @@ class WebApp( Plugin ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
         method."""
         sett['encoding'] = sett['encoding'].lower()
+        sett['IHTTPOutBound'] = h.parsecsvlines( sett['IHTTPOutBound'] )
+        sett['IHTTPInBound'] = h.parsecsvlines( sett['IHTTPInBound'] )
         return sett
+
