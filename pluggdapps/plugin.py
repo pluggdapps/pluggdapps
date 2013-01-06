@@ -538,4 +538,8 @@ def plugin_init():
             x[nm] = cls
             cls._interfs.append(i)
         d[i] = x
+    # All plugins, because they derive from :class:`Plugin`, implement
+    # ISettings interface.
+    d[ ISettings ] = { nm : info['cls'] 
+                       for nm, info in Plugin._pluginmap.items() }
     PluginMeta._implementers = d

@@ -53,6 +53,7 @@ Release check-list
 ------------------
 
 * Sphinx doc quick-start, one time activity.
+    sphinx-quickstart   # And follow the prompts.
     sphinx-apidoc -f -d 2 -T -o  \
                   sphinxdoc/source/ pluggdapps \
                   $(APIDOC_EXCLUDE_PATH)"

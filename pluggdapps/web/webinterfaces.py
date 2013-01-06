@@ -654,6 +654,8 @@ class IHTTPRenderer( Interface ):
     def render( request, c, *args, **kwargs ):
         """Implementing plugin should interpret `args` and ``kwargs``
         arguments and invoke one or more rendering resource (like templates).
+        Returns html text as string.
+
         ``request``,
             Plugin instance implementing :class:`IHTTPRequest` interface. Same
             as the one passed to view-callable.

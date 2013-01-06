@@ -10,10 +10,10 @@ asset-specification.
     TODO : Document asset specification in detail.
 """
 
-import pkg_resources
-from   os.path  import isabs, sep
+import pkg_resources, os
+from   os.path  import isabs, abspath
 
-from   pluggdapps.utils.path import package_name, package_path
+from   pluggdapps.utils.path import package_name, package_path, join
 
 __all__ = [
     'parse_assetspec', 'asset_spec_from_abspath', 'abspath_from_asset_spec',
@@ -43,13 +43,13 @@ def asset_spec_from_abspath( abspath, package ):
     asset specification format path separator is always '/'"""
     if getattr(package, '__name__', None) == '__main__':
         return abspath
-    pp = package_path(package) + sep
+    pp = package_path(package) + os.sep
     if abspath.startswith(pp):
         relpath = abspath[len(pp):]
-        return '%s:%s' % (package_name(package), relpath.replace(sep, '/'))
+        return '%s:%s' % (package_name(package), relpath.replace(os.sep, '/'))
     return abspath
 
-def abspath_from_asset_spec( spec, pname='' ):
+def abspath_from_asset_spec( spec, pname='', relativeto=None ):
     """Convert assert sepcification into absolute path. if ``pname`` is
     supplied, it will be used to parse the asset-spec"""
     if pname is None :
@@ -58,6 +58,11 @@ def abspath_from_asset_spec( spec, pname='' ):
     if pname :
         return pkg_resources.resource_filename(pname, filename)
     else :
-        return filename
+        if relativeto and filename[0] != os.sep :
+            return join( relativeto, filename )
+        elif filename[0] != os.sep :
+            return abspath( filename )
+        else :
+            return filename
 
 

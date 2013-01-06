@@ -11,6 +11,7 @@
 
 import sys, os, fcntl, time, multiprocessing, random, io, traceback, hashlib
 import datetime as dt
+from   os.path  import isfile, join
 from   binascii import hexlify
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
     'reseed_random', 'mergedict', 'multivalue_dict', 'takewhile', 
     'dropwhile', 'print_exc', 'eval_import', 'string_import', 'str2module',
+    'locatefile', 'hitch', 'hitch_method',
     # Classes
     'Context',
 ]
@@ -125,13 +127,8 @@ def call_entrypoint( distribution, group, name, *args, **kwargs ):
     using, ``distribution``, ``group`` and ``name``. ``args`` and ``kwargs``
     will be passed on to the entypoint callable.
     """
-    devmod = kwargs.pop( 'devmod', False )
-    try :
-        ep = distribution.get_entry_info( group, name )
-        return ep.load()( *args, **kwargs ) if ep else None
-    except :
-        if devmod : raise
-    return None
+    ep = distribution.get_entry_info( group, name )
+    return ep.load()( *args, **kwargs ) if ep else None
 
 
 def docstr( obj ):
@@ -237,6 +234,36 @@ def str2module( s ):
         mod = getattr(mod, part)
     return mod
 
+def locatefile( phile, lookup_directories=[] ):
+    """Locate the absolute path in which file ``phile` is located."""
+
+    if phile.startswith('/') and isfile(phile) :
+        return phile
+
+    # First assume that file is relative to lookup_directories
+    files = list( filter( 
+               isfile, [ join(d, phile) for d in lookup_directories ] ))
+    if files : return files[0]
+
+    # Otherwise, assume that it is specified in asset specification notation
+    try    : return h.abspath_from_asset_spec( phile )
+    except : return None
+
+    raise Exception( 'Error locating TTL file %r' % phile )
+
+def hitch( function, *args, **kwargs ):
+    """Hitch a function with a different object and different set of
+    arguments."""
+    def fnhitched( *a, **kw ) :
+        kwargs.update( kw )
+        return function( *(args+a), **kwargs )
+    return fnhitched
+
+def hitch_method( obj, cls, function, *args, **kwargs ) :
+    def fnhitched( self, *a, **kw ) :
+        kwargs.update( kw )
+        return function( *(args+a), **kwargs )
+    return fnhitched.__get__( obj, cls )
 
 class ETag( dict ):
     """A dictionary like object to transparently manage context information.

@@ -65,24 +65,34 @@ import pluggdapps.interfaces
 
 __version__ = '0.3dev'
 
-def package() :
-    """Entry point that returns a dictionary of key,value details about the
-    package.
-    """
-    return {}
+pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
 
 # A gotcha here !
 #   The following lines executed when `pluggdapps` package is imported. As a
 #   side-effect, it loops on valid pluggdapps packages to which this package
 #   is also part of. Hence, make sure that package() entry-point is defined
 #   before executing the following lines.
-packages = []
-pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
 for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
-    info = h.call_entrypoint(d,  'pluggdapps', 'package' )
-    if info == None : continue
-    __import__( pkgname )
-    packages.append( pkgname )
+    if d.get_entry_info( 'pluggdapps', 'package' ) :
+        __import__( pkgname )
+# Initialize plugin data structures
+pluggdapps.plugin.plugin_init()
+
+def package( pa ) :
+    """Entry point that returns a dictionary of key,value details about the
+    package.
+
+    ``pa``,
+        platform object deriving from :class:`Pluggdapps`
+    """
+    return {}
+
+def initialize( pa ):
+    for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
+        if d.get_entry_info( 'pluggdapps', 'package' ) :
+            info = h.call_entrypoint( d,  'pluggdapps', 'package', pa )
+    # Initialize plugin data structures
+    pluggdapps.plugin.plugin_init()
 
 import pluggdapps.erl       # Load netscale interfaces.
 import pluggdapps.commands  # Load pa-script commands
@@ -92,5 +102,3 @@ import pluggdapps.scaffolds # Load web-framework
 # Load applications
 import pluggdapps.docroot   # Application to serve static files.
 
-# Initialize plugin data structures
-pluggdapps.plugin.plugin_init()

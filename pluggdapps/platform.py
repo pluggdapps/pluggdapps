@@ -88,6 +88,15 @@ Finally the platform can be started like,::
   pa = Webapps.boot( args.config )
 
 where ``args.config`` locates the master-ini file
+
+Dynamic plugins :
+
+  There is also an option to create plugin blue-prints dynamically and this
+  option can be carried out by package() entry point implemented by every
+  pluggdapps pacakge. Note that this entry point is called in the context of
+  platform object ``pa`` which is only a partial implementation platform since
+  they do not contain the dynamic plugins. Once all entry points are called, a
+  fully-aware platform object is created.
 """
 
 from   configparser          import SafeConfigParser
@@ -188,10 +197,24 @@ class Pluggdapps( object ):
         Return a new instance of this class object. This is the only way to
         create a platform instance.
         """
+        from pluggdapps import initialize
+
+        # Prebooting. We need pre-booting because package() entry point can
+        # have option of creating dynamic plugins when it is called. The
+        # package() entry point for each and every package will be called only
+        # when initialize() is called. Since initialize() needs a platform
+        # context, we pre-boot the system for initialize then then actually
+        # boot the system.
         pa = cls( *args, **kwargs )
         pa.inifile = baseini
         pa.settings = pa._loadsettings( baseini )
-        # Configure logging
+        pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
+        initialize( pa ) # Prebooting ends with initialize call.
+
+        # Actual booting
+        pa = cls( *args, **kwargs )
+        pa.inifile = baseini
+        pa.settings = pa._loadsettings( baseini )
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
         return pa
 
@@ -222,9 +245,9 @@ class Pluggdapps( object ):
         # Plugin settings
         plugin._settngx.update( kwargs.pop( 'settings', {} ))
 
-        plugin.query_plugins = hitch( plugin, plugin.__class__,
+        plugin.query_plugins = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugins, self )
-        plugin.query_plugin  = hitch( plugin, plugin.__class__,
+        plugin.query_plugin  = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugin, self )
         return args, kwargs
 
@@ -245,6 +268,9 @@ class Pluggdapps( object ):
         by `baseini`. Construct a dictionary of settings for special sections
         and plugin sections."""
         from pluggdapps.plugin import pluginnames, plugin_info
+
+        if not baseini or (not isfile(baseini)) :
+            return deepcopy( defaultsett )
 
         # Initialize return dictionary.
         settings = {}
@@ -308,8 +334,10 @@ class Pluggdapps( object ):
             name = info['name']
             bases = reversed( info['cls'].mro() )
             sett = deepcopy( default )
-            [ sett.update( dict( b.default_settings().items() )) 
-              for b in bases if hasattr(b, 'default_settings') ]
+            for b in bases :
+                if hasattr( b, 'default_settings' ) :
+                    sett.update( dict( b.default_settings().items() ))
+                    sett = b.normalize_settings( sett )
             defaultsett[ h.plugin2sec(name) ] = sett
 
         return defaultsett
@@ -533,10 +561,10 @@ class Webapps( Pluggdapps ):
 
         plugin.pa = self
 
-        plugin.query_plugins = hitch( 
+        plugin.query_plugins = h.hitch_method( 
             plugin, plugin.__class__, Webapps.query_plugins,
             self, plugin.webapp )
-        plugin.query_plugin = hitch(
+        plugin.query_plugin = h.hitch_method(
             plugin, plugin.__class__, Webapps.query_plugin,
             self, plugin.webapp )
 
@@ -753,12 +781,6 @@ class Webapps( Pluggdapps ):
     def default_settings( cls ):
         return _default_settings
 
-
-def hitch( obj, cls, function, *args, **kwargs ) :
-    def fnhitched( self, *a, **kw ) :
-        kwargs.update( kw )
-        return function( *(args+a), **kwargs )
-    return fnhitched.__get__( obj, cls )
 
 def colorize( string, color, bold=False ):
     """ Color values
