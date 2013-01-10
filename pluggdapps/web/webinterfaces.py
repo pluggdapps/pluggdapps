@@ -147,24 +147,28 @@ class IHTTPSession( Interface ):
 class IHTTPRequest( Interface ):
     """Interface specification for a request object."""
 
-    # ---- Socket Attributes
-    httpconn = None
-    """:class:`IHTTPConnection` plugin instance."""
+    # ---- Socket and HTTP Attributes, initialized during plugin instantiation
+    httpconn = None     # Socket attribute
+    """:class:`IHTTPConnection` plugin instance. Initialized during plugin
+    instantiation."""
 
-    # ---- HTTP Attributes
     method = b''
-    """HTTP request method, e.g. b'GET' or b'POST'"""
+    """HTTP request method, e.g. b'GET' or b'POST'. Initialized during plugin
+    instantiation."""
 
     uri = b''
-    """HTTP Request URI in byte-string as found in request start-line"""
+    """HTTP Request URI in byte-string as found in request start-line.
+    Initialized during plugin instantiation."""
 
     version = b''
-    """HTTP protocol version found in request start-line, e.g. b'HTTP/1.1'"""
+    """HTTP protocol version found in request start-line, e.g. b'HTTP/1.1'.
+    Initialized during plugin instantiation."""
 
     headers = {}
     """Dictionary-like object for HTTP headers. Key name are in string, while 
-    values are in byte-string."""
+    values are in byte-string. Initialized during plugin instantiation."""
 
+    #-- Request handler attribute.
     body = b''
     """Request body, if present, as a byte string."""
 
@@ -217,7 +221,8 @@ class IHTTPRequest( Interface ):
         'content-type' : ... }
     """
 
-    #---- Framework attributes
+    #---- Framework attributes, initialized by :class:`IWebApp` dorequest() 
+    # method.
     session = None
     """If a session factory has been configured, this attribute will represent
     the current user's session object."""
@@ -230,7 +235,7 @@ class IHTTPRequest( Interface ):
     """Response object corresponding to this request. The object is an 
     instance of plugin implementing :class:`IHTTPResponse` interface."""
 
-    #---- Routing attributes
+    #---- Routing attributes, intialized by :class:`IHTTPRouter` plugin.
     router = None
     """:class:`IHTTPRouter` plugin resolving this request."""
 
@@ -254,7 +259,7 @@ class IHTTPRequest( Interface ):
     """Timestamp when request was recieved"""
 
     finishedat = 0
-    """Timestamp when the request was finished."""
+    """Timestamp when request was finished."""
 
     def __init__( httpconn, method, uriparts, version, headers ):
         """Instance of plugin implementing this interface corresponds to a
@@ -296,25 +301,30 @@ class IHTTPRequest( Interface ):
 
     def get_cookie( name, default=None ):
         """Gets the value of the cookie with the given ``name``, else return 
-        ``default``."""
+        ``default``. Call to this method is valid only after :meth:`handle` is
+        called."""
 
     def get_secure_cookie( name, value=None ):
-        """Returns a signed cookie if it validates, or None."""
-
-    def ischunked() :
-        """Returns True if this request is received using `chunked`
-        Transfer-Encoding.
-        """
+        """Returns a signed cookie if it validates, or None. Call to this
+        method is valid only after :meth:`handle` is called. Refer to
+        :class:`IHTTPCookie` interface specification to learn more about
+        secure-signing cookies. """
 
     def has_finished():
         """Return True if this request is considered finished, which is, when
         the flush( finishing=True ) method is called on :class:`IHTTPResponse`.
         """
 
+    def ischunked() :
+        """Returns True if this request is received using `chunked`
+        Transfer-Encoding.
+        """
+
     def handle( body=None, chunk=None, trailers=None, ):
-        """Once a `request` is instantiated, this method is called before
-        resolving and dispatching it to view-callable. All in-bound request
-        transformer plugins are applied here.
+        """Typically called by :class:`IWebApp` plugin, after the request is
+        resolved for a web-application. Along with applying in-bound request
+        transformers, the method will initialize most of the attributes under
+        this specification.
         
         ``body``,
             Optional kwarg, if request body is present. Passed as byte-string.
@@ -330,7 +340,10 @@ class IHTTPRequest( Interface ):
 
     def onfinish():
         """Callback for asyncrhonous finish(). Means the response is sent and
-        the request is forgotten."""
+        the request is forgotten. Called by :meth:`IHTTPResponse.onfinish`. It
+        is the responsibility of this plugin to dispatch onfinish() calls on
+        view-callable and web-application plugins.
+        """
 
     def urlfor( name, **matchdict ) :
         """Use request.webapp.urlfor() to generate the url."""
@@ -394,25 +407,33 @@ class IHTTPResponse( Interface ):
     view callables, and eventually to template code."""
 
     #---- Content negotiated attributes
-    charset = None
-    """This attribute will be supplied from two places, webapp['encoding'],
-    and during route composition. webapp['encoding'] configuration setting
-    will be used as the default charset if ``charset`` is not supplied during
-    route composition. And charset preference from request header will be used
-    to negotiate with resource's charset variant."""
-
     media_type = None
-    """This attribute will be supplied during route composition and
-    negotiated with client supplied request-headers."""
+    """If route configuration or content-negotiation supplies media_type
+    specification, this attribute will be set with supplied value before 
+    calling view-callable. View-callable can also override this attribute, the
+    media-type header field is normally set in out-bound-transformer plugin
+    :class:`ResponseHeaders`."""
+
+    charset = None
+    """If route configuration or content-negotiation supplies charset
+    specification, this attribute will be set with supplied value before 
+    calling view-callable. View-callable can also override this attribute, the
+    charset header field is normally set in out-bound-transformer plugin
+    :class:`ResponseHeaders`."""
 
     language = None
-    """This attribute will be supplied during route composition and
-    negotiated with client supplied request-headers."""
+    """If route configuration or content-negotiation supplies language
+    specification, this attribute will be set with supplied value before 
+    calling view-callable. View-callable can also override this attribute, the
+    language header field is normally set in out-bound-transformer plugin
+    :class:`ResponseHeaders`."""
 
     content_coding = None
-    """This attribute will be supplied during route composition and
-    negotiated with client supplied request-headers."""
-
+    """If route configuration or content-negotiation supplies content-encoding
+    specification, this attribute will be set with supplied value before 
+    calling view-callable. View-callable can also override this attribute, the
+    content-encoding header field is normally set in out-bound-transformer
+    plugin :class:`ResponseHeaders`."""
 
     def __init__( request ):
         """Instantiate a response plugin for a corresponding ``request``

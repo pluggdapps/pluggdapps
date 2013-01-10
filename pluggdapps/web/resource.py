@@ -10,6 +10,8 @@ import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
 from   pluggdapps.web.webinterfaces import IHTTPResource
 
+#---- IMPORTANT : This plugin is outdated !!!
+
 class StaticResource( Plugin ):
     """Resource callable for static web-sites."""
     implements( IHTTPResource )

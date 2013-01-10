@@ -49,6 +49,9 @@
 
 * Let log*() methods be available on every instantiated plugins.
 
+* Response header fields are encoded using utf-8 encoding. But looks like the
+  specification says that it must be ISO-8859-1.
+
 Release check-list 
 ------------------
 

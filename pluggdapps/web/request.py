@@ -4,13 +4,11 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-import socket, time, re
-from   urllib.parse import urlunsplit
-from   copy         import deepcopy
+import time
 
 import pluggdapps.utils             as h
-from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IHTTPRequest, IHTTPResponse, IHTTPCookie
+from   pluggdapps.plugin            import Plugin, implements
+from   pluggdapps.web.webinterfaces import IHTTPRequest
 
 # TODO : Product token, header field `Server` to be automatically added in
 # response.
@@ -38,35 +36,30 @@ class HTTPRequest( Plugin ):
         self.httpconn = httpconn
         self.method, self.uri, self.version = method, uri, version
         self.headers = headers
-        self.uriparts = h.parse_url( uri, host=headers.get('host',None)
-                                   ) if isinstance(uri, bytes) else uri
 
-        self.body = None
+        # Initialize request handler attributes, these attributes will be
+        # valid only after a call to handle() method.
+        self.body = b''
         self.chunks = []
         self.trailers = {}
+        self.cookies = {}
+        # Only in case of POST and PUT method.
+        self.postparams = {}
+        self.multiparts = {}
+        self.files = {}
 
+        # Initialize
+        if isinstance( uri, bytes ) :
+            self.uriparts = h.parse_url( uri, host=headers.get('host',None) )
+        else :
+            self.uriparts = uri
         self.params = {}
         self.getparams = self.uriparts['query']
         self.params.update( self.getparams )
 
-        self.content_type = h.parse_content_type( 
-                                headers.get( 'content_type', None ))
-        if method in ( b'POST', b'PUT' ) :
-            self.postparams, self.multiparts = \
-                    h.parse_formbody( self.content_type, body )
-            [ self.params.setdefault( name, [] ).extend( value )
-              for name, value in self.postparams.items() ]
-            [ self.params.setdefault( name, [] ).extend( value )
-              for name, value in self.multiparts.items() ]
-            [ self.files.setdefault( name, [] 
-                                   ).extend( (f['filename'], f['value'] ) )
-              for name, value in self.multiparts.items() ]
-        else :
-            self.postparams = {}
-            self.multiparts = {}
-            self.files = {}
+        self.content_type = \
+                h.parse_content_type( headers.get( 'content_type', None ))
 
-        self.matchdict = {}
         self.receivedat = time.time()
         self.finishedat = None
 
@@ -114,9 +107,8 @@ class HTTPRequest( Plugin ):
 
         # Apply IHTTPInBound transformers on this request.
         data = body if body != None else (chunk[2] if chunk else b'')
-        if data :
-            for tr in self.webapp.in_transforms :
-                data = tr.transform( self, data, finishing=finishing )
+        for tr in self.webapp.in_transformers :
+            data = tr.transform( self, data, finishing=finishing )
 
         # Update the request plugin with attributes.
         if body :
@@ -124,6 +116,18 @@ class HTTPRequest( Plugin ):
         elif chunk :
             self.chunks.append( (chunk[0], chunk[1], data) )
         self.trailers = trailers or self.trailers
+
+        # Process POST and PUT request interpreting multipart content.
+        if self.method in ( b'POST', b'PUT' ) :
+            self.postparams, self.multiparts = \
+                    h.parse_formbody( self.content_type, self.body )
+            [ self.params.setdefault( name, [] ).extend( value )
+              for name, value in self.postparams.items() ]
+            [ self.params.setdefault( name, [] ).extend( value )
+              for name, value in self.multiparts.items() ]
+            [ self.files.setdefault( name, [] 
+                                   ).extend( (f['filename'], f['value'] ) )
+              for name, value in self.multiparts.items() ]
 
     def onfinish( self ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.onfinish`
@@ -147,7 +151,6 @@ class HTTPRequest( Plugin ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.appurl`
         interface method."""
         return webapp.urlfor( self, name, **matchdict )
-
 
     def __repr__( self ):
         attrs = ( "uriparts", "address", "body" )

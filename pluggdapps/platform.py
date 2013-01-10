@@ -104,7 +104,7 @@ from   os.path               import dirname, isfile
 from   copy                  import deepcopy
 
 from   pluggdapps.const      import SPECIAL_SECS, URLSEP
-from   pluggdapps.interfaces import IWebApp
+from   pluggdapps.interfaces import IWebApp, IConfigDB
 import pluggdapps.utils      as h
 
 
@@ -150,6 +150,11 @@ def pluggdapps_defaultsett():
         'types'   : (int,),
         'help'    : "Port addres to bind the http server."
     }
+    sett['configdb'] = {
+        'default' : 'ConfigSqlite3DB',
+        'types'   : (str,),
+        'help'    : "Backend store to be used for web-admin configuration."
+    }
     sett['logging.output'] = {
         'default' : 'console',
         'types'   : (str,),
@@ -186,6 +191,9 @@ class Pluggdapps( object ):
     """Default settings for plugins, gathered from plugin-default settings,
     master configuration file and other backend stores, if any."""
 
+    configdb = None
+    """:class`IConfigDB` plugin instance."""
+
     def __init__( self, erlport=None ):
         self.erlport = erlport # TODO: Document this once bolted with netscale
 
@@ -211,11 +219,17 @@ class Pluggdapps( object ):
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
         initialize( pa ) # Prebooting ends with initialize call.
 
+        # Configuration backend
+        storetype = pa.settings['pluggdapps']['configdb']
+        pa.configdb = pa.query_plugin( pa, None, IConfigDB, storetype )
         # Actual booting
         pa = cls( *args, **kwargs )
         pa.inifile = baseini
         pa.settings = pa._loadsettings( baseini )
+        if pa.configdb :
+            pa.settings.update( pa.configdb.platform() )
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
+
         return pa
 
     def start( self ):
@@ -250,6 +264,32 @@ class Pluggdapps( object ):
         plugin.query_plugin  = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugin, self )
         return args, kwargs
+
+    #---- Configuration APIs
+
+    def config( self, *args, **kwargs ):
+        """Get or set configuration parameter for the platform.
+
+        Positional argument,
+
+        ``section``,
+            Section name to get or set config parameter.
+
+        ``name``,
+            Configuration name to get or set for ``section``.
+
+        Keyword arguments,
+
+        ``value``,
+            If preset, this method was invoked for setting configuration
+            ``name`` under ``section``.
+        """
+        section, name = args
+        value = kwargs.get( 'value', None )
+        if value :      # Set configuration
+            self.settings[section][name] = value
+            self.configdb.config( section, name, value )
+        return self.settings[section][name]
 
     #---- Internal methods.
 
@@ -464,6 +504,10 @@ class Webapps( Pluggdapps ):
     """Dictionay mapping of mount-key and :class:`pluggdapps.web.webapp.WebApp`
     instance, where mount-key is a tuple of appsec, netpath, application-ini"""
 
+    netpaths= {}
+    """Dictionay mapping of netpath, and :class:`pluggdapps.web.webapp.WebApp`
+    instance."""
+
     appurls = {}
     """A dictionary map of webapp's instkey and its base-url. The base url 
     consists of scheme, netloc, scriptname."""
@@ -494,11 +538,13 @@ class Webapps( Pluggdapps ):
             # Instantiate the IWebAPP plugin here for each `instkey`
             appname = h.sec2plugin( appsec )
             webapp = pa.query_plugin( pa, instkey, IWebApp, appname, appsett )
-            webapp.appsetting = appsett
+            webapp.appsettings = appsett
+            if pa.configdb :
+                webapp.appsettings.update( pa.configdb.application( netpath ))
             webapp.instkey, webapp.netpath = instkey, None
             pa.webapps[ instkey ] = webapp
+            pa.netpaths[ netpath ] = webapp
             pa.appurls[ instkey ] = webapp.baseurl = pa._make_appurl( instkey )
-
             
             pa._app_resolve_cache[ h.parse_netpath(netpath) ] = webapp
 
@@ -549,7 +595,7 @@ class Webapps( Pluggdapps ):
 
         elif webapp :                   # Not a IWebApp plugin
             plugin._settngx.update(
-                webapp.appsetting[ h.plugin2sec( pluginname( plugin )) ]
+                webapp.appsettings[ h.plugin2sec( pluginname( plugin )) ]
             )
             plugin.webapp = webapp
 
@@ -571,6 +617,37 @@ class Webapps( Pluggdapps ):
         # Plugin settings
         plugin._settngx.update( kwargs.pop( 'settings', {} ))
         return args, kwargs
+
+    #---- Configuration APIs
+
+    def config( self, *args, **kwargs ):
+        """Get or set configuration parameter for the platform.
+
+        Positional argument,
+
+        ``netpath``,
+            Netpath, including hostname and script-path, on which
+            web-application is mounted
+
+        ``section``,
+            Section name to get or set config parameter.
+
+        ``name``,
+            Configuration name to get or set for ``section``.
+
+        Keyword arguments,
+
+        ``value``,
+            If preset, this method was invoked for setting configuration
+            ``name`` under ``section``.
+        """
+        netpath, section, name = args
+        value = kwargs.get( 'value', None )
+        webapp = self.netpaths[ netpath ]
+        if value :      # Set configuration
+            webapp.appsettings[section][name] = value
+            self.configdb.config( netpath, section, name, value )
+        return webapp.appsettings[section][name]
 
     #---- Internal methods
 
@@ -602,9 +679,9 @@ class Webapps( Pluggdapps ):
         for netpath, mounton in mountloc :
             if netpath in _skipopts : continue
 
-            parts = mounton.split(',', 1)
-            appname = parts.pop(0).strip()
-            configini = parts.pop(0).strip() if parts else None
+            parts = [ x.strip() for x in mounton.split(',', 1) ]
+            appname = parts.pop(0)
+            configini = parts.pop(0) if parts else None
             appsec = h.plugin2sec( appname )
 
             if appsec not in appsecs :
@@ -655,14 +732,10 @@ class Webapps( Pluggdapps ):
 
         Return the base-url as byte-string.
         """
-        host = self.settings['pluggdapps']['host']
         port = self.settings['pluggdapps']['port']
         scheme = self.settings['pluggdapps']['scheme']
         appsec, netpath, config = instkey
         netloc, script = h.parse_netpath( netpath )
-        if not netloc.endswith( host ) :
-            raise Exception(
-                "Mount location's netloc does not match with host config." )
 
         # Prefix scheme
         appurl = scheme + '://' + netloc

@@ -9,7 +9,7 @@ from   urllib.parse import urljoin
 from   pluggdapps.plugin            import implements, Plugin, plugincall
 from   pluggdapps.interfaces        import IWebApp
 from   pluggdapps.web.webinterfaces import IHTTPRouter, IHTTPCookie, \
-                                           IHTTPResponse, IHTTPResource, \
+                                           IHTTPResponse, \
                                            IHTTPSession, IHTTPInBound, \
                                            IHTTPOutBound
 import pluggdapps.utils             as h
@@ -103,14 +103,15 @@ class WebApp( Plugin ):
     def dorequest( self, request, body=None, chunk=None, trailers=None ):
         """:meth:`pluggdapps.interfaces.IWebApps.dorequest` interface method."""
         self.pa.logdebug( 
-            "[%s] %s %s" % 
-            (request.method, request.uri, request.httpconn.address)
+            "[%s] %s %s" % (
+                    request.method, request.uri, request.httpconn.address )
         )
+        # Initialize framework attributes
         request.router = self.router
         request.cookie = self.cookie
-        request.response = response = self.query_plugin(
-                            IHTTPResponse, self['IHTTPResponse'], request )
-
+        # TODO : Initialize session attribute here.
+        request.response = response = \
+            self.query_plugin( IHTTPResponse, self['IHTTPResponse'], request )
         request.handle( body=body, chunk=chunk, trailers=trailers )
         self.router.route( request )
 

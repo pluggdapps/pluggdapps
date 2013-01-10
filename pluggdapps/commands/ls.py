@@ -110,7 +110,7 @@ class CommandLs( Singleton ):
                 appsec, netpath, instconfig = instkey
                 if h.sec2plugin( appsec ) == args.plugin :
                     print( "Settings for %r" % (instkey,) )
-                    pprint( webapp.appsetting, indent=2 )
+                    pprint( webapp.appsettings, indent=2 )
                     print()
         elif args.ls_settings.startswith('def') and args.plugin :
             print( "Default settings for plugin %r" % args.plugin )
@@ -154,7 +154,7 @@ class CommandLs( Singleton ):
                 print("  Subdomain : ", webapp.netpath )
                 print("  Router    : ", webapp.router )
                 print("Application settings")
-                pprint( webapp.appsetting, indent=4 )
+                pprint( webapp.appsettings, indent=4 )
                 print()
 
     def _ls_webapps( self, args ):

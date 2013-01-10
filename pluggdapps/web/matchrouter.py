@@ -51,14 +51,6 @@ _default_settings['negotiate_content']  = {
     'help'    : "Do content-negotiation when more than one representation is "
                 "available for the same resource."
 }
-_default_settings['routemapper'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Filename along with its path, in asset specification format.  "
-                "Referred file contains route mapping information which will "
-                "get transformed into add_view() calls during boot time."
-}
-
 
 re_patt = re.compile( r'([^{]+)?(\{.+\})?([^}]+)?' )
           # prefix, interpolater, suffix
@@ -80,12 +72,6 @@ class MatchRouter( Plugin ):
             self['defaultview'],
             lambda:self.query_plugin(IHTTPView, self['defaultview'], name, None)
         )
-        fl = h.abspath_from_asset_spec( self['routemapper'] )
-        if fl and isfile( fl ) :
-            [ self.add_view( vargs.pop('name'), vargs.pop('pattern'), **vargs )
-              for vargs in eval( open( fl ).read() ) ]
-        elif fl :
-            raise Exception( "Wrong configuration for routemapper : %r" % fl )
 
     def add_view( self, name, pattern, **kwargs ):
         """Add a router mapping rule.
@@ -189,12 +175,13 @@ class MatchRouter( Plugin ):
                 request.view = getattr( vobj, viewd['attr'] ) \
                                     if viewd['attr'] else vobj
                 # Call IHTTPResource plugin configured for this view callable.
-                res = viewd['resource']
-                if res :
-                    res = plugincall(
-                            res, lambda : self.query_plugin(IHTTPResource,res)
-                          )
-                    res( request, c )
+                resource = viewd['resource']
+                if resource :
+                    resource = plugincall(
+                        resource,
+                        lambda : self.query_plugin(IHTTPResource,resource) )
+                    self.resource = resource
+                    resource( request, c )
                 # If etag is available, compute and subsequently clear them.
                 etag = c.etag.hashout( prefix='resp-' )
                 c.setdefault( 'etag', etag ) if etag else None
@@ -279,8 +266,10 @@ class MatchRouter( Plugin ):
             validation during URL generation.
         """
         regex, tmpl, redict = r'^', '', {}
-        segs = pattern.split( URLSEP )
+        segs = list( filter( None, pattern.split( URLSEP )))
         while segs :
+            regex += URLSEP
+            tmpl += URLSEP
             part = segs.pop(0)
             if not part : continue
             if part[0] == '*' :
@@ -351,5 +340,4 @@ class MatchRouter( Plugin ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
         method.
         """
-        sett['routemapper'] = sett['routemapper'].strip()
         return sett

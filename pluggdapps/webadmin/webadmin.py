@@ -11,8 +11,7 @@ import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
-    "Configuration settings for WebApp base class inherited by all " \
-    "pluggdapps web-applications."
+    "Configuration settings for webadmin application "
 
 _default_settings['encoding']  = {
     'default' : 'utf-8',
@@ -24,31 +23,8 @@ _default_settings['language']  = {
     'types'   : (str,),
     'help'    : "Default language to use for content negotiation."
 }
-_default_settings['rootloc'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Root location containing the web-site documents."
-}
-_default_settings['index_page'] = {
-    'default' : 'index.html',
-    'types'   : (str,),
-    'help'    : "Specify the index page for the hosted site."
-}
-_default_settings['favicon'] = {
-    'default' : 'favicon.ico',
-    'types'   : (str,),
-    'help'    : "To use a different file for favorite icon, configure the "
-                "file path here. File path must be relative to ``rootloc``."
-}
-_default_settings['IHTTPRouter']  = {
-    'default' : 'DocRootRouter',
-    'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPRouter` "
-                "interface. A request is resolved for a view-callable by this "
-                "router plugin."
-}
 
-class docroot( WebApp ):
+class WebAdmin( WebApp ):
 
     def startapp( self ):
         super().startapp()
@@ -75,4 +51,5 @@ class docroot( WebApp ):
     @classmethod
     def normalize_settings( cls, sett ):
         return sett
+
 

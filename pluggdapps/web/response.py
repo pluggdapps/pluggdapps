@@ -5,13 +5,14 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 
-import http.client, itertools, time
+import http.client, time
 import datetime as dt
-from   http.cookies import CookieError, SimpleCookie
+from   http.cookies import SimpleCookie
+from   os.path      import splitext
 
-from   pluggdapps.const             import CONTENT_IDENTITY
 from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IHTTPResponse, IHTTPOutBound
+from   pluggdapps.web.webinterfaces import IHTTPResponse, IHTTPOutBound, \
+                                           IHTTPRenderer
 import pluggdapps.utils             as h
 
 # TODO :
@@ -49,7 +50,7 @@ class HTTPResponse( Plugin ):
     the response with finishing=True argument."""
 
     def __init__( self, request ):
-        # Plugin attributes
+        # Initialize response attributes
         self.statuscode = b'200'
         self.reason = http.client.responses[ int(self.statuscode) ]
         self.version = request.httpconn.version
@@ -57,14 +58,16 @@ class HTTPResponse( Plugin ):
         self.body = b''
         self.chunk_generator = None
         self.trailers = {}
+
         self.setcookies = SimpleCookie()
+
+        # Initialize framework attributes
         self.request = request
+        self.context = h.Context()
         self.media_type = None
         self.content_coding = None
         self.charset = self.webapp['encoding']
         self.language = self.webapp['language']
-        self.context = h.Context()
-
 
         # Book keeping
         self.httpconn = request.httpconn
@@ -80,9 +83,9 @@ class HTTPResponse( Plugin ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_status`
         interface method."""
         if isinstance(code, int) :
-            self.statuscode = str(code).encode( self.charset )
+            self.statuscode = str(code).encode('utf-8')
         elif isinstance(code, str) :
-            self.statuscode = code.encode( self.charset )
+            self.statuscode = code.encode('utf-8')
         else :
             self.statuscode = code
         return self.statuscode
@@ -91,34 +94,31 @@ class HTTPResponse( Plugin ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_header`
         interface method."""
         value = value if isinstance( value, bytes ) \
-                      else str( value ).encode( self.charset )
+                      else str( value ).encode('utf-8')
         self.headers[ name ] = value
         return value
 
     def add_header( self, name, value ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.add_header`
         interface method."""
-        value = value if isinstance( value, bytes ) \
-                      else str( value ).encode( self.charset )
-        self.headers[ name ] = b','.join(
-                filter( None, [self.headers.get(name, b''), value] ))
+        value = value if isinstance(value,bytes) else str(value).encode('utf-8')
+        pvalue = self.headers.get( name, b'' )
+        self.headers[name] = b','.join([pvalue, value]) if pvalue else None
         return self.headers[name]
 
     def set_trailer( self, name, value ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.set_trailer`
         interface method."""
-        value = value if isinstance( value, bytes ) \
-                      else str( value ).encode( self.charset )
+        value = value if isinstance(value,bytes) else str(value).encode('utf=8')
         self.trailers[name] = value
         return value
 
     def add_trailer( self, name, value ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.add_trailer`
         interface method."""
-        value = value if isinstance( value, bytes ) \
-                      else str( value ).encode( self.charset )
-        self.trailers[ name ] = b','.join(
-                filter( None, [self.trailers.get(name, b''), value] ))
+        value = value if isinstance(value,bytes) else str(value).encode('utf-8')
+        pvalue = self.trailers.get(name, b'')
+        self.trailers[name] = b','.join([pvalue, value]) if pvalue else None
         return self.trailers[name]
 
     def set_cookie( self, name, value, **kwargs ):
@@ -147,7 +147,7 @@ class HTTPResponse( Plugin ):
     def clear_all_cookies(self):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.clear_all_cookies`
         interface method."""
-        map( self.clear_cookie, self.setcookies.keys() )
+        list( map( self.clear_cookie, self.setcookies.keys() ))
         return None
 
     def set_finish_callback(self, callback):
@@ -190,20 +190,52 @@ class HTTPResponse( Plugin ):
 
         self.finished = finishing
 
-        self._flush_chunk( finishing ) \
-            if callable( self.write_buffer ) else self._flush_body( finishing )
+        if callable( self.write_buffer ) :
+            self._flush_chunk( finishing )
+        else :
+            self._flush_body( finishing )
 
-    def httperror( self, statuscode=500, message=b'' ):
+    def httperror( self, statuscode=b'500', message=b'' ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.httperror`
         interface method."""
         self.statuscode = statuscode
         self.write( message ) if message else None
         self.flush( finishing=True )
 
+    _renderers = {
+        '.ttl' : 'TTLCompiler',
+    }
     def render( self, *args, **kwargs ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.render`
-        interface method."""
-        self.request.view
+        interface method.
+        
+        keyword arguments,
+
+        ``file``,
+            Template file to be used for rendering.
+
+        ``text``,
+            Template text to be used for rendering.
+
+        ``IHTTPRenderer``,
+            :class:`IHTTPRenderer` plugin to use for rendering. 
+
+        If ``file`` keyword argument is passed, this method will resolve the
+        correct renderer plugin based on file-extension. if ``text`` keyword
+        argument is passed, better pass the ``IHTTPRenderer`` argument as
+        well.
+        """
+        renderer = kwargs.get( 'IHTTPRenderer', None )
+        if renderer is None :
+            tfile = kwargs.get( 'file', '' )
+            _, ext = os.path.splitext( tfile )
+            renderer = self._renderers.get( ext, None ) if ext else None
+        renderer = \
+            self.query_plugin( IHTTPRenderer, renderer ) if renderer else None
+        if renderer :
+            return renderer.render( *args, **kwargs )
+        else :
+            raise Exception('Unknown renderer')
 
     def chunk_generator( self, callback, request, c ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.chunk_generator`
@@ -226,26 +258,27 @@ class HTTPResponse( Plugin ):
         """Generate default headers for this response. And return the
         byte-string of response header to write. This can be overriden
         by view callable attributes."""
-        if self.start_response : return False
+        if self.start_response : return b''
         self.start_response = True
-        return self._header_data( self.headers )
+        stline = self._status_line()
+        return self._header_data( self.headers, stline=stline )
 
-    def _header_data( self, headers ):
+    def _status_line( self ):
+        code = self.statuscode
+        reason = http.client.responses[ int(code) ].encode( 'utf-8' )
+        return b' '.join([ self.version, code, reason ])
+
+    def _header_data( self, headers, stline=b'' ):
         # TODO : 3 header field types are specifically prohibited from
         # appearing as a trailer field: Transfer-Encoding, Content-Length and
         # Trailer.
-
-        code = self.statuscode
-        reason = http.client.responses[ int(code) ].encode( self.charset )
-        lines = [ b' '.join([ self.version, code, reason ]) ]
-
+        lines = [ stline ] if stline else []
         for n, v in headers.items() :
-            n = h.hdr_str2camelcase.get( 
-                    n,
-                    '-'.join([ x.capitalize() for x in n.split('_') 
-                            ]).encode('utf-8')
-                )
-            lines.append( n + b': ' + v )
+            nC =  h.hdr_str2camelcase.get( n, None )
+            if nC == None :
+                n = n.encode('utf-8')
+                nC = b'-'.join([ x.capitalize() for x in n.split('_') ])
+            lines.append( nC + b': ' + v )
 
         [ lines.append( b"Set-Cookie: " + cookie.OutputString() )
           for c in self.setcookies.values() ]
@@ -256,45 +289,42 @@ class HTTPResponse( Plugin ):
         data = b''.join( self.write_buffer )
         for tr in self.webapp.out_transformers :
             data = tr.transform( self.request, data, finishing=finishing )
-        self._if_etag( self.request, self.headers.get('etag', '') )
+        self.body = data if self._if_etag() else ''
         self.body = data
         data = self._try_start_headers( finishing=finishing )
         if self.request.method == b'HEAD' :
-            self.httpconn.write( data, callback=self._onflush )
-        elif data :
+            pass
+        elif self.body :
             data += self.body
-            self.httpconn.write( data, callback=self._onflush )
-        else :
-            self.httpconn.write( data, callback=self._onflush )
+        self.httpconn.write( data, callback=self._onflush )
         self.write_buffer = []
 
     def _flush_chunk( self, finishing ):
         self.add_headers( 'transfer_encoding', 'chunked' )
-        chunkdata = self.write_buffer( self.request, self.c )
-        for tr in self.webapp.out_transformers :
-            chunkdata = tr.transform(
-                            self.request, chunkdata, finishing=finishing )
-
         data = self._try_start_headers( finishing=finishing )
-        data += ( hex(len(chunkdata)).encode( self.charset ) + b'\r\n' +
-                  chunkdata + b'\r\n' )
-        if finishing and self.trailers :
-            data += b'0\r\n' + chunkdata + b'\r\n'
-            data += self._header_data( self.trailers )
-            self.httpconn.write( data, callback=self._onflush )
-        elif finishing and chunkdata :
-            data += b'0\r\n' + chunkdata + b'\r\n'
-            self.httpconn.write( data, callback=self._onflush )
-        else :
-            self.httpconn.write( data, callback=self._onflush )
 
-    def _if_etag( self, request, etag ):
-        if request.response.ischunked() == False and etag :
-            im = request.headers.get( "if_match", b'' ).strip()
-            inm = request.headers.get( "if_none_match", b'' ).strip()
+        chunk = self.write_buffer( self.request, self.c )
+        for tr in self.webapp.out_transformers :
+            chunk = tr.transform( self.request, chunk, finishing=finishing )
+
+        if chunk :
+            data += hex(len(chunk)).encode('utf-8') + b'\r\n' + chunk + b'\r\n'
+        else :
+            data += b'0\r\n'
+            if self.trailers :
+                data += self._header_data( self.trailers )
+        self.httpconn.write( data, callback=self._onflush )
+
+    def _if_etag( self ):
+        etag = self.headers.get('etag', '')
+        if self.ischunked() == False and etag :
+            im = self.request.headers.get( "if_match", b'' ).strip()
+            inm = self.request.headers.get( "if_none_match", b'' ).strip()
             if ( (im and im.find( etag ) == -1) or
                  (inm and inm.find( etag ) != -1) ) :
                 self.set_status( b'304' )
+                return False
+        return True
 
     def _onflush( self ):
         if self.flush_callback :
@@ -353,15 +383,13 @@ class ResponseHeaders( Plugin ):
             mt = ('%s;charset=%s' % (mt, resp.charset)) if resp.charset else mt
             resp.set_header( 'content_type', mt ) 
             resp.set_header( 'content_language', resp.language )
+            resp.set_header( 'content_encoding', resp.content_coding )
 
             # For HTTP/1.1 connection can be kept alive across multiple request
             # and response.
             connection = h.connection(request.headers.get("connection", None))
             if request.supports_http_1_1() and b'keep-alive' in connection :
                 resp.set_header( "connection", b"Keep-Alive" )
-
-            if resp.ischunked() == False :
-                resp.set_header( "content_length", len(data) )
 
             # If etag is available from context, compute and subsequently
             # clear them. Manage If-* request headers.
@@ -387,6 +415,9 @@ class ResponseHeaders( Plugin ):
                      (iums and iums < last_modified) ) :
                     resp.set_status( b'304' )
                     return b''
+
+            if resp.ischunked() == False :
+                resp.set_header( "content_length", len(data) )
 
         return data
 

@@ -6,7 +6,7 @@
 
 
 import gzip
-from   io   import BytesIO, StringIO
+from   io   import BytesIO
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import Plugin, implements
@@ -31,23 +31,30 @@ class GZipOutBound( Plugin ) :
     def transform( self, request, data, finishing=True ):
         resp = request.response
         ctype = resp.headers.get( 'content_type', b'' )
-        cenc  = resp.headers.get( 'content_encoding', None )
+        cenc  = resp.headers.get( 'content_encoding', b'' )
 
         # Compress only if content-type is 'text/*' or 'application/*'
-        if ( data and resp.content_coding == 'gzip' and
-             (ctype.startswith(b'text/') or ctype.startswith(b'application/'))
-             and (b'zip' not in ctype) ) :
-            resp.add_header( 'content_encoding', 'gzip' )
+        if self._is_gzip( data, cenc, ctype, resp.statuscode ) :
             data = self._gzip( data )
-            if resp.ischunked() == False :
-                resp.set_header( 'content_length', str( len(data) ))
-                etag = resp.headers.get( 'etag', '' )
-                resp.set_header( 'etag', etag[:-1] + b';gzip"' ) \
-                        if etag else None
+
+        if not data :
+            resp.set_header( 'content_encoding', b'' )
 
         if resp.ischunked() == False :
             resp.set_header( 'content_length', len( data ))
+            etag = resp.headers.get( 'etag', '' )
+            # etag is always double-quoted.
+            if etag :
+                resp.set_header( 'etag', etag[:-1] + b';gzip"' )
+
         return data
+
+    def _is_gzip( self, data, enc, typ, status ):
+        return ( bool(data) and
+                 b'gzip' in enc and
+                 (typ.startswith(b'text/') or 
+                       typ.startswith(b'application/')) and
+                 b'zip' not in typ )
 
     def _gzip( self, data ):
         buf = BytesIO()

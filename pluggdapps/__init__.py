@@ -94,6 +94,7 @@ def initialize( pa ):
     # Initialize plugin data structures
     pluggdapps.plugin.plugin_init()
 
+import pluggdapps.config    # Load plugins for configuration backends.
 import pluggdapps.erl       # Load netscale interfaces.
 import pluggdapps.commands  # Load pa-script commands
 import pluggdapps.web       # Load web-framework

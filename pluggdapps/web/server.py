@@ -137,7 +137,7 @@ class HTTPEPollServer( Plugin ):
     "keyfile".
 
     Server resolves application for HTTP requests and dispatches them to
-    corresponding :class:`IApplication` plugin. Finishing the request does
+    corresponding :class:`IWebApp` plugin. Finishing the request does
     not necessarily close the connection in the case of HTTP/1.1 keep-alive
     requests. Server features,
 
@@ -174,6 +174,7 @@ class HTTPEPollServer( Plugin ):
             self.pa.logdebug( h.print_exc() )
             self.stop()
         self.ioloop.close()
+        # Sanity check on unclosed connections
         if self.connections : 
             addrs = tuple( map( lambda c : c.address, self.connections ))
             self.pa.logwarn( "%r connections are still active" % (addrs,) )
@@ -413,7 +414,6 @@ class IOLoop( object ):
         self.poll_threshold = server['poll_threshold']
         self.poll_timeout = server['poll_timeout']
         self.server = server
-        self.debug = server['debug']
 
         self._evpoll = select.epoll()
         self._waker = Waker()
@@ -428,9 +428,7 @@ class IOLoop( object ):
         self._running = False
         self._stopped = False
 
-        if self.debug :
-            server.pa.logdebug( "Adding poll-loop waker ..." )
-
+        server.pa.logdebug( "Adding poll-loop waker ..." )
         self.add_handler( self._waker.fileno(), 
                           lambda fd, events: self._waker.consume(), # handler
                           self.READ )
@@ -449,27 +447,22 @@ class IOLoop( object ):
             self.server.pa.logwarn(
                 "Polled descriptors exceeded threshold" % self.poll_threshold
             )
-        if self.debug :
-            self.server.pa.logdebug(
-                "Add descriptor to epoll : %s" % list( self._handlers.keys() )
-            )
+        self.server.pa.logdebug( "Add descriptor to epoll : %s" % fd )
 
     def update_handler( self, fd, events ):
         """Changes the events we listen for fd."""
         self._evpoll.modify( fd, events | self.ERROR )
-        if self.debug :
-            self.server.pa.logdebug(
-                "Updating descriptor : (%s, %s)" % (fd, events)
-            )
+        self.server.pa.logdebug("Updating descriptor : %s, %s" % (fd, events))
 
     def remove_handler( self, fd ):
         """Stop listening for events on fd."""
-        if self._handlers.pop(fd, None) or self._events.pop(fd, None) :
-            self.server.pa.logdebug("Remove descriptor from epoll : %s:" % fd)
-            try:
-                self._evpoll.unregister(fd)
-            except (OSError, IOError):
-                self.server.pa.logwarn( "Error deleting fd from epoll" )
+        self.server.pa.logdebug( "Remove descriptor from epoll : %s:" % fd )
+        self._handlers.pop(fd, None)
+        self._events.pop(fd, None)
+        try:
+            self._evpoll.unregister(fd)
+        except (OSError, IOError):
+            self.server.pa.logwarn( "Error deleting fd from epoll" )
 
     #---- Manage timeout handlers on this epoll using heap queue.
 
@@ -535,9 +528,7 @@ class IOLoop( object ):
             self._callbacks = []
             for callback in callbacks :
                 try    : callback()
-                except :
-                    self.server.pa.logerror( "In callback %r" % callback )
-                    if self.debug : raise
+                except : self.server.pa.logdebug( h.print_exc() )
 
             # Handle timeouts
             if self._timeouts :
@@ -549,9 +540,7 @@ class IOLoop( object ):
                     elif self._timeouts[0].deadline <= now : # Handle timeout
                         timeout = heapq.heappop( self._timeouts )
                         try    : timeout.callback()
-                        except :
-                            self.server.pa.logerror("In timeout %r" % timeout)
-                            if self.debug : raise
+                        except : self.server.pa.logdebug( h.print_exc() )
 
                     else : # Adjust poll-timeout
                         seconds = self._timeouts[0].deadline - now
@@ -587,10 +576,8 @@ class IOLoop( object ):
             while self._events :
                 fd, events = self._events.popitem()
                 callback = self._handlers.get( fd, None )
-                try : callback( fd, events ) if callback else None
-                except :
-                    self.server.pa.logerror("In socket callback %r"%callback)
-                    if self.server['debug'] : raise
+                try    : callback( fd, events ) if callback else None
+                except : self.server.pa.logdebug( h.print_exc() )
 
         # reset the stopped flag so another start/stop pair can be issued
         self._stopped = False
@@ -609,8 +596,7 @@ class IOLoop( object ):
         self.server.pa.logdebug( "Stopping poll loop ..." )
         self.remove_handler( self._waker.fileno() )
 
-        fds = list( self._handlers.keys() )
-        [ self.remove_handler( fd ) for fd in fds[:] ]
+        [ self.remove_handler( fd ) for fd in list(self._handlers.keys()) ]
 
         self._running = False
         self._stopped = True
@@ -634,10 +620,10 @@ class IOLoop( object ):
         self._callbacks = []
         self._timeouts = []
         if self._handlers :
-            raise Exception(
+            self.server.pa.logerror( 
                     "Handlers are still subscribed: %r" % self._handlers )
         if self._events :
-            raise Exception(
+            self.server.pa.logerror(
                     "Events are pending to be handled: %r" % self._events )
 
 
@@ -737,9 +723,9 @@ class HTTPConnection( Plugin ):
         self.chunk = None
 
         # Set up a socket from accepted connection (conn, addr).
-        sslopts = h.settingsfor( 'ssl.', server )
         scheme = server['scheme'] or self.pa.settings['pluggdapps']['scheme']
         if scheme == 'https' :
+            sslopts = h.settingsfor( 'ssl.', server )
             self.conn = ssl.wrap_socket( conn, server_side=True,
                                          do_handshake_on_connect=False,
                                          **sslopts )
@@ -781,8 +767,7 @@ class HTTPConnection( Plugin ):
         # Fresh request, resolve application.
         uriparts, webapp = self.pa.resolveapp( uri, headers )
         if webapp == None :
-            self.pa.logerror(
-                "Unable to resolve request for apps. (%s)" % uri )
+            self.pa.logerror("Unable to resolve request for apps. (%s)" % uri)
             self.write_error( self.NOT_FOUND )
             return
 
@@ -793,7 +778,7 @@ class HTTPConnection( Plugin ):
                             IHTTPRequest, webapp['IHTTPRequest'],
                             self, method, uri, version, headers )
         except :
-            h.print_exc()
+            self.pa.logdebug( h.print_exc() )
             self.write_error( self.INTERNAL_ERROR )
             return
 
@@ -893,7 +878,7 @@ class HTTPConnection( Plugin ):
     def on_request_headers( self, data ):
         """A request has started. Parse `data` for startline and headers."""
         if self.request != None :
-            h.print_exc()
+            self.pa.logdebug( h.print_exc() )
             self.write_error( self.INTERNAL_ERROR )
             return
 
@@ -949,7 +934,7 @@ class HTTPConnection( Plugin ):
                             b"\r\n\r\n", self.on_request_headers )
 
         except :
-            h.print_exc()
+            self.pa.logdebug( h.print_exc() )
             self.write_error( self.BAD_REQUEST )
         return
 
@@ -1459,7 +1444,8 @@ class IOStream( object ):
             raise
         # May be the remote end closed
         if not chunk :
-            raise Exception( "May be remote end %r closed" % (self.address,) )
+            self.server.pa.logwarn(
+                    "May be remote end %r closed" % (self.address,) )
         return chunk
 
     def read_to_buffer(self):

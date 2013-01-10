@@ -193,7 +193,7 @@ class IWebApp( Interface ):
     """A tuple of (appsec, netpath, configini)"""
 
     # TODO : Make this as read only copy.
-    appsetting = {}
+    appsettings = {}
     """Optional read only copy of application's settings."""
 
     netpath = ''
@@ -305,3 +305,63 @@ class IScaffold( Interface ):
     def printhelp():
         """If executed in command line, provide a meaning full description
         about this scaffolding plugin and variables that can be defined."""
+
+
+class IConfigDB( Interface ):
+    """Interface specification for managing platform configuration via
+    database and webadmin."""
+
+    def connect():
+        """Do necessary initialization to connection with data-store."""
+
+    def dbinit():
+        """If datastore does not exite, create one.
+        
+        If ``settings`` key-word argument is supplied then update platform 
+        settings in the data-store with ``settings.
+
+        If ``appsettings`` key-word argument is preset it must be interpreted
+        as a list of tuples, ``(netpath, appsetting)`` where each element
+        specifies application setting for application mounted on ``netpath``.
+        """
+
+    def config( *args, **kwargs ):
+        """Get or set configuration parameter for platform.
+
+        Positional argument,
+
+        ``netpath``,
+            Optional netpath, including hostname and script-path, on which
+            web-application is mounted. If not passed, then section and name
+            refers to platform-settings.
+
+        ``section``,
+            Section name to get or set config parameter.
+
+        ``name``,
+            Configuration name to get or set for ``section``.
+
+        Keyword arguments,
+
+        ``value``,
+            If preset, this method was invoked for setting configuration
+            ``name`` under ``section``.
+        """
+
+    def platform( settings=None ):
+        """If ``settings`` is None, then return platform global settings from
+        data-store.
+        
+        If ``settings`` is a valid dictionary, then update platform global
+        settings with ``settings` dictionary.
+        """
+
+    def application( netpath, appsettings=None ):
+        """If ``appsettings`` is None, then return application settings 
+        referred by ``netpath`` on which the application is mounted.
+        
+        If ``appsettings` is a valid dictionary, then update application
+        settings with ``appsettings` dictionary."""
+
+    def close():
+        """Reverse of :meth:`connect`."""
