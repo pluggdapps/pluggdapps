@@ -1,0 +1,29 @@
+@doctype html
+
+## A single page application to do web based platform configuration.
+
+<html>
+  <head>
+  <body {padding: 10px}>
+    ## Header
+    <div {font-size : x-large}> Platform configuration
+      <select #webapp {border:1px solid gray; background-color : white;
+                       margin-left : 20px;
+                      }>
+        <option value="platform" selected>${'platform-config'}
+        @for netpath in netpaths.keys() :
+          <option value=${netpath}>${netpath}
+    <hr {height : 3px}>
+
+    ## Sections and configurations
+    <div {width : 80%; margin: 0px auto}>
+      <table>
+        <tr>
+          <td {border-right: 2px solid gray; padding : 5px;}>
+            ${sections_column( list( settings.keys() ))}
+          <td>
+
+@def sections_column( sections ) :
+  @for section in sorted( sections ) :
+    <div {padding: 2px;}>
+      <a {color: gray}> ${section}
