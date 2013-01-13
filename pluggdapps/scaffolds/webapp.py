@@ -5,7 +5,7 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 import os
-from   os.path                  import dirname, join, basename, abspath
+from   os.path                  import dirname, join, abspath
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
@@ -13,7 +13,8 @@ from   pluggdapps.interfaces        import IScaffold, ICommand
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
-    "Basic configuration settings for IScaffold interface specification."
+    "Basic configuration settings for ``webapp`` command implementing "
+    "IScaffold interface specification."
 )
 
 _default_settings['template_dir']  = {
@@ -33,14 +34,16 @@ _default_settings['webapp_name'] = {
     'help'    : "Web application name."
 }
 
-class ScaffoldingWebApp( Plugin ):
+class CommandWebApp( Plugin ):
     """Automatically generates scaffolding logic for a new web-application.
     It also implements :class:`pluggdapps.interfaces.ICommand` so that this
     can be invoked as a sub-command.
     """
     implements( IScaffold, ICommand )
 
-    description = "Create scaffolding logic for a web application."
+    description = (
+        "Scaffolding logic to create a new web application source tree."
+    )
 
     #---- IScaffold API methods.
 

@@ -24,7 +24,7 @@ def template_to_source( sourcedir, targetdir, _vars ):
         for dirname in dirnames :
             t_dirname = dirname.format( **_vars )
             print("    %s ..." % t_dirname )
-            os.makedirs( join( targetdir, t_dirname ))
+            os.makedirs( join( targetdir, t_dirname ), exist_ok=True )
             targetdirs[ join(dirpath, dirname) ] = join(targetdir, t_dirname)
 
         for filename in filenames :

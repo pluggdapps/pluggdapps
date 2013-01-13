@@ -18,3 +18,4 @@ templates can be invoked directly from pa-script command line.
 
 # Generate scaffold logic for web-application under a project
 import pluggdapps.scaffolds.webapp
+import pluggdapps.scaffolds.env

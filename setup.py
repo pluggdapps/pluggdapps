@@ -7,10 +7,13 @@ from   setuptools import setup, find_packages
 from   os.path    import abspath, dirname, join
 
 here = abspath( dirname(__file__) )
-LONG_DESCRIPTION = open( join( here, 'README.rst' )).read(
-                       ).replace(':class:`', '`'
-                                ).replace(':mod:`', '`'
-                                         ).replace(':meth:`', '`')
+try :
+    LONG_DESCRIPTION = open( join( here, 'README.rst' )).read(
+                           ).replace(':class:`', '`'
+                                    ).replace(':mod:`', '`'
+                                             ).replace(':meth:`', '`')
+except :
+    LONG_DESCRIPTION = ''
 
 version = re.compile( 
             r".*__version__[ ]*=[ ]*'(.*?)'",
@@ -39,10 +42,14 @@ setup(
     include_package_data=True,              # setuptools
     exclude_package_data={},                # setuptools
     zip_safe=False,                         # setuptools
-    entry_points = """\
-    [pluggdapps]
-      package=pluggdapps:package
-    """,
+    entry_points={                          # setuptools
+        'console_scripts' : [
+           'pa = pluggdapps.pa:main',
+        ],
+        'pluggdapps' : [
+            'package=pluggdapps:package',
+        ]
+    },
     install_requires=[                      # setuptools
     ],
     extras_require={},                      # setuptools

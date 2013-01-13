@@ -1,22 +1,7 @@
-* DocRoot activities
-  * Detect MIME media_type for statically served files. If applicable add
-    webapp['encoding'] as media-type charset. Default is 'utf-8'
-
-  * Check where and all webapp['encoding'] is applied.
-
-  * Interpret `gzip` content-coding and apply gzip-plugin on outbout-message.
-
-* Create scaffolding logic to initialize platform, with a bunch of .ini files
-  under ./etc/ directory created under platform.
-
 * The default configuration should setup cache directory for TTL templates.
 
 * When something fails in TTL, error message should point to TTL line-no not
   the .py file's line-no.
-
-* Add :css: filter block in TTL.
-
-* Add :jq: filter block in TTL.
 
 * Create an article explaining content negotiation protocol in pluggdapps
   web-framework's matchrouter.

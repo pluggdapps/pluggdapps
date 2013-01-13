@@ -213,11 +213,11 @@ class Pluggdapps( object ):
         # when initialize() is called. Since initialize() needs a platform
         # context, we pre-boot the system for initialize then then actually
         # boot the system.
-        pa = cls( *args, **kwargs )
+        pa = Pluggdapps( *args, **kwargs )
         pa.settings = pa._loadsettings( baseini )
         # Configuration from backend store.
         storetype = pa.settings['pluggdapps']['configdb']
-        configdb = pa.query_plugin( pa, None, IConfigDB, storetype )
+        configdb = pa.query_plugin( pa, IConfigDB, storetype )
         configdb.dbinit()
         [ pa.settings[section].update(d) 
                 for section, d in configdb.config().items() ]
@@ -228,12 +228,12 @@ class Pluggdapps( object ):
         # Configuration backend
         # Actual booting
         pa = cls( *args, **kwargs )
-        pa.configdb = configdb
         pa.inifile = baseini
         pa.settings = pa._loadsettings( baseini )
+        pa.configdb = configdb
         # Configuration from backend store
         [ pa.settings[section].update(d) 
-                for section, d in configdb.config().items() ]
+                for section, d in pa.configdb.config().items() ]
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
 
         return pa
