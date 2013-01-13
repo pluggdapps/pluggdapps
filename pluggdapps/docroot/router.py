@@ -41,6 +41,8 @@ class DocRootRouter( MatchRouter ):
             elif fl :
                 raise Exception("Wrong configuration for routemapper : %r"%fl)
         else :
+            self.add_view( 'staticmap', '/*path', view='staticfile',
+                           content_coding='gzip' )
             self.add_view( 'staticmap', '/*path', view='staticfile' )
 
     #---- ISettings interface methods

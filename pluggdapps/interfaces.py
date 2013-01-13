@@ -325,43 +325,8 @@ class IConfigDB( Interface ):
         specifies application setting for application mounted on ``netpath``.
         """
 
-    def config( *args, **kwargs ):
-        """Get or set configuration parameter for platform.
-
-        Positional argument,
-
-        ``netpath``,
-            Optional netpath, including hostname and script-path, on which
-            web-application is mounted. If not passed, then section and name
-            refers to platform-settings.
-
-        ``section``,
-            Section name to get or set config parameter.
-
-        ``name``,
-            Configuration name to get or set for ``section``.
-
-        Keyword arguments,
-
-        ``value``,
-            If preset, this method was invoked for setting configuration
-            ``name`` under ``section``.
-        """
-
-    def platform( settings=None ):
-        """If ``settings`` is None, then return platform global settings from
-        data-store.
-        
-        If ``settings`` is a valid dictionary, then update platform global
-        settings with ``settings` dictionary.
-        """
-
-    def application( netpath, appsettings=None ):
-        """If ``appsettings`` is None, then return application settings 
-        referred by ``netpath`` on which the application is mounted.
-        
-        If ``appsettings` is a valid dictionary, then update application
-        settings with ``appsettings` dictionary."""
+    def config( **kwargs ):
+        """Get or set configuration parameter for platform."""
 
     def close():
         """Reverse of :meth:`connect`."""

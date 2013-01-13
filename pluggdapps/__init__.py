@@ -65,19 +65,6 @@ import pluggdapps.interfaces
 
 __version__ = '0.3dev'
 
-pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
-
-# A gotcha here !
-#   The following lines executed when `pluggdapps` package is imported. As a
-#   side-effect, it loops on valid pluggdapps packages to which this package
-#   is also part of. Hence, make sure that package() entry-point is defined
-#   before executing the following lines.
-for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
-    if d.get_entry_info( 'pluggdapps', 'package' ) :
-        __import__( pkgname )
-# Initialize plugin data structures
-pluggdapps.plugin.plugin_init()
-
 def package( pa ) :
     """Entry point that returns a dictionary of key,value details about the
     package.
@@ -102,4 +89,18 @@ import pluggdapps.scaffolds # Load web-framework
 
 # Load applications
 import pluggdapps.docroot   # Application to serve static files.
+import pluggdapps.webadmin  # Application to serve static files.
+
+pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
+
+# A gotcha here !
+#   The following lines executed when `pluggdapps` package is imported. As a
+#   side-effect, it loops on valid pluggdapps packages to which this package
+#   is also part of. Hence, make sure that package() entry-point is defined
+#   before executing the following lines.
+for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
+    if d.get_entry_info( 'pluggdapps', 'package' ) :
+        __import__( pkgname )
+# Initialize plugin data structures
+pluggdapps.plugin.plugin_init()
 

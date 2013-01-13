@@ -236,7 +236,7 @@ def isplugin( plugin ):
 
 def plugincall( obj, fn ):
     """If ``obj`` string is a plugin name, then call ``fn`` and return its
-    value. Other wise import obj."""
+    value. Other wise import obj, if it is a string. Else return obj as is."""
     if isinstance(obj, str) and isplugin(obj) :
         return fn()
     elif isinstance(obj, str) :

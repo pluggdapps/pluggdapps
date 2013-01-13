@@ -6,7 +6,6 @@
 
 
 from   pluggdapps.web.webapp        import WebApp
-from   pluggdapps.web.webinterfaces import IHTTPRouter
 import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()
@@ -22,6 +21,13 @@ _default_settings['language']  = {
     'default' : 'en',
     'types'   : (str,),
     'help'    : "Default language to use for content negotiation."
+}
+_default_settings['IHTTPRouter']  = {
+    'default' : 'WebAdminRouter',
+    'types'   : (str,),
+    'help'    : "Name of the plugin implementing :class:`IHTTPRouter` "
+                "interface. A request is resolved for a view-callable by this "
+                "router plugin."
 }
 
 class WebAdmin( WebApp ):

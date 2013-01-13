@@ -65,7 +65,6 @@ class docroot( WebApp ):
     def shutdown( self ):
         super().shutdown()
 
-
     #---- ISettings interface methods
 
     @classmethod

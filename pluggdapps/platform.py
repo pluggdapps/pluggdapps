@@ -214,20 +214,26 @@ class Pluggdapps( object ):
         # context, we pre-boot the system for initialize then then actually
         # boot the system.
         pa = cls( *args, **kwargs )
-        pa.inifile = baseini
         pa.settings = pa._loadsettings( baseini )
+        # Configuration from backend store.
+        storetype = pa.settings['pluggdapps']['configdb']
+        configdb = pa.query_plugin( pa, None, IConfigDB, storetype )
+        configdb.dbinit()
+        [ pa.settings[section].update(d) 
+                for section, d in configdb.config().items() ]
+
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
         initialize( pa ) # Prebooting ends with initialize call.
 
         # Configuration backend
-        storetype = pa.settings['pluggdapps']['configdb']
-        pa.configdb = pa.query_plugin( pa, None, IConfigDB, storetype )
         # Actual booting
         pa = cls( *args, **kwargs )
+        pa.configdb = configdb
         pa.inifile = baseini
         pa.settings = pa._loadsettings( baseini )
-        if pa.configdb :
-            pa.settings.update( pa.configdb.platform() )
+        # Configuration from backend store
+        [ pa.settings[section].update(d) 
+                for section, d in configdb.config().items() ]
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
 
         return pa
@@ -267,29 +273,28 @@ class Pluggdapps( object ):
 
     #---- Configuration APIs
 
-    def config( self, *args, **kwargs ):
-        """Get or set configuration parameter for the platform.
-
-        Positional argument,
-
-        ``section``,
-            Section name to get or set config parameter.
-
-        ``name``,
-            Configuration name to get or set for ``section``.
+    def config( self, **kwargs ):
+        """Get or set configuration parameter for the platform. If no keyword
+        arguments are supplied, will return platform-settings.
 
         Keyword arguments,
 
+        ``section``,
+            Section name to get or set config parameter. Optional.
+
+        ``name``,
+            Configuration name to get or set for ``section``. Optional.
+
         ``value``,
-            If preset, this method was invoked for setting configuration
-            ``name`` under ``section``.
+            If present, this method was invoked for setting configuration
+            ``name`` under ``section``. Optional.
         """
-        section, name = args
+        section = kwargs.get( 'section', None )
+        name = kwargs.get( 'name', None )
         value = kwargs.get( 'value', None )
-        if value :      # Set configuration
+        if section and name and value :
             self.settings[section][name] = value
-            self.configdb.config( section, name, value )
-        return self.settings[section][name]
+        return self.configdb.config( **kwargs )
 
     #---- Internal methods.
 
@@ -531,6 +536,9 @@ class Webapps( Pluggdapps ):
 
         appsettings = pa._mountapps()
 
+        netpaths = [ instkey[1] for instkey, appsett in appsettings.items() ]
+        pa.configdb.dbinit( netpaths=netpaths )
+
         # Mount webapp instances for subdomains and scripts.
         for instkey, appsett in appsettings.items() :
             appsec, netpath, config = instkey
@@ -539,8 +547,10 @@ class Webapps( Pluggdapps ):
             appname = h.sec2plugin( appsec )
             webapp = pa.query_plugin( pa, instkey, IWebApp, appname, appsett )
             webapp.appsettings = appsett
-            if pa.configdb :
-                webapp.appsettings.update( pa.configdb.application( netpath ))
+            # Update with backend configuration.
+            [ webapp.appsettings[section].update( d )
+              for section, d in pa.configdb.config( netpath=netpath ).items() ]
+
             webapp.instkey, webapp.netpath = instkey, None
             pa.webapps[ instkey ] = webapp
             pa.netpaths[ netpath ] = webapp
@@ -620,34 +630,38 @@ class Webapps( Pluggdapps ):
 
     #---- Configuration APIs
 
-    def config( self, *args, **kwargs ):
-        """Get or set configuration parameter for the platform.
-
-        Positional argument,
-
-        ``netpath``,
-            Netpath, including hostname and script-path, on which
-            web-application is mounted
-
-        ``section``,
-            Section name to get or set config parameter.
-
-        ``name``,
-            Configuration name to get or set for ``section``.
+    def config( self, **kwargs ):
+        """Get or set configuration parameter for the platform. If no keyword
+        arguments are present, will return a dictionary of webapp-settings,
+        where each webapp is identified by netpath as key.
 
         Keyword arguments,
 
+        ``netpath``,
+            Netpath, including hostname and script-path, on which
+            web-application is mounted. Optional.
+
+        ``section``,
+            Section name to get or set config parameter. Optional.
+
+        ``name``,
+            Configuration name to get or set for ``section``. Optional.
+
         ``value``,
-            If preset, this method was invoked for setting configuration
-            ``name`` under ``section``.
+            If present, this method was invoked for setting configuration
+            ``name`` under ``section``. Optional.
         """
-        netpath, section, name = args
-        value = kwargs.get( 'value', None )
-        webapp = self.netpaths[ netpath ]
-        if value :      # Set configuration
-            webapp.appsettings[section][name] = value
-            self.configdb.config( netpath, section, name, value )
-        return webapp.appsettings[section][name]
+        netpath = kwargs.get( 'netpath', None )
+        if netpath == None :
+            super().config( **kwargs )
+        else :
+            section = kwargs.get( 'section', None )
+            name = kwargs.get( 'name', None )
+            value = kwargs.get( 'value', None )
+            webapp = self.netpath[ netpath ]
+            if section and name and value :
+                webapp.appsettings[section][name] = value
+            return self.configdb.config( **kwargs )
 
     #---- Internal methods
 
@@ -686,8 +700,10 @@ class Webapps( Pluggdapps ):
 
             if appsec not in appsecs :
                 raise Exception("%r application not found." % appname )
+            if not configini :
+                raise Exception("configuration file %r not supplied"%configini)
             if not isfile( configini ) :
-                raise Exception("configuration file %r not present"%configini )
+                raise Exception("configuration file %r not valid"%configini)
 
             mountls.append( (appsec,netpath,configini) )
 
@@ -823,6 +839,7 @@ class Webapps( Pluggdapps ):
 
         ``uri``,
             byte-string of request URI.
+
         ``hdrs``,
             Dictionary of request headers.
 
@@ -841,12 +858,14 @@ class Webapps( Pluggdapps ):
                             else uriparts['host'] )
             if netloc == uri_netloc :
                 if script in ['/', ''] :
-                    return uriparts, webapp
+                    break
                 elif uriparts['path'].startswith( script ) :
                     uriparts['script'] = script
                     uriparts['path'] = uriparts['path'][len(script):]
-                    return uriparts, webapp
-        return uriparts, None
+                    break
+        else :
+            webapp = None
+        return uriparts, webapp
 
     #---- ISettings interface methods
 

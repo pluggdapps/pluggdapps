@@ -126,8 +126,7 @@ def run_callback( server, callback, *args, **kwargs ):
     try:
         callback( *args, **kwargs )
     except Exception:
-        server.pa.logerror( "In callback %r" % callback )
-        if server['debug'] : raise
+        server.pa.logdebug( h.print_exc() )
 
 class HTTPEPollServer( Plugin ):
     """A non-blocking, single-threaded HTTP Server plugin. `HTTPEPollServer`
@@ -230,23 +229,16 @@ class HTTPEPollServer( Plugin ):
                 self.connections.append( httpconn )
 
         except ssl.SSLError as err:
-            self.pa.logerror( "Error(%s) in SSL connection %r" % (
-                              address, err.args[0] )
-                            )
+            self.pa.logdebug( h.print_exc() )
             httpconn.close() if httpconn else None
-            if self['debug'] : raise
 
         except socket.error as err:
-            self.pa.logerror( "Socket Error(%s) in connection %r" % (
-                              address, err.args[0] )
-                            )
+            self.pa.logdebug( h.print_exc() )
             httpconn.close() if httpconn else None
-            if self['debug'] : raise
 
         except Exception:
-            self.pa.logerror( "Error in accepting connection ... " )
+            self.pa.logdebug( h.print_exc() )
             httpconn.close() if httpconn else None
-            if self['debug'] : raise
 
     def bind_sockets( self ):
         """Creates listening sockets (server) bound to the given port and 
@@ -353,8 +345,7 @@ def add_accept_handler( server, sock, callback, ioloop ):
             except socket.error as e:
                 if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                     return
-                server.pa.logdebug( "Unable to accept connection." )
-                if self['debug'] : raise
+                server.pa.logdebug( h.print_exc() )
 
             server.pa.logdebug( "Accepting new connection from %r"%(address,) )
             callback( connection, address )
@@ -776,7 +767,7 @@ class HTTPConnection( Plugin ):
             # of a webapp, use `webapp` plugin to query for IHTTPRequest.
             request = webapp.query_plugin(
                             IHTTPRequest, webapp['IHTTPRequest'],
-                            self, method, uri, version, headers )
+                            self, method, uri, uriparts, version, headers )
         except :
             self.pa.logdebug( h.print_exc() )
             self.write_error( self.INTERNAL_ERROR )
@@ -822,7 +813,7 @@ class HTTPConnection( Plugin ):
         if self.stream and self.stream.closed() :
             self.pa.logwarn("Cannot write to closed stream %r"%(self.address,))
             return
-        self.stream.write( rawdata, self.tryclose )
+        self.stream.write( rawdata, self.close )
         return
 
     def supports_http_1_1( self ):
@@ -837,7 +828,7 @@ class HTTPConnection( Plugin ):
         guidelines to close the connection.""" 
         if disconnect == False and self.request :
             meth, hdrs = self.request.method, self.request.headers
-            conn_val = h.connection( hdrs.get( "connection", None ))
+            conn_val = h.parse_connection( hdrs.get( "connection", b'' ))
             disconnect = conn_val == [ b'close' ]
 
         if disconnect == True :
@@ -906,9 +897,9 @@ class HTTPConnection( Plugin ):
             # The presence of a message-body in a request is signaled by the
             # inclusion of a Content-Length or Transfer-Encoding header field
             # in the request's message-headers.
-            clen = h.content_length( hdrs.get( "content_length", None ))
-            transenc = h.transfer_encoding( 
-                            hdrs.get( 'transfer_encoding', None ))
+            clen = h.parse_content_length( hdrs.get( "content_length", None ))
+            transenc = h.parse_transfer_encoding( 
+                            hdrs.get( 'transfer_encoding', b'' ))
 
             if transenc and transenc[0][0] == b'chunked' :
                 hdrs.pop( "content_length", None )
@@ -920,7 +911,7 @@ class HTTPConnection( Plugin ):
                     self.write_error( self.ENTITY_LARGE )
                     self.stream.read_bytes( clen, self.on_skip_request )
 
-                elif expect == "100-continue" :
+                elif expect == b"100-continue" :
                     self.stream.write( b"HTTP/1.1 100 (Continue)\r\n\r\n" )
                     self.stream.read_bytes( clen, self.on_request_body )
 
@@ -963,7 +954,7 @@ class HTTPConnection( Plugin ):
 
         if chunk_size == 0 :    # last_chunk
             self.chunk = (chunk_size, chunk_ext, None)
-            if h.trailer( hdrs.get( 'trailer', None )) :# Trailer present
+            if hdrs.get( 'trailer', None ) :    # Trailer present
                 self.stream.read_until( b"\r\n\r\n", self.on_request_trailer )
             else :
                 self.stream.read_until( b"\r\n", self.on_request_chunks_done )
@@ -1287,8 +1278,12 @@ class IOStream( object ):
         # If the socket is not closed, then try reading from the socket.
         try :
             while self.read_to_buffer() : pass
-        except :
-            self.server.pa.logdebug( h.print_exc() )
+        except Exception as e :
+            if e.args[0] == 'Closed' :
+                self.server.pa.logwarn(
+                    "May be remote end %r closed" % (self.address,) )
+            else :
+                self.server.pa.logdebug( h.print_exc() )
             self.close()
 
         # And see if we've already got the data from this read
@@ -1408,7 +1403,7 @@ class IOStream( object ):
                 state |= self.ioloop.READ
 
             if state != self._state:
-                if self._state is not None :
+                if self._state is None :
                     raise Exception( 
                             "shouldn't happen: on_epoll_event without _state" )
                 self._state = state
@@ -1427,8 +1422,12 @@ class IOStream( object ):
                 # out if it's there is to try to read it.
                 if self.read_to_buffer() == 0:
                     break
-        except :
-            self.server.pa.logdebug( h.print_exc() )
+        except Exception as e :
+            if e.args[0] == 'Closed' :
+                self.server.pa.logwarn(
+                    "May be remote end %r closed" % (self.address,) )
+            else :
+                self.server.pa.logdebug( h.print_exc() )
             self.close()
         self.try_read_buffer()
 
@@ -1444,8 +1443,7 @@ class IOStream( object ):
             raise
         # May be the remote end closed
         if not chunk :
-            self.server.pa.logwarn(
-                    "May be remote end %r closed" % (self.address,) )
+            raise Exception("Closed")
         return chunk
 
     def read_to_buffer(self):
@@ -1455,11 +1453,8 @@ class IOStream( object ):
         to read (i.e. the read returns EWOULDBLOCK or equivalent).  On
         error closes the socket and raises an exception.
         """
-        try:
-            self.check_closed()
-            chunk = self.read_from_socket()
-        except :
-            raise
+        self.check_closed()
+        chunk = self.read_from_socket()
 
         chunklen = 0
         if chunk is not None :

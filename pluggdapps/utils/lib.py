@@ -207,8 +207,8 @@ def string_import( s ):
     """Import a module, object, or an attribute on an object.
 
     A string like ``foo.bar.baz`` can be a module ``foo.bar.baz`` or a
-    module ``foo.bar`` with an object ``baz`` in it, or a module
-    ``foo`` with an object ``bar`` with an attribute ``baz``.
+    module ``foo.bar`` with an object ``baz`` in it, or a module ``foo`` with
+    an object ``bar`` with an attribute ``baz``.
     """
     parts = s.split('.')
     module = str2module( parts[0] )

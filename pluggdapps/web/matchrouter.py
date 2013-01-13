@@ -46,7 +46,7 @@ _default_settings['defaultview']  = {
                 "view-callable."
 }
 _default_settings['negotiate_content']  = {
-    'default' : False,
+    'default' : True,
     'types'   : (bool,),
     'help'    : "Do content-negotiation when more than one representation is "
                 "available for the same resource."
@@ -64,10 +64,15 @@ class MatchRouter( Plugin ):
     """Dictionary of view-names to view-callables and its predicates,
     typically added via add_view() interface method."""
 
+    viewlist = []
+    """same as views.items() except that this list will maintain the order in
+    which the views where added."""
+
     def onboot( self ):
         """:meth:`pluggapps.web.webinterfaces.IHTTPRouter.onboot` interface
         method."""
         self.views = {}
+        self.viewlist = []
         self['defaultview'] = plugincall(
             self['defaultview'],
             lambda:self.query_plugin(IHTTPView, self['defaultview'], name, None)
@@ -103,6 +108,9 @@ class MatchRouter( Plugin ):
         ``attr``,
             Callable method attribute for ``view`` plugin.
 
+        ``method``,
+            HTTP method string supported by the view. Eg. b'GET', b'PUT' etc.
+
         ``media_type``,
             Media type/subtype string specifying the resource variant. If
             unspecified will be automatically detected using heuristics.
@@ -132,8 +140,9 @@ class MatchRouter( Plugin ):
 
         view['resource'] = kwargs.pop( 'resource', None )
         view['attr'] = kwargs.pop( 'attr', None )
+        view['method'] = kwargs.pop( 'method', None )
         # Content Negotiation attributes
-        view['media_type'] = kwargs.pop('media_type','application/octet-stream')
+        view['media_type']=kwargs.pop('media_type', 'application/octet-stream')
         view['content_coding'] = kwargs.pop('content_coding',CONTENT_IDENTITY)
         view['language'] = kwargs.pop( 'language', self.webapp['language'] )
         view['charset'] = kwargs.pop( 'charset', self.webapp['encoding'] )
@@ -146,6 +155,7 @@ class MatchRouter( Plugin ):
         view['compiled_pattern'] = re.compile( regex )
         view['path_template'] = tmpl
         view['match_segments'] = redict
+        self.viewlist.append( (name, view) )
 
     def route( self, request ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRouter.route` interface
@@ -154,46 +164,61 @@ class MatchRouter( Plugin ):
         resp = request.response
         c = resp.context
         variants = []
-        for name, viewd in self.views.items() :
+        for name, viewd in self.viewlist :
             path = request.uriparts['path']
             m = viewd['compiled_pattern'].match( path )
-            variants.append( (name, viewd, m) ) if m else None
+            if m and self.match_predicates( request, viewd ) :
+                variants.append( (name, viewd, m) )
 
-        if variants :
+        if variants and self['negotiate_content'] :
             variant = self.negotiate( request, variants )
-            if variant :
-                name, viewd, m = variant
-                resp.media_type = viewd['media_type']
-                resp.charset = viewd['charset']
-                resp.language = viewd['language']
-                resp.content_coding = viewd['content_coding']
-                request.matchdict = m.groupdict()
-                vobj = plugincall(
-                 viewd['view'], 
-                 lambda:self.query_plugin(IHTTPView, viewd['view'], name, viewd)
-                )
-                request.view = getattr( vobj, viewd['attr'] ) \
-                                    if viewd['attr'] else vobj
-                # Call IHTTPResource plugin configured for this view callable.
-                resource = viewd['resource']
-                if resource :
-                    resource = plugincall(
-                        resource,
-                        lambda : self.query_plugin(IHTTPResource,resource) )
-                    self.resource = resource
-                    resource( request, c )
-                # If etag is available, compute and subsequently clear them.
-                etag = c.etag.hashout( prefix='resp-' )
-                c.setdefault( 'etag', etag ) if etag else None
-                c.etag.clear()
-            else :
-                from pluggdapps.web.views import HTTPNotAcceptable
-                request.view = HTTPNotAcceptable
+        elif variants :
+            variant = variants[0]
         else :
             request.view = self['defaultview']
+            variant = None
+
+        import pprint
+        pprint.pprint( variant )
+        if variant :
+            name, viewd, m = variant
+            resp.media_type = viewd['media_type']
+            resp.charset = viewd['charset']
+            resp.language = viewd['language']
+            resp.content_coding = viewd['content_coding']
+            request.matchdict = m.groupdict()
+            vobj = plugincall(
+             viewd['view'], 
+             lambda:self.query_plugin(IHTTPView, viewd['view'], name, viewd)
+            )
+            request.view = getattr( vobj, viewd['attr'] ) \
+                                if viewd['attr'] else vobj
+            # Call IHTTPResource plugin configured for this view callable.
+            resource = viewd['resource']
+            if resource :
+                resource = plugincall(
+                    resource,
+                    lambda : self.query_plugin(IHTTPResource,resource) )
+                self.resource = resource
+                resource( request, c )
+            # If etag is available, compute and subsequently clear them.
+            etag = c.etag.hashout( prefix='resp-' )
+            c.setdefault( 'etag', etag ) if etag else None
+            c.etag.clear()
+        else :
+            from pluggdapps.web.views import HTTPNotAcceptable
+            request.view = HTTPNotAcceptable
 
         if callable( request.view ) :   # Call the view-callable
             request.view( request, c )
+
+    def match_predicates( self, request, viewd ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPRouter.negotiate` interface
+        method."""
+        x = True
+        if viewd['method'] != None :
+            x = x and viewd['method'] == request.method.decode('utf-8')
+        return x
 
     def negotiate( self, request, variants ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRouter.negotiate` interface
@@ -303,15 +328,15 @@ class MatchRouter( Plugin ):
         return regex, tmpl, redict
 
     def _compile_client_negotiation( self, request ):
-        hs = [ request.headers.get( 'accept', None ),
-               request.headers.get( 'accept_charset', None ),
-               request.headers.get( 'accept_encoding', None ),
-               request.headers.get( 'accept_language', None ),
+        hs = [ request.headers.get( 'accept', b'' ),
+               request.headers.get( 'accept_charset', b'' ),
+               request.headers.get( 'accept_encoding', b'' ),
+               request.headers.get( 'accept_language', b'' ),
              ]
-        accept = h.accept( hs[0] ) or [('*/*', 1.0, '')]
-        accchr = h.accept_charset( hs[1] ) or [('*', 1.0)]
-        accenc = h.accept_encoding( hs[2] ) or [(CONTENT_IDENTITY, 1.0)]
-        acclan = h.accept_language( hs[3] ) or [('*', 1.0)]
+        accept = h.parse_accept( hs[0] ) or [('*/*', 1.0, b'')]
+        accchr = h.parse_accept_charset( hs[1] ) or [('*', 1.0)]
+        accenc = h.parse_accept_encoding( hs[2] ) or [(CONTENT_IDENTITY, 1.0)]
+        acclan = h.parse_accept_language( hs[3] ) or [('*', 1.0)]
 
         ad = { mt : q for mt, q, params in accept }
         bd = { (a, ch) : aq*q for ch, q in accchr for a, aq in ad.items() }

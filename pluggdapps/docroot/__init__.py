@@ -15,5 +15,5 @@ subjected to content negotiation.
 # - Import necessary modules from 'docroot' web-application so as to load
 #   their plugins and interfaces during pluggdapps-bootup.
 
-import pluggdapps.docroot.docrouter
 import pluggdapps.docroot.docroot
+import pluggdapps.docroot.router

@@ -168,9 +168,9 @@ class HTTPResponse( Plugin ):
     def ischunked( self ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.ischunked`
         interface method."""
-        x = h.transfer_encoding( 
-                self.headers.get( 'transfer_encoding', None ))
-        return ('chunked' in dict(x).keys()) if x else False
+        vals = dict( h.parse_transfer_encoding(
+                        self.headers.get( 'transfer_encoding', b'' ))).keys()
+        return b'chunked' in list( vals )
 
     def write( self, data ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.write`
@@ -228,7 +228,7 @@ class HTTPResponse( Plugin ):
         renderer = kwargs.get( 'IHTTPRenderer', None )
         if renderer is None :
             tfile = kwargs.get( 'file', '' )
-            _, ext = os.path.splitext( tfile )
+            _, ext = splitext( tfile )
             renderer = self._renderers.get( ext, None ) if ext else None
         renderer = \
             self.query_plugin( IHTTPRenderer, renderer ) if renderer else None
@@ -289,8 +289,11 @@ class HTTPResponse( Plugin ):
         data = b''.join( self.write_buffer )
         for tr in self.webapp.out_transformers :
             data = tr.transform( self.request, data, finishing=finishing )
-        self.body = data if self._if_etag() else ''
-        self.body = data
+        if self._if_etag() :
+            self.body = data 
+        else :
+            self.body = b''
+        self.set_header( "content_length", len(self.body) )
         data = self._try_start_headers( finishing=finishing )
         if self.request.method == b'HEAD' :
             pass
@@ -379,26 +382,23 @@ class ResponseHeaders( Plugin ):
             resp.set_header( 'server', resp.httpconn.product )
 
             # Content negotiated headers
-            mt = resp.media_type
-            mt = ('%s;charset=%s' % (mt, resp.charset)) if resp.charset else mt
-            resp.set_header( 'content_type', mt ) 
-            resp.set_header( 'content_language', resp.language )
-            resp.set_header( 'content_encoding', resp.content_coding )
+            if resp.media_type :
+                mt = resp.media_type
+                if resp.charset :
+                    mt = '%s;charset=%s' % (mt, resp.charset)
+                resp.set_header( 'content_type', mt ) 
+            if resp.language :
+                resp.set_header( 'content_language', resp.language )
+            if resp.content_coding :
+                resp.set_header( 'content_encoding', resp.content_coding )
 
             # For HTTP/1.1 connection can be kept alive across multiple request
             # and response.
-            connection = h.connection(request.headers.get("connection", None))
-            if request.supports_http_1_1() and b'keep-alive' in connection :
-                resp.set_header( "connection", b"Keep-Alive" )
-
-            # If etag is available from context, compute and subsequently
-            # clear them. Manage If-* request headers.
-            etag = c.etag.hashout( prefix="view-", joinwith=c.pop('etag','') )
-            etag = ('"%s"' % etag).encode( 'utf-8' ) if etag else etag
-            c.etag.clear()
-            if ( resp.ischunked() == False and resp.statuscode == b'200' and
-                 request.method in (b'GET', b'HEAD') and etag ) :
-                resp.set_header( "etag", etag )
+            if request.supports_http_1_1() :
+                connection = h.parse_connection(
+                                    request.headers.get( "connection", b'' ))
+                if b'keep-alive' in connection :
+                    resp.set_header( "connection", b"Keep-Alive" )
 
             # Update Last-modified header field and If-* request headers
             last_modified = resp.context.get( 'last_modified', '' )
@@ -408,16 +408,23 @@ class ResponseHeaders( Plugin ):
             if resp.ischunked() == False and last_modified :
                 ims = request.headers.get( 'if_modified_since', b'' )
                 iums = request.headers.get( 'if_umodified_since', b'' )
-                ims = ims and h.parse_date( ims.strip().decode('utf-8') )
-                iums = iums and h.parse_date( iums.strip().decode('utf-8') )
+                ims = ims and h.parse_date( ims.strip() )
+                iums = iums and h.parse_date( iums.strip() )
                 last_modified = h.parse_date( last_modified )
                 if ( (ims and ims >= last_modified) or
                      (iums and iums < last_modified) ) :
                     resp.set_status( b'304' )
                     return b''
 
-            if resp.ischunked() == False :
-                resp.set_header( "content_length", len(data) )
+            # If etag is available from context, compute and subsequently
+            # clear them.
+            # IMPORANT : Do not change this sequence of last-modified and etag
+            etag = c.etag.hashout( prefix="view-", joinwith=c.pop('etag','') )
+            etag = ('"%s"' % etag).encode( 'utf-8' ) if etag else etag
+            c.etag.clear()
+            if ( resp.ischunked() == False and resp.statuscode == b'200' and
+                 request.method in (b'GET', b'HEAD') and etag ) :
+                resp.set_header( "etag", etag )
 
         return data
 

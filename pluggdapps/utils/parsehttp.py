@@ -26,9 +26,11 @@ __all__ = [
     #-- Functions
     'port_for_scheme', 'parse_startline', 'parse_url', 'make_url',
     'compare_url', 'parse_netpath', 'parse_formbody',
-    'connection', 'parse_date', 'http_fromdate', 'http_todate',
-    'trailer', 'transfer_encoding', 'accept', 'accept_charset',
-    'accept_language', 'accept_encoding', 'content_length',
+    'parse_connection', 'parse_date', 'http_fromdate', 'http_todate',
+    'parse_transfer_encoding', 'make_transfer_encoding', 'parse_accept',
+    'make_accept', 'parse_accept_charset', 'make_accept_charset',
+    'parse_accept_encoding', 'make_accept_encoding',
+    'parse_accept_language', 'make_accept_language', 'parse_content_length', 
     'parse_content_type', 'parse_content_disposition',
     #-- Classes
     'HTTPHeaders',
@@ -207,31 +209,36 @@ def port_for_scheme( scheme ):
 
 def parse_startline( startline ):
     """Every HTTP request starts with a start line specifying method, uri and
-    version. Parse them and return a tuple of (method, uri, version). All
-    elements in the return tuple will be available as byte-strings."""
+    version. Parse them and return a tuple of (method, uri, version).
+    
+    ``startline`` is expected in bytes and all the elements in returned tuple
+    will be in byte-strings as well."""
     return [ x.strip( b' \t' ) for x in startline.split(b' ') ]
 
 
 def parse_url( uri, host=None, scheme=None ):
-    """Parse uri using urlsplit() method into its component parts.
+    """Using stdlib's urllib.parse.urlsplit() API, parse ``uri`` into its
+    component parts.
     
     ``uri``,
-        uri is expected in string format, decoded using 'utf8' encoding.
+        byte-string of request-url, decoded using 'utf-8' encoding.
 
     ``host``,
         byte-string from HTTP `Host` header.
         Many times uri, as found in the request startline, have `abs_path`
         alone, in which case, optional host name as found in the `Host` header
-        can be supplied. It will be applied on the urlsplit() result. Note
-        that as per RFC definition Host header can also contain port address.
+        can be supplied. It will be applied on the urlsplit() result.
+        
+        Note that as per RFC definition Host header can also contain port
+        address.
 
     ``scheme``,
         Default scheme to use while parsing the url. Directly passed to
-        urlsplit()
+        urllib.parse.urlsplit().
 
     Returns a UserDict with following keys,
         scheme, netloc, path, query, fragment, username, password, hostname,
-        port, script
+        port, script - all of them in string type.
 
     Among these key values,
       * `path` value will be unquoted using urllib.parse.unquote()
@@ -246,17 +253,17 @@ def parse_url( uri, host=None, scheme=None ):
     except :
         host, port = host, None
     r = urlsplit( uri )
-    fn = lambda x : ( (x[0], (x[1].decode('utf8')) if x[1] else x[1]) )
-    kwargs = { 'scheme' : r.scheme or scheme,
-               'netloc' : r.netloc,
-               'host'   : r.hostname or host,
-               'port'   : r.port or port,
+    fn = lambda x : x.decode('utf-8') if isinstance(x, bytes) else None
+    kwargs = { 'scheme'   : (r.scheme or scheme),
+               'netloc'   : r.netloc,
+               'host'     : (r.hostname or host),
+               'port'     : (r.port or port),
                'username' : r.username,
                'password' : r.password,
                'fragment' : r.fragment,
-               'script' : b'',
+               'script'   : b'',
              }
-    kwargs = dict( map( fn, kwargs.items() ))
+    kwargs = { k : fn(v) for k, v in kwargs.items() }
     kwargs['path'] = unquote( r.path.decode('utf8') )
     kwargs['query'] = parse_qs( r.query ) # With default encoding
     r = UserDict( **kwargs )
@@ -265,7 +272,7 @@ def parse_url( uri, host=None, scheme=None ):
 def make_url( baseurl, path, query, fragment ):
     """Using the baseurl and the remaining variable part of a url namely
     path, query, fragment construct a full url that can be sent in response
-    and interpreted by Clients.
+    and interpreted by clients.
     
     ``baseurl``,
         string of base-url with scheme and netlocation. Otherwise None,
@@ -318,7 +325,7 @@ def parse_netpath( netpath ):
     parts = netpath.split('/', 1)
     netloc = parts.pop( 0 )
     script = '/' + (parts.pop( 0 ) if parts else '')
-    return netloc, script 
+    return netloc, script
 
 def parse_formbody( content_type, body ):
     """HTML form values can be submited via POST or PUT methods, in which
@@ -329,6 +336,9 @@ def parse_formbody( content_type, body ):
 
     ``content_type``,
         Value as return from parse_content_type().
+
+    ``body``
+        Byte string of HTTP request body.
     """
 
     arguments, multiparts = {}, {}
@@ -372,7 +382,7 @@ def parse_formbody( content_type, body ):
 
             multiparts.setdefault( name, [] ).extend( nvalue )
 
-        return arguments, multiparts
+    return arguments, multiparts
 
 def parse_multipart( content_type, data ):
     """Parses a multipart/form-data (including multipart/mixed) body.
@@ -425,9 +435,8 @@ def parse_multipart( content_type, data ):
 
 class HTTPHeaders( dict ):
     """Dictionary of HTTP headers for both request and response. Value of each
-    key, lower-cased string, is represented as list of byte-string. If a
-    header field occur in a request only once, then list of values will have
-    only one element. `Refer RFC2616 for more information`.
+    key, lower-cased string, is represented as a byte-string of comma separated 
+    values. `Refer RFC2616 for more information`.
     """
 
     @classmethod
@@ -449,76 +458,78 @@ class HTTPHeaders( dict ):
             else :
                 consume( obj, prev_line ) if prev_line else None
                 prev_line = line
-
-        consume( obj, prev_line ) if prev_line else None
+        consume( obj, prev_line ) if prev_line else None    # Corner case
 
         return obj
 
 
-def parameters( ps=None, params=None ):
-    """Parse parameter from list of byte-string `s`, 
+def parse_parameters( ls=[] ):
+    """Parse parameter from list of byte-strings `ls`,
 
-    ``ps``,
-        list of byte-string to parse for attribute and value
+    .. code-block:: ini
+
+        parameter  = attribute "=" value
+        attribute  = token
+        value      = token | quoted-string
+
+    Return a list of (attr,value) tuple where both ``attr`` and ``value`` are
+    byte-strings.
+    """
+    params = []
+    for s in ls :
+        try :
+            attr, val = re.match( s, re_param.encode('utf-8') ).groups()
+            params.append( (attr.lower(), val) )
+        except : continue
+    return params
+
+def make_parameters( params=[] ):
+    """Reverse of parse_parameters().
+
     ``params``
         list of (attr, value) pairs. Both attr and value are expected to be in
         byte-string.
 
-    parameter               = attribute "=" value
-    attribute               = token
-    value                   = token | quoted-string
-
-    to construct paramter string, pass a list of (attr, value) pairs in
-    `params` kwarg.
+    Return byte-string of parameters.
     """
-    if ps :
-        params = []
-        for p in ps :
-            try :
-                attr, val = re.match( p, re_param.encode('utf-8') ).groups()
-                params.append( (attr.lower(), val) )
-            except :
-                continue
-        return params
-    elif params :
-        return b';'.join( attr + '=' + val for attr, val in params )
+    return b';'.join( attr + '=' + val for attr, val in params )
 
-def directives( ds=b'', tokens=None ):
-    """Parse directives from list of byte-string `ds`,
+def parse_directives( ls=[] ):
+    """Parse directives from list of byte-string ``ls``.
 
-    ``ds``,
-        List of byte-string to be parsed for directive.
-    ``tokens``
-        List of token or (attr, value) pair in byte-string to merge them into
-        a single set of directives, separated by ';'.
+    Return a list of tokens as (attr, value) where ``attr`` and ``value`` are
+    byte-strings.
     """
-    if ds :
-        tokens = []
-        for d in ds :
-            a,b,c = re.match( re_dirtive.encode('utf-8'), d ).groups()
+    tokens = []
+    for s in ls :
+        try :
+            a,b,c = re.match( re_dirtive.encode('utf-8'), s ).groups()
             tokens.append( (a, b or c) if (b or c) else a )
-        return tokens
-    elif tokens :
-        return b';'.join( 
-                    ( t[0] + b'=' + t[1] if isinstance(t, tuple) else t )
-                    for t in tokens 
-               )
+        except : continue
+    return tokens
 
-def rules( s=None, rs=None ):
-    """Parse comma seperated rules from `s`.
-         ( *LWS element *( *LWS "," *LWS element ))
+def make_directives( tokens=[] ):
+    """Reverse of parse_directives().
 
-    ``s``,
-        byte-string of rules separated by comma and LWS.
-    ``rs``,
-        List of rules in bytes-string.
-
-    to contstruct a rule string, pass a list of byte-string in `rs` kwarg.
+    Return a byte-string of directive.
     """
-    if s :
-        return [ x.strip(b' \r\n\t') for x in s.split(b',') ]
-    elif rs :
-        return b', '.join( rs )
+    return b';'.join([ ( t[0] + b'=' + t[1] if isinstance(t, tuple) else t )
+                       for t in tokens ])
+
+def parse_rules( s=b'' ):
+    """Parse comma seperated rules from byte-string ``s``.
+    
+    ``( *LWS element *( *LWS "," *LWS element ))``
+
+    Return a list of byte-string rules.
+    """
+    return [ x.strip(b' \r\n\t') for x in s.split(b',') ]
+
+def make_rules( rs=[] ):
+    """Reverse of parse_rules()
+    Return byte-string of comma separated rules.
+    """
+    return b', '.join( rs )
 
 def qparam( parameters ):
     """Return the quality value, as float, found in `parameters`,
@@ -542,7 +553,7 @@ def parse_simplevalue_q( value ):
     where `tok` is a byte value and `qvalue` is float.
     """
     vals = []
-    for v in rules( value ) :
+    for v in parse_rules( value ) :
         try :
             tok, qvalue = v.split(b';')
         except :
@@ -564,16 +575,16 @@ def make_simplevalue_q( tokenrules ):
     where, `tok` is byte-string and `qvalue` is float.
     """
     fn = lambda tok_q : tok_q[0] + str(tok_q[1]).encode( 'utf8' )
-    return rules( rs=map( fn, tokenrules ))
+    return make_rules( map( fn, tokenrules ))
 
 #---- Generic headers
 
-def connection( value ):
+def parse_connection( value ):
     """Return a list of lowercased token values, in byte-strings, from 
     Connection header field.
     """
     if value == None : return None
-    return list( map( lambda x : x.lower(), rules( value )))
+    return list( map( lambda x : x.lower(), parse_rules( value )))
 
 rfc1123_format = "%a, %d %b %Y %H:%M:%S %Z"
 rfc1036_format = "%A, %d-%b-%y %H:%M:%S %Z"
@@ -590,6 +601,7 @@ def parse_date( value ):
     heuristically parses the date format (from request header) and changes the
     format to RFC 1123 format.  Returns ``datetime`` object
     """
+    value = value.decode('utf-8') if isinstance( value, bytes ) else value
     for fmt in [ rfc1123_format, rfc1036_format, asctime_format ] :
         try :
             dtime = strptime( value, fmt )
@@ -606,22 +618,32 @@ def http_todate( datestr ):
     return strptime( datestr, rfc1123_format )
 
 def http_fromdate( dtime, tzinfo=None ):
-    """Convert local-timestamp  to RFC 1123 UTC date format."""
+    """Convert local-timestamp  to RFC 1123 UTC date format. Return string."""
     return time.strftime( rfc1123_format, time.gmtime( dtime ))[:-3] + 'GMT'
 
-def trailer( value ):
-    if value == None : return None
-    return rules( value )
+def parse_transfer_encoding( value=b'' ):
+    """Parse Transfer-Encoding header value,
 
-def transfer_encoding( value=b'', tokenrules=[], prefix=b'' ):
-    """
-    Parse Transfer-Encoding header value,::
+    .. code-block:: ini
 
-      transfer-coding         = "chunked" | transfer-extension
-      transfer-extension      = token *( ";" parameter )
+        transfer-coding      = "chunked" | transfer-extension
+        transfer-extension   = token *( ";" parameter )
 
     ``value``,
         byte-string of Transfer-Encoding header value to parse.
+
+    Returns ``[ ( token, param ), ... ]``, where, ``token`` and ``param`` 
+    are byte-strings. ``token`` is also lower-cased.
+    """
+    tokenrules = []
+    for rule in parse_rules(value) :
+        try    : token, params = rule.split( b';', 1 )
+        except : token, params = rule, b''
+        tokenrules.append( (token.lower(), params) )
+    return tokenrules
+
+def make_transfer_encoding( tokenrules=[], prefix=b'' ):
+    """Reverse of parse_transfer_encoding().
 
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
@@ -632,27 +654,15 @@ def transfer_encoding( value=b'', tokenrules=[], prefix=b'' ):
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Returns ``[ ( token, param ), ... ]``, where, ``param`` is byte-string
-    representing encoding token's parameter spec.
+    Return byte-string.
     """
-    if value :
-        tokenrules = []
-        for rule in rules(value) :
-            try    : token, params = rule.split( b';', 1 )
-            except : token, params = rule, b''
-            tokenrules.append( token.lower().decode('utf-8'), params )
-        return tokenrules
-
-    elif tokenrules :
-        fn = lambda r : r[0] + b';'.join( directives( tokens=r[1] ))
-        value = b'; '.join( prefix, rules(rs=map(fn, tokenrules)) )
-        return b'Transfer-Encoding:' + value
-
-    return None
+    fn = lambda r : r[0] + b';'.join( make_directives( r[1] ))
+    value = b'; '.join( prefix, make_rules( map( fn, tokenrules )))
+    return b'Transfer-Encoding:' + value
 
 #---- Request headers
 
-def accept( value=b'', tokenrules=[], prefix=b'' ):
+def parse_accept( value=b'' ):
     """
     Parse Accept header value,::
 
@@ -669,6 +679,37 @@ def accept( value=b'', tokenrules=[], prefix=b'' ):
     ``value``,
         byte-string of Accept header value to parse.
 
+    Returns ``[ ( '<type>/<subtype>', q, param ), ... ]``, where, ``param`` is
+    a byte-string representing media-type parameters and ``q`` is quality
+    value in float for media-type.
+    """
+    mranges = []
+    rangeq = {}
+    for rule in parse_rules( value ) :
+        try    : mt, params = rule.split( b';', 1 )
+        except : mt, params = rule, b''
+        q = re.search( re_qparam.encode('utf-8'), params )
+        q = float( q.groups()[0] ) if q else None
+
+        if mt == b'*/*' :
+            rangeq.setdefault( b'*', q or DEFAULT_QVALUE )
+        elif mt.endswith( b'/*' ) :
+            rangeq.setdefault( mt.split(b'/',1)[0],  q or DEFAULT_QVALUE )
+
+        mranges.append( (mt.strip().decode('utf-8'), q, params) )
+
+    mranges = [( mt, q or rangeq.get(mt.split('/', 1)[0], DEFAULT_QVALUE),
+                 params ) for mt, q, params in mranges ]
+
+    def quality_sort( mrange ):
+        mt, q, params = mrange
+        return q + len( params.split(b';') )
+
+    return sorted( mranges, key=quality_sort, reverse=True )
+
+def make_accept( tokenrules=[], prefix=b'' ):
+    """Reverse of parse_accept()
+
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
         this function for parsing Accept header value.
@@ -678,50 +719,29 @@ def accept( value=b'', tokenrules=[], prefix=b'' ):
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Returns ``[ ( '<type>/<subtype>', q, param ), ... ]``, where, ``param`` is
-    a byte-string representing media-type parameters and ``q`` is quality
-    value in float for media-type.
+    Return byte-string.
     """
-    if value :
-        mranges = []
-        rangeq = {}
-        for rule in rules( value ) :
-            try    : mt, params = rule.split( b';', 1 )
-            except : mt, params = rule, b''
-            q = re.search( re_qparam.encode('utf-8'), params )
-            q = float( q.groups()[0] ) if q else None
+    fn = lambda r : r[0]+b'/'+r[1] + b';'.join( make_directives( r[2] ))
+    return b'Accept:' + b'; '.join( prefix, make_rules(map(fn, tokenrules)) )
 
-            if mt == b'*/*' :
-                rangeq.setdefault( b'*', q or DEFAULT_QVALUE )
-            elif mt.endswith( b'/*' ) :
-                rangeq.setdefault( mt.split(b'/',1)[0],  q or DEFAULT_QVALUE )
-
-            mranges.append( (mt.strip().decode('utf-8'), q, params) )
-
-        mranges = [( mt, q or rangeq.get(mt.split('/', 1)[0], DEFAULT_QVALUE),
-                     params ) for mt, q, params in mranges ]
-
-        def quality_sort( mrange ):
-            mt, q, params = mrange
-            return q + len( params.split(b';') )
-
-        return sorted( mranges, key=quality_sort, reverse=True )
-
-    elif tokenrules :
-        fn = lambda r : r[0]+b'/'+r[1] + b';'.join( directives( tokens=r[2] ))
-        return b'Accept:' + b'; '.join( prefix, rules(rs=map(fn, tokenrules)) )
-
-    return None
-
-def accept_charset( value=b'', tokenrules=[], prefix=b'' ):
-    """
-    Parse Accept-Charset header value,::
+def parse_accept_charset( value=b'' ):
+    """Parse Accept-Charset header value,::
 
       Accept-Charset = "Accept-Charset" ":"
                 1#( ( charset | "*" )[ ";" "q" "=" qvalue ] )
 
     ``value``,
         byte-string of Accept-Charset header value to parse.
+
+    Returns, ``[ (charset, qvalue), ... ]``, where, ``charset`` is in string
+    and ``qvalue`` is in float. The returned list is sorted by qvalue which is
+    in float.
+    """
+    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
+    return list( map( lowercase, parse_simplevalue_q(value) ))
+
+def make_accept_charset( value=b'', tokenrules=[], prefix=b'' ):
+    """Reverse of parse_accept_charset()
 
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
@@ -732,21 +752,14 @@ def accept_charset( value=b'', tokenrules=[], prefix=b'' ):
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Returns, ``[ (charset, qvalue), ... ]``, where, ``qvalue`` is in float.
-    The returned list is sorted by qvalue which is in float.
+    Return byte-string.
     """
-    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
-    if value :
-        return list( map( lowercase, parse_simplevalue_q(value) ))
-    elif tokenrules :
-        value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
-        return b'Accept-Charset:' + value
-    return None
+    value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
+    return b'Accept-Charset:' + value
 
 
-def accept_encoding( value, tokenrules=[], prefix=b'' ):
-    """
-    Parse Accept-Encoding header value,::
+def parse_accept_encoding( value=b'' ):
+    """Parse Accept-Encoding header value,::
 
       Accept-Encoding  = "Accept-Encoding" ":"
                             1#( codings [ ";" "q" "=" qvalue ] )
@@ -754,6 +767,20 @@ def accept_encoding( value, tokenrules=[], prefix=b'' ):
 
     ``value``,
         byte-string of Accept-Encoding header value to parse.
+
+    Returns, ``[ (content-coding, qvalue), ... ]``, where ``content-coding``
+    is in string and ``qvalue`` is in float. Returned list is sorted by
+    qvalue.
+    """
+    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
+    tokenrules = list( map( lowercase, parse_simplevalue_q(value) ))
+    tokens = dict(tokenrules)
+    if ('identity' not in tokens) and (tokens.get('*', 1.0) != 0.0) :
+        tokenrules.append( ('identity', 1.0) )
+    return tokenrules
+
+def make_accept_encoding( tokenrules=[], prefix=b'' ):
+    """Reverse of parse_accept_encoding()
 
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
@@ -764,24 +791,13 @@ def accept_encoding( value, tokenrules=[], prefix=b'' ):
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Returns, ``[ (content-coding, qvalue), ... ]`` and the returned list is
-    sorted by qvalue, which is in float.
+    Return byte-string.
     """
-    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
-    if value :
-        tokenrules = list( map( lowercase, parse_simplevalue_q(value) ))
-        tokens = dict(tokenrules)
-        if ('identity' not in tokens) and (tokens.get('*', 1.0) != 0.0) :
-            tokenrules.append( ('identity', 1.0) )
-        return tokenrules
-    elif tokenrules :
-        value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
-        return b'Accept-Encoding:' + value
-    return [(b'identity', 1.0)]
+    value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
+    return b'Accept-Encoding:' + value
 
-def accept_language( value, tokenrules=[], prefix=b'' ):
-    """
-    Parse Accept-Language header value,::
+def parse_accept_language( value=b'' ):
+    """Parse Accept-Language header value,::
 
       Accept-Language = "Accept-Language" ":"
                         1#( language-range [ ";" "q" "=" qvalue ] )
@@ -789,6 +805,15 @@ def accept_language( value, tokenrules=[], prefix=b'' ):
 
     ``value``,
         byte-string of Accept-Language header value to parse.
+
+    Returns, ``[ (language, qvalue), ... ]``, where ``language`` is in string
+    and ``qvalue`` is in float. The returned list is sorted by qvalue.
+    """
+    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
+    return list( map( lowercase, parse_simplevalue_q(value) ))
+
+def make_accept_language( tokenrules=[], prefix=b'' ):
+    """Reverse of parse_accept_language()
 
     ``tokenrules``,
         list of rules, the format of the data is the same as what is return by
@@ -799,24 +824,19 @@ def accept_language( value, tokenrules=[], prefix=b'' ):
         as byte-string, join this with byte-string generated from
         `tokenrules`,
 
-    Returns, ``[ (language, qvalue), ... ]`` and the returned list is
-    sorted by qvalue, which is in float.
+    Return byte-string.
     """
-    lowercase = lambda x : (x[0].decode('utf8').lower(), x[1])
-    if value :
-        return list( map( lowercase, parse_simplevalue_q(value) ))
-    elif tokenrules :
-        value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
-        return b'Accept-Encoding:' + value
-    return None
+    value = b'; '.join( prefix, make_simplevalue_q( tokenrules ))
+    return b'Accept-Encoding:' + value
 
 #---- Response headers
 
 #---- Entity headers
 
-def content_length( value ):
+def parse_content_length( value ):
     """Return length as integer type."""
-    return int(value) if value else value
+    try    : return int(value) if value else value
+    except : return None
 
 def parse_content_type( value ):
     """Parse content type using grammar,::
@@ -829,13 +849,14 @@ def parse_content_type( value ):
       attribute      = token
       value          = token | quoted-string
 
-    Returns, ``[ type, subtype, [ (attr, value), ... ]``
+    Returns, ``[ type, subtype, [ (attr, value), ... ]`` where all elements
+    are in byte-string.
     """
     if value == None : return value
 
     parts = value.lstrip().split( b';' )
     typ, subtype = parts[0].split( b'/' )
-    params = parameters( parts[1:] ) if parts[1:] else []
+    params = parse_parameters( parts[1:] ) if parts[1:] else []
     return typ, subtype, filter( None, params )
 
 #---- additional features
@@ -851,12 +872,13 @@ def parse_content_disposition( value ):
       disp-extension-token = token
       disp-extension-parm = token "=" ( token | quoted-string )
 
-    Returns, ``( token, [ (attr, value), ... ] )``
+    Returns, ``( token, [ (attr, value), ... ] )``, where all elements are in
+    byte-string.
     """
     if not value : return value
 
     ps = value.split( b';' )
-    params = parameters( parts[1:] ) if parts[1:] else []
+    params = parse_parameters( parts[1:] ) if parts[1:] else []
     return ps[0].lower(), filter( None, params )
 
 #---- Yet to be cleaned up.

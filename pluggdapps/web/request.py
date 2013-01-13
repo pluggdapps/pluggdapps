@@ -23,18 +23,18 @@ class HTTPRequest( Plugin ):
 
     implements( IHTTPRequest )
 
-    content_type = None
-    """Parsed content type as tuple of,
-    ``( type, subtype, [ (attr, value), ... ] )`` """
+    content_type = ''
+    """Parsed content type as return from :meth:`parse_content_type`."""
 
     # IHTTPRequest interface methods and attributes
-    def __init__( self, httpconn, method, uri, version, headers ):
+    def __init__( self, httpconn, method, uri, uriparts, version, headers ):
 
         self.router = self.cookie = None
         self.response = self.session = None
 
         self.httpconn = httpconn
-        self.method, self.uri, self.version = method, uri, version
+        self.method, self.uri, self.uriparts, self.version = \
+                method, uri, uriparts, version
         self.headers = headers
 
         # Initialize request handler attributes, these attributes will be
@@ -49,10 +49,6 @@ class HTTPRequest( Plugin ):
         self.files = {}
 
         # Initialize
-        if isinstance( uri, bytes ) :
-            self.uriparts = h.parse_url( uri, host=headers.get('host',None) )
-        else :
-            self.uriparts = uri
         self.params = {}
         self.getparams = self.uriparts['query']
         self.params.update( self.getparams )
@@ -94,7 +90,7 @@ class HTTPRequest( Plugin ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.ischunked`
         interface method."""
         x = h.parse_transfer_encoding( 
-                self.headers.get( 'transfer_encoding', None ))
+                self.headers.get( 'transfer_encoding', b'' ))
         return (x[0][0] == 'chunked') if x else False
 
     def handle( self, body=None, chunk=None, trailers=None ):

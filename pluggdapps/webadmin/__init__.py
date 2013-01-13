@@ -13,4 +13,6 @@
 #   their plugins and interfaces during pluggdapps-bootup.
 
 import pluggdapps.webadmin.webadmin
-
+import pluggdapps.webadmin.resource
+import pluggdapps.webadmin.router
+import pluggdapps.webadmin.views

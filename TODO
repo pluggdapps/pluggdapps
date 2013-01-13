@@ -6,9 +6,25 @@
 
   * Interpret `gzip` content-coding and apply gzip-plugin on outbout-message.
 
+* Create scaffolding logic to initialize platform, with a bunch of .ini files
+  under ./etc/ directory created under platform.
+
+* The default configuration should setup cache directory for TTL templates.
+
+* When something fails in TTL, error message should point to TTL line-no not
+  the .py file's line-no.
+
+* Add :css: filter block in TTL.
+
+* Add :jq: filter block in TTL.
+
+* Create an article explaining content negotiation protocol in pluggdapps
+  web-framework's matchrouter.
+
 * Single-function applications to be developed and demonstrated.
-    Publishing Static-web-site / Remote-file-explorer / Publishing repository
-    Discussion forums / Publishing version-control-systems.
+    Publishing Static-web-site / Remote-file-explorer / Publishing repository /
+    Discussion forums / Publishing version-control-systems /
+    Brandizer to create brand-names using dictionary words.
 
 * Refer Apache mod_dir and mod_autoindex while developing
   Remote-file-explorer app.

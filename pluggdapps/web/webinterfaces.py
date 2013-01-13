@@ -261,7 +261,7 @@ class IHTTPRequest( Interface ):
     finishedat = 0
     """Timestamp when request was finished."""
 
-    def __init__( httpconn, method, uriparts, version, headers ):
+    def __init__( httpconn, method, uri, uriparts, version, headers ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
@@ -274,8 +274,12 @@ class IHTTPRequest( Interface ):
         ``method``,
             Request method in byte-string.
 
+        ``uri``,
+            Request URI in byte-string from request message.
+
         ``uriparts``,
-            Request URI in byte-string or dictionary of uriparts.
+            Dictionary of uriparts after uri is used to resolve webapp. SCRIPT
+            and PATH are adjusted according to resolved web-application.
 
         ``version``,
             Request version in byte-string.

@@ -32,21 +32,16 @@ class GZipOutBound( Plugin ) :
         resp = request.response
         ctype = resp.headers.get( 'content_type', b'' )
         cenc  = resp.headers.get( 'content_encoding', b'' )
+        etag = resp.headers.get( 'etag', b'' )
 
         # Compress only if content-type is 'text/*' or 'application/*'
         if self._is_gzip( data, cenc, ctype, resp.statuscode ) :
             data = self._gzip( data )
-
-        if not data :
-            resp.set_header( 'content_encoding', b'' )
-
-        if resp.ischunked() == False :
-            resp.set_header( 'content_length', len( data ))
-            etag = resp.headers.get( 'etag', '' )
             # etag is always double-quoted.
-            if etag :
-                resp.set_header( 'etag', etag[:-1] + b';gzip"' )
-
+            resp.set_header( 'etag', etag[:-1] + b';gzip"' ) if etag else None
+        else :
+            enc = cenc.replace( b'gzip', b'' )
+            resp.set_header('content_encoding', enc)
         return data
 
     def _is_gzip( self, data, enc, typ, status ):
