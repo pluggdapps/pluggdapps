@@ -100,7 +100,7 @@ Dynamic plugins :
 """
 
 from   configparser          import SafeConfigParser
-from   os.path               import dirname, isfile
+from   os.path               import dirname, isfile, abspath
 from   copy                  import deepcopy
 
 from   pluggdapps.const      import SPECIAL_SECS, URLSEP
@@ -321,7 +321,7 @@ class Pluggdapps( object ):
         settings = {}
 
         # context for parsing ini files.
-        _vars = { 'here' : dirname(baseini) }
+        _vars = { 'here' : abspath( dirname( baseini )) }
 
         # Read master ini file.
         cp = SafeConfigParser()
@@ -673,7 +673,7 @@ class Webapps( Pluggdapps ):
         settings = self.settings
 
         # context for parsing ini files.
-        _vars = { 'here' : dirname(self.inifile) }
+        _vars = { 'here' : abspath( dirname( self.inifile )) }
 
 
         # Fetch special section [mountloc]. And override them with [DEFAULT]
@@ -721,7 +721,7 @@ class Webapps( Pluggdapps ):
     def _loadinstance( self, appsett, instanceini ):
         """Load configuration settings for a web application's instance."""
         from pluggdapps.plugin import plugin_info
-        _vars = { 'here' : dirname(instanceini) }
+        _vars = { 'here' : abspath( dirname( instanceini )) }
         cp = SafeConfigParser()
         cp.read( instanceini )
 
