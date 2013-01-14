@@ -6,6 +6,7 @@
 
 from   urllib.parse import urljoin
 
+from   pluggdapps.const             import URLSEP
 from   pluggdapps.plugin            import implements, Plugin, plugincall
 from   pluggdapps.interfaces        import IWebApp
 from   pluggdapps.web.webinterfaces import IHTTPRouter, IHTTPCookie, \
@@ -137,7 +138,11 @@ class WebApp( Plugin ):
 
     def pathfor( self, request, *args, **kwargs ):
         """:meth:`pluggdapps.interfaces.IWebApps.pathfor` interface method."""
-        return self.router.urlpath( request, *args, **kwargs )
+        path = self.router.urlpath( request, *args, **kwargs )
+        if path.startswith( URLSEP ) :  # Prefix uriparts['script']
+            if request.uriparts['script'] :
+                path = request.uriparts['script'] + path
+        return path
 
 
     #---- ISettings interface methods

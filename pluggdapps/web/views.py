@@ -4,7 +4,6 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-
 def HTTPNotFound( request, c ):
     resp = request.response
     resp.set_status( b'404' )
@@ -25,3 +24,4 @@ def SplashPage( request, c ):
     resp = request.response
     resp.write( "hello world" )
     resp.flush( finishing=True )
+

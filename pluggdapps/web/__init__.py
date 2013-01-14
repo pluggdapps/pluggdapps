@@ -26,7 +26,7 @@ import pluggdapps.web.request
 import pluggdapps.web.resource
 import pluggdapps.web.response
 import pluggdapps.web.server
-import pluggdapps.web.staticfile
+import pluggdapps.web.staticview
 import pluggdapps.web.views
 import pluggdapps.web.webapp
 import pluggdapps.web.webinterfaces

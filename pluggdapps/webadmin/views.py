@@ -24,6 +24,8 @@ def get_html_config( request, c ):
     response = request.response
     c['netpaths'] = request.pa.netpaths
     c['settings'] = request.pa.settings
+    c['url_jquery'] = request.pathfor(
+            'staticfiles', path='jquery-1.8.3.min.js' )
     html = response.render( 
                 request, c, file='pluggdapps:webadmin/templates/config.ttl' )
     response.write( html )

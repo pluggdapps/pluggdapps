@@ -294,7 +294,7 @@ def make_url( baseurl, path, query, fragment ):
     path = quote( path ) if path else ''
     query = urlencode( query ) if query else ''
     fragment = fragment if fragment else ''
-    relurl = urlunsplit( '', '', path, query, fragment )
+    relurl = urlunsplit([ '', '', path, query, fragment ])
     return urljoin( baseurl, relurl ) if baseurl else relurl
 
 scheme2ports = {

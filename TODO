@@ -1,15 +1,13 @@
-* The default configuration should setup cache directory for TTL templates.
-
 * When something fails in TTL, error message should point to TTL line-no not
   the .py file's line-no.
-
-* Create an article explaining content negotiation protocol in pluggdapps
-  web-framework's matchrouter.
 
 * Single-function applications to be developed and demonstrated.
     Publishing Static-web-site / Remote-file-explorer / Publishing repository /
     Discussion forums / Publishing version-control-systems /
     Brandizer to create brand-names using dictionary words.
+
+* Create an article explaining content negotiation protocol in pluggdapps
+  web-framework's matchrouter.
 
 * Refer Apache mod_dir and mod_autoindex while developing
   Remote-file-explorer app.

@@ -133,17 +133,17 @@ class HTTPRequest( Plugin ):
         self.webapp.onfinish( self )
         self.finishedat = time.time()
 
-    def urlfor( name, **matchdict ):
+    def urlfor( self, name, **matchdict ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.urlfor`
         interface method."""
         return self.webapp.urlfor( self, name, **matchdict )
 
-    def pathfor( name, **matchdict ):
+    def pathfor( self, name, **matchdict ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.pathfor`
         interface method."""
         return self.webapp.pathfor( self, name, **matchdict )
 
-    def appurl( webapp, name, **matchdict ):
+    def appurl( self, webapp, name, **matchdict ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.appurl`
         interface method."""
         return webapp.urlfor( self, name, **matchdict )

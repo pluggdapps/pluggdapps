@@ -17,3 +17,4 @@ subjected to content negotiation.
 
 import pluggdapps.docroot.docroot
 import pluggdapps.docroot.router
+import pluggdapps.docroot.views

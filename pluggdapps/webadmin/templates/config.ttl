@@ -4,26 +4,31 @@
 
 <html>
   <head>
+    <script defer "text/javascript" src="${url_jquery}">
   <body {padding: 10px}>
-    ## Header
-    <div {font-size : x-large}> Platform configuration
-      <select #webapp {border:1px solid gray; background-color : white;
-                       margin-left : 20px;
-                      }>
-        <option value="platform" selected>${'platform-config'}
-        @for netpath in netpaths.keys() :
-          <option value=${netpath}>${netpath}
-    <hr {height : 3px}>
+    <div {width: 80%; margin: 0px auto;}>
+      ## Header
+      <div {font-size : x-large}> Platform configuration
+        <select #webapp {border:1px solid gray; background-color : white;
+                         margin-left : 20px;
+                        }>
+          <option value="platform" selected>${'platform-config'}
+          @for netpath in netpaths.keys() :
+            <option value=${netpath}>${netpath}
+      <hr {height : 3px}>
 
-    ## Sections and configurations
-    <div {width : 80%; margin: 0px auto}>
-      <table>
-        <tr>
-          <td {border-right: 2px solid gray; padding : 5px;}>
-            ${sections_column( list( settings.keys() ))}
-          <td>
+      ## Sections and configurations
+      <div {width : 95%; margin: 0px auto}>
+        <table>
+          <tr>
+            <td {border-right: 2px solid gray; padding : 5px;}>
+              ${sections_column( list( settings.keys() ))}
+            <td {padding: 5px}>
 
 @def sections_column( sections ) :
+  <inptext {border: 1px solid lightBlue;}>
   @for section in sorted( sections ) :
     <div {padding: 2px;}>
-      <a {color: gray}> ${section}
+      <a {color: blue}> ${section}
+
+  <script>

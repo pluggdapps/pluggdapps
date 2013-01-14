@@ -24,13 +24,15 @@ class WebAdminRouter( MatchRouter ):
         """:meth:`pluggapps.web.webinterfaces.IHTTPRouter.onboot` interface
         method."""
         super().onboot()
-        self.add_view( 'staticfiles', '/static/*path', view='staticfile' )
+        self.add_view( 'staticfiles', '/static/*path', 
+                       rootloc='pluggdapps:webadmin/static',
+                       view='staticview' )
 
         self.add_view( 'htmlconfig1', '/',
                        method='GET',
                        media_type='text/html',
                        content_coding='gzip',
-                       view=get_html_config
+                       view=get_html_config,
                      )
 
         self.add_view( 'updateconfig', '/config/{netpath}/{section}',

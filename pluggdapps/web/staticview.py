@@ -6,7 +6,6 @@
 
 import os, mimetypes
 from   os.path          import join, isfile
-import datetime         as dt
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import Plugin, implements
@@ -22,7 +21,7 @@ _default_settings['max_age']  = {
     'help'    : "How long this file can remain fresh in a HTTP cache."
 }
 
-class StaticFile( Plugin ):
+class StaticView( Plugin ):
     """Plugin to serve static files over HTTP."""
     implements( IHTTPView )
 
@@ -38,11 +37,8 @@ class StaticFile( Plugin ):
         method.
         """
         resp = request.response
-        path = request.uriparts['path'].lstrip('/') or resp.webapp['index_page']
-        if path == 'favicon.ico' :
-            path = self.webapp['favicon']
-        c['rootloc'] = self.view.get( 'rootloc', self.webapp['rootloc'] )
-        docfile = join( c['rootloc'], path )
+        assetpath = h.abspath_from_asset_spec( self.view['rootloc'] )
+        docfile = join( assetpath, request.matchdict['path'] )
 
         if docfile and isfile( docfile ) :
             # Collect information about the document, for response.
@@ -62,7 +58,7 @@ class StaticFile( Plugin ):
             resp.write( c['body'] )
             resp.flush( finishing=True )
         else :
-            resp.pa.logdebug( "Not found %r" % docfile )
+            resp.pa.logwarn( "Not found %r" % docfile )
             resp.set_status( b'404' )
             resp.flush( finishing=True )
 

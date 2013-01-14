@@ -132,6 +132,11 @@ class MatchRouter( Plugin ):
             Cache-Control response header value to be used for the resource's
             variant.
 
+        ``rootloc``,
+            To add views for static files, use this attribute. Specifies the
+            root location where static files are located. Note that when using
+            this option, ``pattern`` argument must end with ``*path``.
+
         ``media_type``, ``language``, ``content_coding`` and ``charset``
         kwargs, if supplied, will be used during content negotiation.
         """
@@ -178,8 +183,6 @@ class MatchRouter( Plugin ):
             request.view = self['defaultview']
             variant = None
 
-        import pprint
-        pprint.pprint( variant )
         if variant :
             name, viewd, m = variant
             resp.media_type = viewd['media_type']
@@ -267,7 +270,7 @@ class MatchRouter( Plugin ):
         view = self.views[ name ]
         query = matchdict.pop( '_query', None )
         fragment = matchdict.pop( '_anchor', None )
-        path = view['path_template'].format( matchdict )
+        path = view['path_template'].format( **matchdict )
         return h.make_url( None, path, query, fragment )
 
 
