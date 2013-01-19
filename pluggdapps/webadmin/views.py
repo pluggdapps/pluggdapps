@@ -22,14 +22,19 @@ def get_json_config( request, c ):
 
 def get_html_config( request, c ):
     response = request.response
+    common_url( request, c )
     c['netpaths'] = request.pa.netpaths
     c['settings'] = request.pa.settings
-    c['url_jquery'] = request.pathfor(
-            'staticfiles', path='jquery-1.8.3.min.js' )
-    html = response.render( 
+    html = response.render(
                 request, c, file='pluggdapps:webadmin/templates/config.ttl' )
     response.write( html )
     response.flush( finishing=True )
 
 def put_config( request, c ):
     pass
+
+
+#---- Local functions
+
+def common_url( req, c ):
+    c['url_jquery'] = req.pathfor( 'staticfiles', path='jquery-1.8.3.min.js' )

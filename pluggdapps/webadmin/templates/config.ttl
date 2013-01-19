@@ -7,6 +7,7 @@
     <script defer "text/javascript" src="${url_jquery}">
   <body {padding: 10px}>
     <div {width: 80%; margin: 0px auto;}>
+
       ## Header
       <div {font-size : x-large}> Platform configuration
         <select #webapp {border:1px solid gray; background-color : white;
@@ -30,5 +31,3 @@
   @for section in sorted( sections ) :
     <div {padding: 2px;}>
       <a {color: blue}> ${section}
-
-  <script>
