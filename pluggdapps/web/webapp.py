@@ -6,14 +6,13 @@
 
 from   urllib.parse import urljoin
 
-from   pluggdapps.const             import URLSEP
-from   pluggdapps.plugin            import implements, Plugin, plugincall
-from   pluggdapps.interfaces        import IWebApp
-from   pluggdapps.web.webinterfaces import IHTTPRouter, IHTTPCookie, \
-                                           IHTTPResponse, \
-                                           IHTTPSession, IHTTPInBound, \
-                                           IHTTPOutBound
-import pluggdapps.utils             as h
+from   pluggdapps.const          import URLSEP
+from   pluggdapps.plugin         import implements, Plugin, plugincall
+from   pluggdapps.interfaces     import IWebApp
+from   pluggdapps.web.interfaces import IHTTPRouter,IHTTPCookie,IHTTPResponse, \
+                                        IHTTPSession, IHTTPInBound, \
+                                        IHTTPOutBound
+import pluggdapps.utils          as h
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \

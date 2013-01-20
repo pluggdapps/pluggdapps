@@ -10,10 +10,10 @@ import datetime as dt
 from   http.cookies import SimpleCookie
 from   os.path      import splitext
 
-from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IHTTPResponse, IHTTPOutBound, \
-                                           IHTTPRenderer
-import pluggdapps.utils             as h
+from   pluggdapps.plugin         import implements, Plugin
+from   pluggdapps.web.interfaces import IHTTPResponse, IHTTPOutBound, \
+                                        IHTTPRenderer
+import pluggdapps.utils          as h
 
 # TODO :
 #   1. user locale (server side).
@@ -373,7 +373,7 @@ class ResponseHeaders( Plugin ):
     implements( IHTTPOutBound )
 
     def transform( self, request, data, finishing=False ): 
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPOutBound.transform`
+        """:meth:`pluggdapps.web.interfaces.IHTTPOutBound.transform`
         interface method."""
         resp = request.response
         c = resp.context

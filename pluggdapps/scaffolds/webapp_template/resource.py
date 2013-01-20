@@ -2,7 +2,7 @@
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IHTTPResource
+from   pluggdapps.web.interfaces import IHTTPResource
 
 class {webapp_name}Resource( Plugin ):
     implements( IHTTPResource )

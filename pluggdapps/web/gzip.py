@@ -8,9 +8,9 @@
 import gzip
 from   io   import BytesIO
 
-import pluggdapps.utils             as h
-from   pluggdapps.plugin            import Plugin, implements
-from   pluggdapps.web.webinterfaces import IHTTPOutBound
+import pluggdapps.utils          as h
+from   pluggdapps.plugin         import Plugin, implements
+from   pluggdapps.web.interfaces import IHTTPOutBound
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \

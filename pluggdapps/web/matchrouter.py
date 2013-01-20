@@ -25,11 +25,11 @@ import re
 from   copy import deepcopy
 from   os.path import isfile
 
-import pluggdapps.utils             as h
-from   pluggdapps.const             import URLSEP, CONTENT_IDENTITY
-from   pluggdapps.plugin            import Plugin, implements, plugincall
-from   pluggdapps.web.webinterfaces import IHTTPRouter, IHTTPResource, \
-                                           IHTTPView, IHTTPResponse
+import pluggdapps.utils          as h
+from   pluggdapps.const          import URLSEP, CONTENT_IDENTITY
+from   pluggdapps.plugin         import Plugin, implements, plugincall
+from   pluggdapps.web.interfaces import IHTTPRouter, IHTTPResource, \
+                                        IHTTPView, IHTTPResponse
 # Notes :
 #   - An Allow header field MUST be present in a 405 (Method Not Allowed)
 #     response.
@@ -69,7 +69,7 @@ class MatchRouter( Plugin ):
     which the views where added."""
 
     def onboot( self ):
-        """:meth:`pluggapps.web.webinterfaces.IHTTPRouter.onboot` interface
+        """:meth:`pluggapps.web.interfaces.IHTTPRouter.onboot` interface
         method."""
         self.views = {}
         self.viewlist = []
@@ -163,7 +163,7 @@ class MatchRouter( Plugin ):
         self.viewlist.append( (name, view) )
 
     def route( self, request ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRouter.route` interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPRouter.route` interface
         method.
         """
         resp = request.response
@@ -216,7 +216,7 @@ class MatchRouter( Plugin ):
             request.view( request, c )
 
     def match_predicates( self, request, viewd ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRouter.negotiate` interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPRouter.negotiate` interface
         method."""
         x = True
         if viewd['method'] != None :
@@ -224,7 +224,7 @@ class MatchRouter( Plugin ):
         return x
 
     def negotiate( self, request, variants ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRouter.negotiate` interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPRouter.negotiate` interface
         method."""
         negot_tbl = self._compile_client_negotiation( request )
         fn = lambda x : (x,)
@@ -247,7 +247,7 @@ class MatchRouter( Plugin ):
         return variants_[0][:3] if variants_ else None
 
     def urlpath( self, request, name, **matchdict ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRouter.route` interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPRouter.route` interface
         method. Generate url path for request using view-patterns. Return a
         string of URL-path, with query and anchore elements.
 

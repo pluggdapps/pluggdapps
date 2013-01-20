@@ -83,9 +83,10 @@ def initialize( pa ):
 
 import pluggdapps.config    # Load plugins for configuration backends.
 import pluggdapps.erl       # Load netscale interfaces.
-import pluggdapps.commands  # Load pa-script commands
-import pluggdapps.web       # Load web-framework
-import pluggdapps.scaffolds # Load web-framework
+import pluggdapps.commands  # Load pa-script sub-command framework
+import pluggdapps.scaffolds # Load scaffolding framework
+import pluggdapps.web       # Load web framework
+import pluggdapps.console   # Load console framework
 
 # Load applications
 import pluggdapps.docroot   # Application to serve static files.

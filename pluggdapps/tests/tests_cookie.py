@@ -10,9 +10,9 @@ import http.cookies
 import datetime as dt
 
 from   pluggdapps.plugin     import pluginname, query_plugins, query_plugin
-from   pluggdapps.interfaces import IWebApp
-from   pluggdapps.platform   import Pluggdapps
-from   pluggdapps.web.webinterfaces import IHTTPCookie
+from   pluggdapps.interfaces     import IWebApp
+from   pluggdapps.platform       import Pluggdapps
+from   pluggdapps.web.interfaces import IHTTPCookie
 
 
 refheaders = {

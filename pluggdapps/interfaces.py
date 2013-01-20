@@ -257,7 +257,7 @@ class IWebApp( Interface ):
     def onfinish( request ):
         """When a finish is called on the :attr:`request.response`, by calling
         a ``flush( finished=True )``, onfinish() callbacks will be issued by
-        the :class:`pluggdapps.web.webinterfaces.IHTTPResponse`."""
+        the :class:`pluggdapps.web.interfaces.IHTTPResponse`."""
 
     def shutdown():
         """Shutdown this application. Reverse of :meth:`startapp`."""

@@ -6,9 +6,9 @@
 
 import hashlib
 
-import pluggdapps.utils             as h
-from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IHTTPResource
+import pluggdapps.utils          as h
+from   pluggdapps.plugin         import implements, Plugin
+from   pluggdapps.web.interfaces import IHTTPResource
 
 #---- IMPORTANT : This plugin is outdated !!!
 
@@ -19,11 +19,11 @@ class StaticResource( Plugin ):
     #-- IHTTPResource interface methods
 
     def __call__( request, c ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPResource.__call__ interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPResource.__call__ interface
         method."""
 
     def etag( self, response, weak=False ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPResource.etag interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPResource.etag interface
         method."""
         hasher = hashlib.sha1()
         [ hasher.update(x) for x in response.data ]

@@ -7,7 +7,7 @@
 """This package specify and define a web-framework compatible with
 :class:`pluggdapps.platform.Webapps` platform and every aspect of the
 framework is abstracted into ``Interface``. These interfaces are specified in
-module :mod:`pluggdapps.web.webinterfaces`, this combined with
+module :mod:`pluggdapps.web.interfaces`, this combined with
 :class:`pluggdapps.interfaces.IWebApp` interface provides the complete
 collection of interfaces required to build the framework. With these
 interfaces in place, :mod:`pluggdapps.web` directory provide the necessary 
@@ -29,4 +29,4 @@ import pluggdapps.web.server
 import pluggdapps.web.staticview
 import pluggdapps.web.views
 import pluggdapps.web.webapp
-import pluggdapps.web.webinterfaces
+import pluggdapps.web.interfaces

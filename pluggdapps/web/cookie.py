@@ -8,9 +8,9 @@
 import hmac, hashlib, base64, re, calendar, email, time
 from   http.cookies import CookieError, SimpleCookie
 
-from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IHTTPCookie
-import pluggdapps.utils             as h
+from   pluggdapps.plugin         import implements, Plugin
+from   pluggdapps.web.interfaces import IHTTPCookie
+import pluggdapps.utils          as h
 
 
 _default_settings = h.ConfigDict()
@@ -45,7 +45,7 @@ class HTTPCookie( Plugin ):
     #-- IHTTPCookie interface methods.
 
     def parse_cookies( self, headers ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.parse_cookies` 
+        """:meth:`pluggdapps.web.interfaces.IHTTPCookie.parse_cookies` 
         interface method."""
         cookies = SimpleCookie()
         cookie = headers.get( 'cookie', '' )
@@ -57,7 +57,7 @@ class HTTPCookie( Plugin ):
             return None
 
     def set_cookie( self, cookies, name, value, **kwargs ) :
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.set_cookie`
+        """:meth:`pluggdapps.web.interfaces.IHTTPCookie.set_cookie`
         interface method."""
         if re.search( r"[\x00-\x20]", name + value ):
             # Don't let us accidentally inject bad stuff
@@ -90,7 +90,7 @@ class HTTPCookie( Plugin ):
         return cookies
 
     def create_signed_value( self, name, value ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.set_cookie`
+        """:meth:`pluggdapps.web.interfaces.IHTTPCookie.set_cookie`
         interface method."""
         parts = [ self['secret'], name, value, str( int( time.time() )) ]
         parts = [ x.encode( 'utf-8' ) for x in parts ]
@@ -100,7 +100,7 @@ class HTTPCookie( Plugin ):
         return signedval.decode( self['value_encoding'] )
 
     def decode_signed_value( self, name, signedval ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPCookie.set_cookie`
+        """:meth:`pluggdapps.web.interfaces.IHTTPCookie.set_cookie`
         interface method."""
         if not signedval : return None
 

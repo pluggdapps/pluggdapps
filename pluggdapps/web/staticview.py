@@ -9,7 +9,7 @@ from   os.path          import join, isfile
 
 import pluggdapps.utils             as h
 from   pluggdapps.plugin            import Plugin, implements
-from   pluggdapps.web.webinterfaces import IHTTPView
+from   pluggdapps.web.interfaces import IHTTPView
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \
@@ -26,14 +26,14 @@ class StaticView( Plugin ):
     implements( IHTTPView )
 
     def __init__( self, viewname, view ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPView.__init__` interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPView.__init__` interface
         method.
         """
         self.viewname = viewname
         self.view = view
 
     def __call__( self, request, c ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPView.__call__` interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPView.__call__` interface
         method.
         """
         resp = request.response
@@ -63,7 +63,7 @@ class StaticView( Plugin ):
             resp.flush( finishing=True )
 
     def onfinish( self, request ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPView.__call__` interface
+        """:meth:`pluggdapps.web.interfaces.IHTTPView.__call__` interface
         method.
         """
         pass

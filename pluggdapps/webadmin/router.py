@@ -21,7 +21,7 @@ class WebAdminRouter( MatchRouter ):
     """IHTTPRouter plugin to route static web sites."""
 
     def onboot( self ):
-        """:meth:`pluggapps.web.webinterfaces.IHTTPRouter.onboot` interface
+        """:meth:`pluggapps.web.interfaces.IHTTPRouter.onboot` interface
         method."""
         super().onboot()
         self.add_view( 'staticfiles', '/static/*path', 

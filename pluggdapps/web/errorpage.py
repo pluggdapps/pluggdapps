@@ -6,9 +6,9 @@
 
 import traceback
 
-import pluggdapps.utils             as h
-from   pluggdapps.plugin            import implements, Plugin
-from   pluggdapps.web.webinterfaces import IHTTPView
+import pluggdapps.utils          as h
+from   pluggdapps.plugin         import implements, Plugin
+from   pluggdapps.web.interfaces import IHTTPView
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = \

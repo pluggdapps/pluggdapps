@@ -7,13 +7,12 @@
 import unittest
 from   random import choice
 
-from   pluggdapps.plugin     import *
-from   pluggdapps.interfaces import ICommand, IWebApp, IHTTPServer
-from   pluggdapps.web.webinterfaces import IHTTPView, IHTTPCookie, \
-                                           IHTTPRenderer, IHTTPRequest, \
-                                           IHTTPResource, IHTTPResponse, \
-                                           IHTTPOutBound, \
-                                           IHTTPRouter
+from   pluggdapps.plugin         import *
+from   pluggdapps.interfaces     import ICommand, IWebApp, IHTTPServer
+from   pluggdapps.web.interfaces import IHTTPView, IHTTPCookie, \
+                                        IHTTPRenderer, IHTTPRequest, \
+                                        IHTTPResource, IHTTPResponse, \
+                                        IHTTPOutBound, IHTTPRouter
 
 class TestPlugin( unittest.TestCase ):
 

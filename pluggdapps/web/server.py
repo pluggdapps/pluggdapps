@@ -14,10 +14,10 @@ import sys, datetime, errno, heapq, time, os, select, socket, re, \
 
 import ssl  # Python 2.6+
 
-import pluggdapps.utils             as h
-from   pluggdapps.plugin            import Plugin, implements
-from   pluggdapps.web.webinterfaces import IHTTPRequest
-from   pluggdapps.interfaces        import IHTTPServer, IHTTPConnection
+import pluggdapps.utils          as h
+from   pluggdapps.plugin         import Plugin, implements
+from   pluggdapps.web.interfaces import IHTTPRequest
+from   pluggdapps.interfaces     import IHTTPServer, IHTTPConnection
 
 
 # TODO :

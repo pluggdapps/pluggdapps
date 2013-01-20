@@ -6,9 +6,9 @@
 
 import time
 
-import pluggdapps.utils             as h
-from   pluggdapps.plugin            import Plugin, implements
-from   pluggdapps.web.webinterfaces import IHTTPRequest
+import pluggdapps.utils          as h
+from   pluggdapps.plugin         import Plugin, implements
+from   pluggdapps.web.interfaces import IHTTPRequest
 
 # TODO : Product token, header field `Server` to be automatically added in
 # response.
@@ -60,41 +60,41 @@ class HTTPRequest( Plugin ):
         self.finishedat = None
 
     def supports_http_1_1( self ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.supports_http_1_1`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.supports_http_1_1`
         interface method."""
         return self.version == b"HTTP/1.1"
 
     def get_ssl_certificate(self):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.get_ssl_certificate`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.get_ssl_certificate`
         interface method."""
         return self.httpconn.get_ssl_certificate()
 
     def get_cookie( self, name, default=None ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.get_cookie`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.get_cookie`
         interface method."""
         return self.cookies[name].value if name in self.cookies else default
 
     def get_secure_cookie( self, name, value=None ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.get_secure_cookie`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.get_secure_cookie`
         interface method."""
         if value is None :
             value = self.get_cookie(name)
         return self.cookie.decode_signed_value( name, value ) 
 
     def has_finished( self ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.has_finished`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.has_finished`
         interface method."""
         return self.response.has_finished() if self.response else True
 
     def ischunked( self ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.ischunked`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.ischunked`
         interface method."""
         x = h.parse_transfer_encoding( 
                 self.headers.get( 'transfer_encoding', b'' ))
         return (x[0][0] == 'chunked') if x else False
 
     def handle( self, body=None, chunk=None, trailers=None ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.handle`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.handle`
         interface method."""
         self.cookies = self.cookie.parse_cookies( self.headers )
 
@@ -126,7 +126,7 @@ class HTTPRequest( Plugin ):
               for name, value in self.multiparts.items() ]
 
     def onfinish( self ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.onfinish`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.onfinish`
         interface method."""
         # Will be callbe by response.onfinish() callback.
         self.view.onfinish(self) if hasattr( self.view, 'onfinish' ) else None
@@ -134,17 +134,17 @@ class HTTPRequest( Plugin ):
         self.finishedat = time.time()
 
     def urlfor( self, name, **matchdict ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.urlfor`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.urlfor`
         interface method."""
         return self.webapp.urlfor( self, name, **matchdict )
 
     def pathfor( self, name, **matchdict ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.pathfor`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.pathfor`
         interface method."""
         return self.webapp.pathfor( self, name, **matchdict )
 
     def appurl( self, webapp, name, **matchdict ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPRequest.appurl`
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.appurl`
         interface method."""
         return webapp.urlfor( self, name, **matchdict )
 

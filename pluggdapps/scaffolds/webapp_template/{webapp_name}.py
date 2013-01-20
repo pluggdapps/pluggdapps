@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from   pluggdapps.web.webapp        import WebApp
-from   pluggdapps.web.webinterfaces import IHTTPRouter
+from   pluggdapps.web.interfaces import IHTTPRouter
 import pluggdapps.utils             as h
 
 _default_settings = h.ConfigDict()

@@ -20,16 +20,17 @@ _default_settings.__doc__ = \
 _default_settings['routemapper'] = {
     'default' : '',
     'types'   : (str,),
-    'help'    : "Filename along with its path, in asset specification format.  "
-                "Referred file contains route mapping information which will "
-                "get transformed into add_view() calls during boot time."
+    'help'    : "Filename along with its path, in asset specification "
+                "format. Referred file contains route mapping information "
+                "which will get transformed into add_view() calls during "
+                "boot time."
 }
 
 class DocRootRouter( MatchRouter ):
     """IHTTPRouter plugin to route static web sites."""
 
     def onboot( self ):
-        """:meth:`pluggapps.web.webinterfaces.IHTTPRouter.onboot` interface
+        """:meth:`pluggapps.web.interfaces.IHTTPRouter.onboot` interface
         method."""
         super().onboot()
         if self['routemapper'] :
