@@ -77,6 +77,7 @@ class CommandEnv( Plugin ):
 
     #---- ICommand attributes and methods
 
+    description = "Scaffolding logic to create a new pluggdapps environment."
     cmd = 'env'
 
     def subparser( self, parser, subparsers ):

@@ -102,6 +102,7 @@ Dynamic plugins :
 from   configparser          import SafeConfigParser
 from   os.path               import dirname, isfile, abspath
 from   copy                  import deepcopy
+import curses
 
 from   pluggdapps.const      import SPECIAL_SECS, URLSEP
 from   pluggdapps.interfaces import IWebApp, IConfigDB
@@ -219,8 +220,9 @@ class Pluggdapps( object ):
         storetype = pa.settings['pluggdapps']['configdb']
         configdb = pa.query_plugin( pa, IConfigDB, storetype )
         configdb.dbinit()
-        [ pa.settings[section].update(d) 
-                for section, d in configdb.config().items() ]
+        dbsett = configdb.config()
+        if dbsett :
+            [ pa.settings[section].update(d) for section, d in dbsett.items() ]
 
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
         initialize( pa ) # Prebooting ends with initialize call.
@@ -232,8 +234,9 @@ class Pluggdapps( object ):
         pa.settings = pa._loadsettings( baseini )
         pa.configdb = configdb
         # Configuration from backend store
-        [ pa.settings[section].update(d) 
-                for section, d in pa.configdb.config().items() ]
+        dbsett = pa.configdb.config()
+        if dbsett :
+            [ pa.settings[section].update(d) for section, d in dbsett.items() ]
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
 
         return pa
@@ -469,7 +472,7 @@ class Pluggdapps( object ):
         if 'file' in output and self.logsett['file'] :
             open( self.logsett['file'], 'a' ).write( formatstr )
         if 'console' in output :
-            print( colorize( formatstr, color='33' ))
+            print( h.colorize( formatstr, color='33' ))
 
     def logwarn( self, formatstr, values=[] ):
         """Use this method to log warning messages. The log messages will
@@ -483,7 +486,7 @@ class Pluggdapps( object ):
         if 'file' in output and self.logsett['file'] :
             open( self.logsett['file'], 'a' ).write( formatstr )
         if 'console' in output :
-            print( colorize( formatstr, color='32' ))
+            print( h.colorize( formatstr, color='32' ))
 
     def logerror( self, formatstr, values=[] ):
         """Use this method to log error messages. The log messages will
@@ -497,7 +500,7 @@ class Pluggdapps( object ):
         if 'file' in output and self.logsett['file'] :
             open( self.logsett['file'], 'a' ).write( formatstr )
         if 'console' in output :
-            print( colorize( formatstr, color='31' ))
+            print( h.colorize( formatstr, color='31' ))
 
 
 
@@ -867,25 +870,34 @@ class Webapps( Pluggdapps ):
             webapp = None
         return uriparts, webapp
 
-    #---- ISettings interface methods
 
-    @classmethod
-    def default_settings( cls ):
-        return _default_settings
+class Consoleapps( Pluggdapps ):
+    """Provides a framework for console based applications using ncurses."""
 
+    stdscr = None
+    """Standard screen"""
 
-def colorize( string, color, bold=False ):
-    """ Color values
-    Black       0;30     Dark Gray     1;30
-    Blue        0;34     Light Blue    1;34
-    Green       0;32     Light Green   1;32
-    Cyan        0;36     Light Cyan    1;36
-    Red         0;31     Light Red     1;31
-    Purple      0;35     Light Purple  1;35
-    Brown       0;33     Yellow        1;33
-    Light Gray  0;37     White         1;37
-    """
-    attr = []
-    attr.append( color )
-    attr.append('1') if bold else None
-    return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
+    def __init__( self, *args, **kwargs ):
+        super().__init__( *args, **kwargs )
+
+    #---- Overridable methods
+
+    def start( self ):
+        """Boot all loaded application. Web applicationss are loaded when the
+        system is booted via boot() call. Apps are booted only when an
+        explicit call is made to this method."""
+        super().start()
+        self.stdscr = curses.initscr()
+        self.stdscr.keypad(1)   # Handle multi-byte special characters
+        curses.noecho()         # Turn off echo
+        curses.cbreak()         # Non-buffered mode
+        curses.start_color()
+
+    def shutdown( self ):
+        """Reverse of start() method."""
+        curses.nocbreak()
+        curses.echo()
+        self.stdscr.keypad(0)
+        curses.endwin()
+        super().shutdown()
+

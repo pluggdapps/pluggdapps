@@ -20,7 +20,7 @@ __all__ = [
     'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
     'reseed_random', 'mergedict', 'multivalue_dict', 'takewhile', 
     'dropwhile', 'print_exc', 'eval_import', 'string_import', 'str2module',
-    'locatefile', 'hitch', 'hitch_method',
+    'locatefile', 'hitch', 'hitch_method', 'colorize',
     # Classes
     'Context',
 ]
@@ -264,6 +264,22 @@ def hitch_method( obj, cls, function, *args, **kwargs ) :
         kwargs.update( kw )
         return function( *(args+a), **kwargs )
     return fnhitched.__get__( obj, cls )
+
+def colorize( string, color, bold=False ):
+    """ Color values
+    Black       0;30     Dark Gray     1;30
+    Blue        0;34     Light Blue    1;34
+    Green       0;32     Light Green   1;32
+    Cyan        0;36     Light Cyan    1;36
+    Red         0;31     Light Red     1;31
+    Purple      0;35     Light Purple  1;35
+    Brown       0;33     Yellow        1;33
+    Light Gray  0;37     White         1;37
+    """
+    attr = []
+    attr.append( color )
+    attr.append('1') if bold else None
+    return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
 
 class ETag( dict ):
     """A dictionary like object to transparently manage context information.

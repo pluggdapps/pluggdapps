@@ -64,9 +64,7 @@ def main():
     # Do a full parsing of command line arguments.
     args = mainparser.parse_args()
 
-    # Handle subcommand
     args.handler( args )
-
 
 if __name__ == '__main__' :
     main()
