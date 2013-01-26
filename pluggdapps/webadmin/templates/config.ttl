@@ -5,29 +5,40 @@
 <html>
   <head>
     <script defer "text/javascript" src="${url_jquery}">
-  <body {padding: 10px}>
-    <div {width: 80%; margin: 0px auto;}>
+    <style>
+      body { 
+        font-size : large; 
+        padding : 10px;
+        width : 50%;
+        margin : 0px auto;
+      }
+      .section td {
+        padding : 5px;
+        border : 1px solid gray;
+      }
 
-      ## Header
-      <div {font-size : x-large}> Platform configuration
-        <select #webapp {border:1px solid gray; background-color : white;
-                         margin-left : 20px;
-                        }>
-          <option value="platform" selected>${'platform-config'}
-          @for netpath in netpaths.keys() :
-            <option value=${netpath}>${netpath}
-      <hr {height : 3px}>
+  <body>
+    ## All configurations.
+    ${plugin_settings( 'platform', settings )}
+    @for netpath, webapp in netpaths.items() :
+      ${plugin_settings( netpath, webapp.appsettings )}
 
-      ## Sections and configurations
-      <div {width : 95%; margin: 0px auto}>
-        <table>
-          <tr>
-            <td {border-right: 2px solid gray; padding : 5px;}>
-              ${sections_column( list( settings.keys() ))}
-            <td {padding: 5px}>
-
-@def sections_column( sections ) :
-  <inptext {border: 1px solid lightBlue;}>
-  @for section in sorted( sections ) :
-    <div {padding: 2px;}>
-      <a {color: blue}> ${section}
+@def plugin_settings( appname, setts ) :
+  <div .{'app-'+appname}>
+    @for section, secsetts in sorted( setts.items() ) :
+      <table .{'sec-'+section}.section>
+        @for key, value in sorted( secsetts.items() ) :
+          @@item = defaults[section]._spec.get( key, \
+                              defaults['DEFAULT']._spec.get( key, {} ))
+          @@fn = lambda x : x if isinstance(x, str) else x.__name__
+          @@types = ', '.join( map( fn, item.get( 'types', [] )))
+          @@fn = lambda x : str(x)
+          @@options = ', '.join( map( fn, item.get('options', [] )))
+          @if item and item['webconfig'] :
+            <tr>
+              <td {vertical-align : top; text-align : right;}>${ key }
+              <td>
+                <div>${ value }
+                <div>${ item['help'] }
+                <div>${ types }
+                <div>${ options }

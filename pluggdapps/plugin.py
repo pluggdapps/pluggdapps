@@ -139,7 +139,6 @@ class PluginMeta( type ):
                 self._settngx = {}
 
                 (args, kwargs) = pa.masterinit( self, *args, **kwargs )
-                # print( self, self._settngx )
 
                 # Call the original plugin's __init__. Avoid calling the
                 # masterinit of the super class.
@@ -494,7 +493,7 @@ class Plugin( PluginBase ):     # Plugin base class implementing ISettings
     # :class:`ISettings` interface methods
     @classmethod
     def default_settings( cls ):
-        return {}
+        return h.ConfigDict()
 
     @classmethod
     def normalize_settings( cls, settings ):

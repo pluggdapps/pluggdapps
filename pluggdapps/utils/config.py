@@ -66,6 +66,12 @@ class ConfigItem( dict ):
         List of optional values that can be used for configuring this 
         parameter. Optional field.
     """
+    def __init__( self, *args, **kwargs ):
+        super().__init__( *args, **kwargs )
+        self['webconfig'] = self.get('webconfig', True)
+        types = self.get('types', tuple())
+        self['types'] = types if isinstance( types, tuple ) else (types,)
+
     @property
     def default( self ):
         return self['default']

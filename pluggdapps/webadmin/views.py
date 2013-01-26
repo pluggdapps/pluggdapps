@@ -4,7 +4,9 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-from   pluggdapps.plugin    import pluginname
+from   pluggdapps.platform  import DEFAULT, pluggdapps_defaultsett,\
+                                   mountloc_defaultsett
+from   pluggdapps.plugin    import pluginname, PluginMeta
 import pluggdapps.utils     as h
 
 def get_json_config( request, c ):
@@ -23,6 +25,12 @@ def get_json_config( request, c ):
 def get_html_config( request, c ):
     response = request.response
     common_url( request, c )
+    c['defaults'] = {}
+    for name, info in PluginMeta._pluginmap.items() :
+        c['defaults'][ h.plugin2sec(name) ] = info['cls'].default_settings()
+        c['defaults'][ 'DEFAULT' ] = DEFAULT()
+        c['defaults'][ 'pluggdapps' ] = pluggdapps_defaultsett()
+        c['defaults'][ 'mountloc' ] = mountloc_defaultsett()
     c['netpaths'] = request.pa.netpaths
     c['settings'] = request.pa.settings
     html = response.render(

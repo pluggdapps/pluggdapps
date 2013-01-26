@@ -178,6 +178,13 @@ def normalize_pluggdapps( sett ):
         sett['logging.output'] = h.parsecsv( sett['logging.output'] )
     return sett
 
+def mountloc_defaultsett():
+    sett = h.ConfigDict()
+    sett.__doc__ = "Mount application settings"
+    return sett
+
+def normalize_mountloc( sett ):
+    return sett
 
 class Pluggdapps( object ):
     """Platform class tying together pluggdapps platform, component
@@ -438,7 +445,7 @@ class Pluggdapps( object ):
         If ``settings`` key-word argument is present, it will be used to
         override default plugin settings. Return a single Plugin instance.
         """
-        from pluggdapps.plugin import PluginMeta, pluginname
+        from pluggdapps.plugin import PluginMeta, pluginname, ISettings
         cls = PluginMeta._implementers[ interface ][ pluginname(name) ]
         return cls( pa, *args, **kwargs )
 

@@ -126,7 +126,7 @@ def run_callback( server, callback, *args, **kwargs ):
     try:
         callback( *args, **kwargs )
     except Exception:
-        server.pa.logdebug( h.print_exc() )
+        server.pa.logerror( h.print_exc() )
 
 class HTTPEPollServer( Plugin ):
     """A non-blocking, single-threaded HTTP Server plugin. `HTTPEPollServer`
@@ -170,7 +170,7 @@ class HTTPEPollServer( Plugin ):
         except KeyboardInterrupt :
             self.stop()
         except :
-            self.pa.logdebug( h.print_exc() )
+            self.pa.logerror( h.print_exc() )
             self.stop()
         self.ioloop.close()
         # Sanity check on unclosed connections
@@ -229,15 +229,15 @@ class HTTPEPollServer( Plugin ):
                 self.connections.append( httpconn )
 
         except ssl.SSLError as err:
-            self.pa.logdebug( h.print_exc() )
+            self.pa.logerror( h.print_exc() )
             httpconn.close() if httpconn else None
 
         except socket.error as err:
-            self.pa.logdebug( h.print_exc() )
+            self.pa.logerror( h.print_exc() )
             httpconn.close() if httpconn else None
 
         except Exception:
-            self.pa.logdebug( h.print_exc() )
+            self.pa.logerror( h.print_exc() )
             httpconn.close() if httpconn else None
 
     def bind_sockets( self ):
@@ -345,7 +345,7 @@ def add_accept_handler( server, sock, callback, ioloop ):
             except socket.error as e:
                 if e.args[0] in (errno.EWOULDBLOCK, errno.EAGAIN):
                     return
-                server.pa.logdebug( h.print_exc() )
+                server.pa.logerror( h.print_exc() )
 
             server.pa.logdebug( "Accepting new connection from %r"%(address,) )
             callback( connection, address )
@@ -519,7 +519,7 @@ class IOLoop( object ):
             self._callbacks = []
             for callback in callbacks :
                 try    : callback()
-                except : self.server.pa.logdebug( h.print_exc() )
+                except : self.server.pa.logerror( h.print_exc() )
 
             # Handle timeouts
             if self._timeouts :
@@ -531,7 +531,7 @@ class IOLoop( object ):
                     elif self._timeouts[0].deadline <= now : # Handle timeout
                         timeout = heapq.heappop( self._timeouts )
                         try    : timeout.callback()
-                        except : self.server.pa.logdebug( h.print_exc() )
+                        except : self.server.pa.logerror( h.print_exc() )
 
                     else : # Adjust poll-timeout
                         seconds = self._timeouts[0].deadline - now
@@ -568,7 +568,7 @@ class IOLoop( object ):
                 fd, events = self._events.popitem()
                 callback = self._handlers.get( fd, None )
                 try    : callback( fd, events ) if callback else None
-                except : self.server.pa.logdebug( h.print_exc() )
+                except : self.server.pa.logerror( h.print_exc() )
 
         # reset the stopped flag so another start/stop pair can be issued
         self._stopped = False
@@ -769,7 +769,7 @@ class HTTPConnection( Plugin ):
                             IHTTPRequest, webapp['IHTTPRequest'],
                             self, method, uri, uriparts, version, headers )
         except :
-            self.pa.logdebug( h.print_exc() )
+            self.pa.logerror( h.print_exc() )
             self.write_error( self.INTERNAL_ERROR )
             return
 
@@ -869,7 +869,7 @@ class HTTPConnection( Plugin ):
     def on_request_headers( self, data ):
         """A request has started. Parse `data` for startline and headers."""
         if self.request != None :
-            self.pa.logdebug( h.print_exc() )
+            self.pa.logerror( h.print_exc() )
             self.write_error( self.INTERNAL_ERROR )
             return
 
@@ -925,7 +925,7 @@ class HTTPConnection( Plugin ):
                             b"\r\n\r\n", self.on_request_headers )
 
         except :
-            self.pa.logdebug( h.print_exc() )
+            self.pa.logerror( h.print_exc() )
             self.write_error( self.BAD_REQUEST )
         return
 
@@ -1283,7 +1283,7 @@ class IOStream( object ):
                 self.server.pa.logwarn(
                     "May be remote end %r closed" % (self.address,) )
             else :
-                self.server.pa.logdebug( h.print_exc() )
+                self.server.pa.logerror( h.print_exc() )
             self.close()
 
         # And see if we've already got the data from this read
@@ -1409,7 +1409,7 @@ class IOStream( object ):
                 self._state = state
                 self.ioloop.update_handler( self.conn.fileno(), self._state )
         except Exception :
-            self.server.pa.logdebug( h.print_exc() )
+            self.server.pa.logerror( h.print_exc() )
             self.close()
 
     def handle_read( self ):
@@ -1427,7 +1427,7 @@ class IOStream( object ):
                 self.server.pa.logwarn(
                     "May be remote end %r closed" % (self.address,) )
             else :
-                self.server.pa.logdebug( h.print_exc() )
+                self.server.pa.logerror( h.print_exc() )
             self.close()
         self.try_read_buffer()
 
@@ -1495,7 +1495,7 @@ class IOStream( object ):
                     self._write_buffer_frozen = True
                     break
                 else:
-                    self.server.pa.logdebug( h.print_exc() )
+                    self.server.pa.logerror( h.print_exc() )
                     self.close()
                     return
 
