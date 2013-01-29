@@ -533,6 +533,15 @@ class Webapps( Pluggdapps ):
     def __init__( self, *args, **kwargs ):
         super().__init__( *args, **kwargs )
 
+    def findapp( self, appname=None, appsec=None ):
+        appsec = appsec or (h.plugin2sec( appname ) if appname else None)
+        if appsec :
+            for asec, netpath, config in self.webapps.keys() :
+                if appsec==asec : return self.webapps[(asec, netpath, config)]
+            else :
+                return None
+        return None
+
     #---- Overridable methods
 
     @classmethod

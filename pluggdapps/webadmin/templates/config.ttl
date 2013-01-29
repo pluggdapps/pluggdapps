@@ -4,7 +4,7 @@
 
 <html>
   <head>
-    <script defer "text/javascript" src="${url_jquery}">
+    <script "text/javascript" src="${url_jquery}">
     <style>
       body { 
         font-size : large; 

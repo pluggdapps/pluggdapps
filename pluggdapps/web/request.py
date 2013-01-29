@@ -43,6 +43,7 @@ class HTTPRequest( Plugin ):
         self.chunks = []
         self.trailers = {}
         self.cookies = {}
+
         # Only in case of POST and PUT method.
         self.postparams = {}
         self.multiparts = {}
@@ -50,12 +51,14 @@ class HTTPRequest( Plugin ):
 
         # Initialize
         self.params = {}
-        self.getparams = self.uriparts['query']
+        self.getparams = { h.strof(k) : list( map( h.strof, vs )) 
+                           for k,vs in self.uriparts['query'].items() }
         self.params.update( self.getparams )
 
         self.content_type = \
                 h.parse_content_type( headers.get( 'content_type', None ))
 
+        self.view = None
         self.receivedat = time.time()
         self.finishedat = None
 
@@ -117,6 +120,8 @@ class HTTPRequest( Plugin ):
         if self.method in ( b'POST', b'PUT' ) :
             self.postparams, self.multiparts = \
                     h.parse_formbody( self.content_type, self.body )
+            self.postparams = { h.strof(k) : list( map( h.strof, vs )) 
+                                for k,vs in self.postparams.items() }
             [ self.params.setdefault( name, [] ).extend( value )
               for name, value in self.postparams.items() ]
             [ self.params.setdefault( name, [] ).extend( value )

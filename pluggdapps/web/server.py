@@ -585,12 +585,15 @@ class IOLoop( object ):
         """
         # Close listening sockets and remove them from IOLoop
         self.server.pa.logdebug( "Stopping poll loop ..." )
-        self.remove_handler( self._waker.fileno() )
 
-        [ self.remove_handler( fd ) for fd in list(self._handlers.keys()) ]
+        for fd in list(self._handlers.keys()) :
+            # Don't remove the waker, should  be done in close() method.
+            if fd is self._waker.fileno() : continue
+            self.remove_handler( fd ) 
 
         self._running = False
         self._stopped = True
+
         self._waker.wake()  # Wake the ioloop
 
     def close( self ):
@@ -602,9 +605,11 @@ class IOLoop( object ):
         call `IOLoop.close()`. Therefore the call to `close` will usually 
         appear just after the call to `start` rather than near the call to 
         `stop`. """
+        # Waker is only removed here. Don't change this sequence.
+        self.remove_handler( self._waker.fileno() )
+
         self._waker.close()
         self._evpoll.close()
-
         # Remove all the references to other objects, so that it will be
         # garbage collected.
         self._waker = self._evpoll = self.server = None
@@ -790,8 +795,7 @@ class HTTPConnection( Plugin ):
         """
         response = getattr( self.request, 'response', None )
         if self.request == None :
-            self.pa.logerror( "Request is not yet received." )
-            return
+            raise Exception( "Request is not yet received." )
 
         if self.stream and self.stream.closed() :
             self.pa.logwarn("Cannot write to closed stream %r"%(self.address,))
@@ -1067,8 +1071,7 @@ class Waker( object ):
         return self.reader.fileno()
 
     def wake(self):
-        try           : self.writer.write( b'x' )
-        except IOError: pass
+        self.writer.write( b'wake up epoll' )
 
     def consume(self):
         try :

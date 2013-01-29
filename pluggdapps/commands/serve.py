@@ -88,18 +88,24 @@ class CommandServe( Singleton ):
 
         Typically used in development mode.
         """
+        server = self.query_plugin( IHTTPServer, self['IHTTPServer'] )
         if args.mreload :
             # Launch a thread to poll and then start serving http
             t = threading.Thread( target=self.pollthread, 
-                                  name='Reloader', args=(args,) )
+                                  name='Reloader', args=(args, server) )
             t.setDaemon(True)
             t.start()
 
         time.sleep(0.5) # To allow the poll-thread to execute first.
         self.pa.start() # Start pluggdapps
-        server = self.query_plugin( IHTTPServer, self['IHTTPServer'] )
         server.start()  # Blocking call
 
+        # use os._exit() here and not sys.exit() since within a
+        # thread sys.exit() just closes the given thread and
+        # won't kill the process; note os._exit does not call
+        # any atexit callbacks, nor does it do finally blocks,
+        # flush open files, etc.  In otherwords, it is rude.
+        os._exit(3)
 
     def fork_and_monitor( self, args ):
         """Install the reloading monitor."""
@@ -124,17 +130,12 @@ class CommandServe( Singleton ):
                     sys.exit(0)
                     
 
-    def pollthread( self, args ):
+    def pollthread( self, args, server ):
         """Thread (daemon) to monitor for changing files."""
         self.pa.logdebug( "Periodic poll started for module reloader ..." )
         while True:
             if self.pollthread_checkfiles( args ) == True :
-                # use os._exit() here and not sys.exit() since within a
-                # thread sys.exit() just closes the given thread and
-                # won't kill the process; note os._exit does not call
-                # any atexit callbacks, nor does it do finally blocks,
-                # flush open files, etc.  In otherwords, it is rude.
-                os._exit(3)
+                server.stop()
                 break
             time.sleep( self['reload.poll_interval'] )
 

@@ -27,7 +27,6 @@ Python equivalent for erlang term.
 from   struct     import pack, unpack
 from   array      import array
 from   zlib       import decompressobj, compress
-from   datetime   import datetime
 import builtins
 
 from   pluggdapps.erl.terms import *

@@ -8,7 +8,8 @@ from pluggdapps.plugin import Interface
 
 __all__ = [
     'IHTTPRouter', 'IHTTPResource', 'IHTTPRequest', 
-    'IHTTPResponse', 'IHTTPView', 'IHTTPRenderer', 'IHTTPCookie', 
+    'IHTTPResponse', 'IHTTPView', 'IHTTPRenderer', 'IHTTPCookie',
+    'IHTTPSession', 'IHTTPWebDebug',
 ]
 
 class IHTTPRouter( Interface ):
@@ -196,12 +197,14 @@ class IHTTPRequest( Interface ):
     getparams = {}
     """GET arguments are available in the params property, which maps
     parameter names to lists of values (to support multiple values for
-    individual names). Names and values are are of type `str`."""
+    individual names). Names and values are are of type `str`, where,
+    ``response.charset`` will be used to decode the byte values."""
 
     postparams = {}
     """POST arguments are available in the params property, which maps
     parameter names to lists of values (to support multiple values for
-    individual names). Names and values are of type `str`."""
+    individual names). Names and values are are of type `str`, where,
+    ``response.charset`` will be used to decode the byte values."""
 
     multiparts = {}
     """POST arguments in multipart format (like uploaded file content) are 
@@ -210,7 +213,8 @@ class IHTTPRequest( Interface ):
     params = {}
     """Combined arguments of GET/POST, which maps parameter names to lists of
     values (to support multiple values for individual names). Names and values
-    are of type `str`."""
+    are are of type `str`, where, ``response.charset`` will be used to decode
+    the byte values."""
 
     files = {}
     """File uploads are available in this attribute as a dictionary of name 
@@ -702,3 +706,10 @@ class IHTTPContentNegotiation( Interface ):
     """
 
     pass
+
+
+class IHTTPWebDebug( Interface ):
+    """Catch exceptions in application code and handle them. Typically the
+    exceptions can be formated and logged and/or sent as email and/or rendered
+    as html page in debug mode and optionally provide interactive debugging
+    via browser."""

@@ -342,6 +342,8 @@ def parse_formbody( content_type, body ):
     """
 
     arguments, multiparts = {}, {}
+    if not( content_type and body ) : return arguments, multiparts
+
     if content_type[:2] == ( b"application", b"x-www-form-urlencoded" ) :
         for name, values in parse_qs( body ).items() :
             arguments.setdefault( name, [] ).extend( filter( None, values ))
@@ -430,6 +432,7 @@ def parse_multipart( content_type, data ):
             value = value[:-2] # Remove CRLF
         multiparts.append( (headers, value) )
     return multiparts
+
 
 #---- Logic to parse HTTP headers
 
@@ -618,7 +621,8 @@ def http_todate( datestr ):
     return strptime( datestr, rfc1123_format )
 
 def http_fromdate( dtime, tzinfo=None ):
-    """Convert local-timestamp  to RFC 1123 UTC date format. Return string."""
+    """Convert timestamp adjusting it to GMT using RFC 1123 date format. 
+    Return string."""
     return time.strftime( rfc1123_format, time.gmtime( dtime ))[:-3] + 'GMT'
 
 def parse_transfer_encoding( value=b'' ):

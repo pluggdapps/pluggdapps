@@ -205,6 +205,8 @@ class HTTPResponse( Plugin ):
     _renderers = {
         '.ttl' : 'TTLCompiler',
     }
+    _renderer_plugins = {
+    }
     def render( self, *args, **kwargs ):
         """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.render`
         interface method.
@@ -230,10 +232,18 @@ class HTTPResponse( Plugin ):
             tfile = kwargs.get( 'file', '' )
             _, ext = splitext( tfile )
             renderer = self._renderers.get( ext, None ) if ext else None
-        renderer = \
-            self.query_plugin( IHTTPRenderer, renderer ) if renderer else None
-        if renderer :
-            return renderer.render( *args, **kwargs )
+
+        if renderer in self._renderer_plugins :
+            plugin = self._renderer_plugins[ renderer ]
+        elif renderer :
+            plugin = self.query_plugin( IHTTPRenderer, renderer )
+        else :
+            plugin = None
+
+        if plugin :
+            self.media_type = 'text/html'
+            self._renderer_plugins.setdefault( renderer, plugin )
+            return plugin.render( *args, **kwargs )
         else :
             raise Exception('Unknown renderer')
 

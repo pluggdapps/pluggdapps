@@ -28,8 +28,14 @@ class WebAdminRouter( MatchRouter ):
                        rootloc='pluggdapps:webadmin/static',
                        view='staticview' )
 
-        self.add_view( 'htmlconfig1', '/',
-                       method='GET',
+        self.add_view( 'index', '/',
+                       method=b'GET',
+                       content_coding='gzip',
+                       view=get_index,
+                     )
+
+        self.add_view( 'htmlconfig1', '/config/{netpath}/{section}',
+                       method=b'GET',
                        media_type='text/html',
                        content_coding='gzip',
                        view=get_html_config,
@@ -50,6 +56,10 @@ class WebAdminRouter( MatchRouter ):
                        media_type='application/json',
                        view=get_json_config
                      )
+
+        self.add_view( 'framedebug', '/debug/frame/{frameid}',
+                       method=b'POST',
+                       view=frame_debug )
 
 
     #---- ISettings interface methods

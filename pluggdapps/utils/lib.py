@@ -9,8 +9,7 @@
 # TODO :
 #   * Improve function asbool() implementation.
 
-import sys, os, fcntl, time, multiprocessing, random, io, traceback, hashlib
-import datetime as dt
+import sys, os, fcntl, multiprocessing, random, io, traceback, hashlib
 from   os.path  import isfile, join
 from   binascii import hexlify
 
@@ -20,9 +19,9 @@ __all__ = [
     'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
     'reseed_random', 'mergedict', 'multivalue_dict', 'takewhile', 
     'dropwhile', 'print_exc', 'eval_import', 'string_import', 'str2module',
-    'locatefile', 'hitch', 'hitch_method', 'colorize',
+    'locatefile', 'hitch', 'hitch_method', 'colorize', 'strof',
     # Classes
-    'Context',
+    'Context', 'Bunch',
 ]
 
 ver_int = int( str(sys.version_info[0]) + str(sys.version_info[1]) )
@@ -281,6 +280,15 @@ def colorize( string, color, bold=False ):
     attr.append('1') if bold else None
     return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
 
+def strof( o ):
+    """``o`` can be either a string or bytes or other object convertible to
+    string. In case of bytes, it will be decoded using 'utf-8'. In case of
+    None, None will be returned."""
+    if isinstance(o, str) : return o
+    elif isinstance(o, bytes) : return o.decode('utf-8')
+    elif o == None : return None
+    else : return str(o)
+
 class ETag( dict ):
     """A dictionary like object to transparently manage context information.
     Instead of directly accessing context object to update key,value pairs,
@@ -364,3 +372,19 @@ class Context( dict ):
     def __init__( self, *args, **kwargs ):
         super().__init__( *args, **kwargs )
         self.etag = ETag( self )
+
+
+class Bunch( object ):
+    """A generic container"""
+
+    def __init__( self, **attrs ):
+        [ setattr(self, name, value) for name, value in attrs.items() ]
+
+    def __repr__( self ):
+        name = '<%s ' % self.__class__.__name__
+        name += ' '.join(['%s=%r' % (name, str(value)[:30])
+                          for name, value in self.__dict__.items()
+                          if not name.startswith('_')])
+        return name + '>'
+
+

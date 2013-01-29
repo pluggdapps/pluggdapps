@@ -1,0 +1,59 @@
+@doctype html
+
+## A single page application to do web based platform configuration.
+
+<html>
+  <head>
+    <script "text/javascript" src="${url_jquery}">
+    <script text/javascript async>
+      $(document).ready( function() {
+        // Handle click event on line-text
+        $('.frame').each( function(index) {
+          $('.linetext', this).click( function(e) {
+            $('.shell', this.parentNode).css( 'display', 'block' );
+          });
+        });
+        // Handle expression evaluation.
+        $('.frame form').each( function(index) {
+          $(this).submit( function(e) {
+            var posting = $.post(
+                            $(this).attr('action'),
+                            { expression : $('input', this).val() }
+                          );
+            posting.done( function(data) {
+              $('pre', e.target.parentNode).html( data );
+            });
+            posting.fail( function(xhr) {
+              $('pre', e.target.parentNode).html(
+                            xhr.status + ' ' + xhr.statusText );
+            });
+            return false;
+          })
+        });
+      });
+
+  <body {width : 80%; margin : 0px auto}>
+    <div {font-size : xx-large}>
+      <span {font-weight : bold}>${exception_type} : 
+      <span {font-size : normal}>${exception_value}
+    <div {font-size : small}> ${date}
+    <hr>
+    @for frame in frames :
+      ${display_frame(frame)}
+      <hr>
+
+@def display_frame( frame ):
+  <div #{frameid} .frame {margin : 5px 0px}>
+    <span {font-weight : bold}>File : 
+    <span {font-style: italic; color : blue}}>${frame.filename},
+    <span>line 
+    <span {color: red}>${frame.lineno},
+    <span>in 
+    <span {color: red}>${frame.name}
+    <div {padding:5px} >
+      <div .linetext {cursor : pointer; color: green}>${frame.linetext}
+      <div .shell {display : none}>
+        <form "${frame.url_eval}">
+          <inptext :expression size="100">
+          <inpsubmit>
+        <pre {border : 1px solid brown; padding: 3px;}>

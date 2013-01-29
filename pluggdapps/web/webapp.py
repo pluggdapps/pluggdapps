@@ -5,13 +5,14 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 from   urllib.parse import urljoin
+import sys
 
 from   pluggdapps.const          import URLSEP
 from   pluggdapps.plugin         import implements, Plugin, plugincall
 from   pluggdapps.interfaces     import IWebApp
 from   pluggdapps.web.interfaces import IHTTPRouter,IHTTPCookie,IHTTPResponse, \
                                         IHTTPSession, IHTTPInBound, \
-                                        IHTTPOutBound
+                                        IHTTPOutBound, IHTTPWebDebug
 import pluggdapps.utils          as h
 
 _default_settings = h.ConfigDict()
@@ -78,6 +79,14 @@ _default_settings['IHTTPOutBound'] = {
                 ":class:`IHTTPOutBound` plugin. Transforms will be applied in "
                 "specified order."
 }
+_default_settings['IHTTPWebDebug']  = {
+    'default' : 'CatchAndDebug',
+    'types'   : (str,),
+    'help'    : "Name of the plugin implementing :class:`IHTTPWebDebug` "
+                "interface spec. Will be used to catch application exception "
+                "and render them on browser. Provides browser based debug "
+                "interface."
+}
 
 
 class WebApp( Plugin ):
@@ -92,6 +101,7 @@ class WebApp( Plugin ):
         """:meth:`pluggdapps.interfaces.IWebApps.startapp` interface method."""
         self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
         self.cookie = self.query_plugin( IHTTPCookie, self['IHTTPCookie'] )
+        self.webdebug = self.query_plugin(IHTTPWebDebug, self['IHTTPWebDebug'])
         self.in_transformers = [
                 self.query_plugin( IHTTPInBound, name )
                 for name in self['IHTTPInBound'] ]
@@ -103,17 +113,30 @@ class WebApp( Plugin ):
     def dorequest( self, request, body=None, chunk=None, trailers=None ):
         """:meth:`pluggdapps.interfaces.IWebApps.dorequest` interface method."""
         self.pa.logdebug( 
-            "[%s] %s %s" % (
-                    request.method, request.uri, request.httpconn.address )
-        )
-        # Initialize framework attributes
-        request.router = self.router
-        request.cookie = self.cookie
-        # TODO : Initialize session attribute here.
-        request.response = response = \
-            self.query_plugin( IHTTPResponse, self['IHTTPResponse'], request )
-        request.handle( body=body, chunk=chunk, trailers=trailers )
-        self.router.route( request )
+          "[%s] %s %s" % (request.method,request.uri,request.httpconn.address))
+
+        try :
+            # Initialize framework attributes
+            request.router = self.router
+            request.cookie = self.cookie
+            # TODO : Initialize session attribute here.
+            request.response = response = \
+              self.query_plugin( IHTTPResponse, self['IHTTPResponse'], request )
+            request.handle( body=body, chunk=chunk, trailers=trailers )
+            self.router.route( request )
+        except :
+            self.pa.logerror( h.print_exc() )
+            response.set_header( 'content_type', b'text/html' )
+            if self['debug'] :
+                data = self.webdebug.handle_exc( request, *sys.exc_info() )
+                response.set_status( b'200' )
+            else :
+                response.set_status( b'500' )
+                data = ( "An error occurred.  See the error logs for more "
+                         "information. (Turn debug on to display exception "
+                         "reports here)" )
+            response.write( data )
+            response.flush( finishing=True )
 
     def dochunk( self, request, chunk=None, trailers=None ):
         """:meth:`pluggdapps.interfaces.IWebApps.dochunk` interface method."""

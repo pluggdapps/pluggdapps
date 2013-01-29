@@ -145,7 +145,7 @@ class MatchRouter( Plugin ):
 
         view['resource'] = kwargs.pop( 'resource', None )
         view['attr'] = kwargs.pop( 'attr', None )
-        view['method'] = kwargs.pop( 'method', None )
+        view['method'] = h.strof( kwargs.pop( 'method', None ))
         # Content Negotiation attributes
         view['media_type']=kwargs.pop('media_type', 'application/octet-stream')
         view['content_coding'] = kwargs.pop('content_coding',CONTENT_IDENTITY)
@@ -168,19 +168,23 @@ class MatchRouter( Plugin ):
         """
         resp = request.response
         c = resp.context
-        variants = []
+        matches = []
+        # Match urls.
         for name, viewd in self.viewlist :
-            path = request.uriparts['path']
-            m = viewd['compiled_pattern'].match( path )
-            if m and self.match_predicates( request, viewd ) :
-                variants.append( (name, viewd, m) )
-
+            m = viewd['compiled_pattern'].match( request.uriparts['path'] )
+            if m :
+                matches.append( (m, viewd) )
+            
+        # Match predicates and filter out variants.
+        variants = [
+            (name, vd, m)
+            for m, vd in matches if m and self.match_predicates(request, vd)
+        ]
         if variants and self['negotiate_content'] :
             variant = self.negotiate( request, variants )
         elif variants :
             variant = variants[0]
         else :
-            request.view = self['defaultview']
             variant = None
 
         if variant :
@@ -208,9 +212,13 @@ class MatchRouter( Plugin ):
             etag = c.etag.hashout( prefix='resp-' )
             c.setdefault( 'etag', etag ) if etag else None
             c.etag.clear()
-        else :
+
+        elif matches :
             from pluggdapps.web.views import HTTPNotAcceptable
             request.view = HTTPNotAcceptable
+
+        else :
+            request.view = self['defaultview']
 
         if callable( request.view ) :   # Call the view-callable
             request.view( request, c )
@@ -220,7 +228,7 @@ class MatchRouter( Plugin ):
         method."""
         x = True
         if viewd['method'] != None :
-            x = x and viewd['method'] == request.method.decode('utf-8')
+            x = x and viewd['method'] == h.strof( request.method )
         return x
 
     def negotiate( self, request, variants ):
