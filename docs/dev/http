@@ -4,7 +4,6 @@ Tolerant application
    However, we recommend that applications, when parsing such headers,
    recognize a single LF as a line terminator and ignore the leading CR.
 
-
 Date encodings
 
    HTTP/1.1 clients and caches SHOULD assume that an RFC-850 date

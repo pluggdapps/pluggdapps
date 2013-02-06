@@ -1,6 +1,0 @@
-* `pluggdapps` platform is a design to host multiple application on a single
-  environment. Because of this, multiprocessing module can be used as opposed
-  to threading module.
-
-* To achieve good performance, right now only Python 2.6+ on Linux 2.5 is 
-  supported.
