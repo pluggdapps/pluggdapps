@@ -8,7 +8,7 @@ from   urllib.parse import urljoin
 import sys
 
 from   pluggdapps.const          import URLSEP
-from   pluggdapps.plugin         import implements, Plugin, plugincall
+from   pluggdapps.plugin         import implements, Plugin
 from   pluggdapps.interfaces     import IWebApp
 from   pluggdapps.web.interfaces import IHTTPRouter,IHTTPCookie,IHTTPResponse, \
                                         IHTTPSession, IHTTPInBound, \

@@ -27,7 +27,7 @@ from   os.path import isfile
 
 import pluggdapps.utils          as h
 from   pluggdapps.const          import URLSEP, CONTENT_IDENTITY
-from   pluggdapps.plugin         import Plugin, implements, plugincall
+from   pluggdapps.plugin         import Plugin, implements, isplugin
 from   pluggdapps.web.interfaces import IHTTPRouter, IHTTPResource, \
                                         IHTTPView, IHTTPResponse
 # Notes :
@@ -73,10 +73,7 @@ class MatchRouter( Plugin ):
         method."""
         self.views = {}
         self.viewlist = []
-        self['defaultview'] = plugincall(
-            self['defaultview'],
-            lambda:self.query_plugin(IHTTPView, self['defaultview'], name, None)
-        )
+        self['defaultview'] = h.string_import( self['defaultview'] )
 
     def add_view( self, name, pattern, **kwargs ):
         """Add a router mapping rule.
@@ -156,7 +153,7 @@ class MatchRouter( Plugin ):
         view.update( kwargs )
 
         view['pattern'] = pattern
-        regex, tmpl, redict = self._compile_pattern( pattern )
+        regex, tmpl, redict = self.compile_pattern( pattern )
         view['compiled_pattern'] = re.compile( regex )
         view['path_template'] = tmpl
         view['match_segments'] = redict
@@ -168,24 +165,11 @@ class MatchRouter( Plugin ):
         """
         resp = request.response
         c = resp.context
-        matches = []
-        # Match urls.
-        for name, viewd in self.viewlist :
-            m = viewd['compiled_pattern'].match( request.uriparts['path'] )
-            if m :
-                matches.append( (m, viewd) )
-            
-        # Match predicates and filter out variants.
-        variants = [
-            (name, vd, m)
-            for m, vd in matches if m and self.match_predicates(request, vd)
-        ]
-        if variants and self['negotiate_content'] :
-            variant = self.negotiate( request, variants )
-        elif variants :
-            variant = variants[0]
-        else :
-            variant = None
+
+        # Three phases of request resolution to view-callable
+        matches = self.match_url( request, self.viewlist )
+        variants = self.match_predicates( request, matches )
+        variant = self.negotiate( request, variants )
 
         if variant :
             name, viewd, m = variant
@@ -194,24 +178,17 @@ class MatchRouter( Plugin ):
             resp.language = viewd['language']
             resp.content_coding = viewd['content_coding']
             request.matchdict = m.groupdict()
-            vobj = plugincall(
-             viewd['view'], 
-             lambda:self.query_plugin(IHTTPView, viewd['view'], name, viewd)
-            )
-            request.view = getattr( vobj, viewd['attr'] ) \
-                                if viewd['attr'] else vobj
+
             # Call IHTTPResource plugin configured for this view callable.
-            resource = viewd['resource']
-            if resource :
-                resource = plugincall(
-                    resource,
-                    lambda : self.query_plugin(IHTTPResource,resource) )
-                self.resource = resource
-                resource( request, c )
+            resource = self.resourceof( request, viewd )
+            resource( request, c ) if resource else None
+
             # If etag is available, compute and subsequently clear them.
             etag = c.etag.hashout( prefix='resp-' )
             c.setdefault( 'etag', etag ) if etag else None
             c.etag.clear()
+
+            request.view = self.viewof( request, name, viewd )
 
         elif matches :
             from pluggdapps.web.views import HTTPNotAcceptable
@@ -221,38 +198,8 @@ class MatchRouter( Plugin ):
             request.view = self['defaultview']
 
         if callable( request.view ) :   # Call the view-callable
+            c['h'] = h
             request.view( request, c )
-
-    def match_predicates( self, request, viewd ):
-        """:meth:`pluggdapps.web.interfaces.IHTTPRouter.negotiate` interface
-        method."""
-        x = True
-        if viewd['method'] != None :
-            x = x and viewd['method'] == h.strof( request.method )
-        return x
-
-    def negotiate( self, request, variants ):
-        """:meth:`pluggdapps.web.interfaces.IHTTPRouter.negotiate` interface
-        method."""
-        negot_tbl = self._compile_client_negotiation( request )
-        fn = lambda x : (x,)
-        variants_ = []
-        for name, viewd, m in variants :
-            typ, subtype = viewd['media_type'].split('/', 1)
-            keys = [ (viewd['media_type'],), ('%s/*'%typ,), ('*/*',) ]
-            keys = [ x+y
-                for x in keys 
-                for y in map( fn, [viewd['charset'], '*']) ]
-            keys = [ x+y
-                for x in keys 
-                for y in map(fn, [viewd['content_coding'], CONTENT_IDENTITY]) ]
-            keys = [ x+y
-                for x in keys 
-                for y in map( fn, [viewd['language'], '*']) ]
-            q = max( negot_tbl.get( k, 0.0 ) for k in keys )
-            variants_.append( (name, viewd, m, q) ) if q else None
-        variants_ = sorted( variants_, key=lambda x : x[3], reverse=True )
-        return variants_[0][:3] if variants_ else None
 
     def urlpath( self, request, name, **matchdict ):
         """:meth:`pluggdapps.web.interfaces.IHTTPRouter.route` interface
@@ -284,7 +231,88 @@ class MatchRouter( Plugin ):
 
     #---- Internal methods.
 
-    def _compile_pattern( self, pattern ):
+    def match_url( self, request, viewlist ):
+        """Match view pattern with request url and filter out views with
+        matching urls."""
+        matches = []
+        for name, viewd in viewlist :  # Match urls.
+            m = viewd['compiled_pattern'].match( request.uriparts['path'] )
+            matches.append( (name, viewd, m) ) if m else None
+        return matches
+
+    def match_predicates( self, request, matches ):
+        """Filter matching views, whose pattern matches with request-url,
+        based on view-predicates"""
+        variants = []
+        for name, viewd, m in matches :
+            x = True
+            if viewd['method'] != None :
+                x = x and viewd['method'] == h.strof( request.method )
+            variants.append( (name, viewd, m) ) if x else None
+
+        return variants
+
+    def negotiate( self, request, variants ):
+        """When the router finds that a resource (typically indicated by the
+        request-URL) is multiple representations, where each representation is
+        called a variant, it has to pick the best representation negotiated by
+        the client. Negotiation is handled through attributes like media-type,
+        language, charset and content-encoding. Returns the best matching
+        variant from ``variants``. 
+
+        ``request``,
+            Plugin instance implementing :class:`IHTTPRequest` interface.
+
+        Return matching variant.
+        """
+        if self['negotiate_content'] == False :
+            return variants[0] if variants else None
+
+        negot_tbl = self.compile_client_negotiation( request )
+
+        fn = lambda x : (x,)
+        variants_ = []
+        for name, viewd, m in variants :
+            typ, subtype = viewd['media_type'].split('/', 1)
+            keys = [ (viewd['media_type'],), ('%s/*'%typ,), ('*/*',) ]
+            keys = [ x+y
+                for x in keys 
+                for y in map( fn, [viewd['charset'], '*']) ]
+            keys = [ x+y
+                for x in keys 
+                for y in map(fn, [viewd['content_coding'], CONTENT_IDENTITY]) ]
+            keys = [ x+y
+                for x in keys 
+                for y in map( fn, [viewd['language'], '*']) ]
+            q = max( negot_tbl.get( k, 0.0 ) for k in keys )
+            variants_.append( (name, viewd, m, q) ) if q else None
+        variants_ = sorted( variants_, key=lambda x : x[3], reverse=True )
+        return variants_[0][:3] if variants_ else None
+
+    def viewof( self, request, name, viewd ):
+        """For resolved view ``viewd``, fetch the view-callable."""
+        v = viewd['view']
+        self.pa.logdebug( "%r view callable: %r " % (request.uri, v) )
+        if isinstance( v, str ) and isplugin(v) :
+            view = self.query_plugin( IHTTPView, v, name, viewd )
+        elif isinstance( v, str ):
+            view = h.string_import( v )
+        else :
+            view = v
+        return getattr( view, viewd['attr'] ) if viewd['attr'] else view
+
+    def resourceof( self, request, viewd ):
+        """For resolved view ``viewd``, fetch the resource-callable."""
+        res = viewd['resource']
+        self.pa.logdebug( "%r resource callable: %r " % (request.uri, res) )
+        if isinstance( res, str ) and isplugin( res ) :
+            return self.query_plugin( IHTTPResource, res )
+        elif isinstance( res, str ) :
+            return h.string_import( res )
+        else :
+            return res
+
+    def compile_pattern( self, pattern ):
         """`pattern` is URL routing pattern.
 
         This method compiles the pattern in three different ways and returns
@@ -338,7 +366,7 @@ class MatchRouter( Plugin ):
         regex += '$'
         return regex, tmpl, redict
 
-    def _compile_client_negotiation( self, request ):
+    def compile_client_negotiation( self, request ):
         hs = [ request.headers.get( 'accept', b'' ),
                request.headers.get( 'accept_charset', b'' ),
                request.headers.get( 'accept_encoding', b'' ),

@@ -25,15 +25,15 @@ def mainoptions():
     # setup main script arguments
     description = "Pluggdapps command line script."
     mainparser = ArgumentParser( description=description )
-    mainparser.add_argument( '-m', dest='monitor', 
+    mainparser.add_argument( '-m', dest='monitor',
                              action='store_true', default=False,
-                             help="Start monitor process" )
+                             help="Start monitor process." )
     mainparser.add_argument( '-c', dest='config', 
                              default=DEFAULT_INI,
-                             help="specify config file(s)" )
+                             help="Specify config file." )
     mainparser.add_argument( '-w', dest='webapps',
                              action='store_true', default=False,
-                             help="load with web-framework" )
+                             help="Load platform with web-framework" )
     return mainparser
 
 def main():

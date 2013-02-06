@@ -5,6 +5,7 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 import os, fcntl, signal, sys, time, threading, imp, signal
+from   os.path  import abspath
 
 from   pluggdapps.plugin        import implements, ISettings, Singleton, \
                                        pluginname
@@ -142,13 +143,15 @@ class CommandServe( Singleton ):
     def pollthread_checkfiles( self, args ):
         """Check whether any of the module files have modified after loading
         this platform. If so, return True else False."""
-        files = [args.config] if args.config else []
+        from pluggdapps import papackages
+
+
         modfiles = {}
         for mod in sys.modules.values() :
             if hasattr( mod, '__file__' ) :
                 modfiles.setdefault( getattr(mod, '__file__'), mod )
 
-        for filename in list( modfiles.keys() ) + files :
+        for filename in list( modfiles.keys() ) + self.pa.monitorfiles() :
             stat = os.stat(filename)
             mtime = stat.st_mtime if stat else 0
 

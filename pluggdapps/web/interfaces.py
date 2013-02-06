@@ -49,19 +49,6 @@ class IHTTPRouter( Interface ):
             Context dictionary for response, and templates.
         """
 
-    def negotiate( request, *args, **kwargs ):
-        """When the router finds that a resource (typically indicated by the
-        request-URL) is multiple representations, each representation is
-        called a variant, it has to pick the best representation negotiated by
-        the client. Negotiation is handled through attributes like media-type,
-        language, charset and content-encoding. Returns the best matching
-        variant from ``variants``. ``args`` and ``kwargs`` are specific to
-        plugin implementation.
-
-        ``request``,
-            Plugin instance implementing :class:`IHTTPRequest` interface.
-        """
-
     def urlpath( request, *args, **kwargs ):
         """Generate path, including query and fragment (aka anchor), for
         `request` using arguments, using ``args`` and ``kwargs``, to learn

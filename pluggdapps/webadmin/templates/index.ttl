@@ -7,5 +7,5 @@
     <script "text/javascript" src="${url_jquery}">
   <body {font-size : x-large; width:70%; margin: 0px auto; 
          text-align: center; padding: 10px;}>
-    <a "${url_config_platform}"> Platform configuration
+    <a "${url_defaultconfig}"> Platform configuration
     

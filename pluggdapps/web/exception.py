@@ -11,6 +11,7 @@
 
 import sys, traceback, linecache, cgi, time
 from   hashlib              import md5
+from   os.path              import isfile
 
 import pluggdapps.utils         as h
 from   pluggdapps.plugin        import Plugin, implements
@@ -223,11 +224,17 @@ class CatchAndDebug( Plugin ):
             self.pa.logwarn(
                 "Frame %s has an invalid locals(): %r" % (name, locals))
             locals = {}
+
+        try :
+            linetext = open( code.co_filename ).readlines()[tb.tb_lineno-1]
+        except :
+            linetext = ''
+
         data = {
             'modname'   : globals.get('__name__', None),
             'filename'  : code.co_filename,
             'lineno'    : tb.tb_lineno,
-            'linetext'  : open( code.co_filename ).readlines()[tb.tb_lineno-1],
+            'linetext'  : linetext,
             'revision'  : self.getRevision(globals),
             'name'      : name,
             'tbid'      : id(tb),

@@ -4,13 +4,41 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""Collection of interface specifications used by pluggdapps platform."""
+"""Collection of some basic set of interface specifications used by pluggdapps
+platform."""
 
 import socket
 
-from pluggdapps.plugin import Interface
+from   pluggdapps.plugin import Interface
 
-__all__ = [ 'ICommand', 'IWebApp', 'IHTTPServer', 'IHTTPConnection' ]
+__all__ = [
+    'IConfigDB', 'ICommand', 'IHTTPServer', 'IHTTPConnection', 'IWebApp',
+    'IScaffold',
+    
+]
+
+class IConfigDB( Interface ):
+    """Interface specification to persist platform configuration to a backend
+    data-store or database."""
+
+    def connect():
+        """Do necessary initialization to connect with data-store."""
+
+    def dbinit( *args, **kwargs ):
+        """If datastore does not exist, create one. Also intialize
+        configuration tables for each mounted application under
+        [mountloc] section. Expect this method to be called when ever platform
+        starts-up. For more information refer to corresponding plugin's
+        documentation
+        """
+
+    def config( **kwargs ):
+        """Get or set configuration parameter for platform. For more
+        information refer to corresponding plugin's documentation."""
+
+    def close():
+        """Reverse of :meth:`connect`."""
+
 
 class ICommand( Interface ):
     """Handle sub-commands issued from command line script. Plugins are
@@ -18,7 +46,7 @@ class ICommand( Interface ):
     ``arguments`` and handle the sub-commands."""
 
     description = ''
-    """Text to display --help."""
+    """A short description about the plugin implementing this specification."""
 
     usage = ''
     """String describing the program usage"""
@@ -28,25 +56,30 @@ class ICommand( Interface ):
 
     def subparser( parser, subparsers ):
         """Use ``subparsers`` to create a sub-command parser. The `subparsers`
-        object would have been created using ArgumentParser object ``parser``.
+        object would have been created, by the main script, using 
+        ArgumentParser object ``parser``.
         """
 
     def handle( args ):
-        """While :meth:`subparser` is invoked, the sub-command plugin can 
-        use set_default() method on subparser to set `handler` attribute to
-        this method so that this handler will automatically be invoked if the
-        sub-command is used on the command line.
+        """Previously when :meth:`subparser` was invoked, the plugin can 
+        use set_default() method on subparser to set the `handler` attribute 
+        to this method so that this handler will automatically be invoked if
+        the sub-command is used on the command line.
 
         ``args``,
             parsed args from ArgumentParser's parse_args() method.
         """
 
+
 class IHTTPServer( Interface ):
-    """Interface to bind and listen for accept HTTP client connections."""
+    """Web server specification to bind and listen for new client 
+    connections. Every successfull connection will further be handled by 
+    :class:`IHTTPConnection` plugin.
+    """
 
     sockets = {}
     """Mapping of socket (file-descriptor) listening for new connection and
-    the socket object."""
+    the socket object. These are server sockets."""
 
     connections = []
     """List of accepted and active connections. Each connection is a plugin
@@ -56,35 +89,45 @@ class IHTTPServer( Interface ):
     """HTTP Version supported by this server."""
 
     def start( *args, **kwargs ):
-        """Starts this server and returns a server object."""
+        """Starts the server. This is typically a blocking call."""
 
     def stop():
-        """Stops listening for new connections. Requests currently in progress
-        may still continue after the server is stopped.
+        """Stop listening for new connections. Close ``connections`` that are 
+        currently active and finally close the server sockets. Implementers
+        must make sure that when this method is called :meth:`start` method
+        must return from blocking.
         """
 
+    def close_connection( httpconn ):
+        """Close a client connection `httpconn` which is
+        :class:`IHTTPConnection` plugin maintained in :attr:`connections`
+        list."""
+
+
 class IHTTPConnection( Interface ):
-    """Interface for handling HTTP connections accepted by IHTTPServer.
-    Received request are dispatched using :class:`IHTTPRequest` plugin."""
+    """Every new client connection accepted by :class:`IHTTPServer` will
+    be handled by a plugin instance implementing this interface. All
+    read-writes on the connection is specified by this interface."""
 
     conn = None
-    """Accepted connection object."""
+    """Socket connection object accepted by the server."""
 
     address = tuple()
     """Client's IP address and port number."""
 
     server = None
-    """:class:`IHTTPServer` plugin"""
+    """:class:`IHTTPServer` plugin that accepted this connection."""
 
     product = b''
     """HTTP product string (byte-string) for this server. Typically sent with
     HTTP `Server` Reponse header."""
 
     version = b''
-    """HTTP Version supported by this connection."""
+    """HTTP Version supported by this connection. Normally infered from
+    :attr:`IHTTPServer.version` attribute. """
 
     request = None
-    """:class:`IHTTPResource` plugin instance for current on-going request."""
+    """:class:`IHTTPRequest` plugin instance for current on-going request."""
 
     def __init__( self, conn, addr, server, version ):
         """Positional arguments,
@@ -97,6 +140,9 @@ class IHTTPConnection( Interface ):
 
         ``server``,
             :class:`IHTTPServer` plugin object.
+
+        ``version``,
+            HTTP Version supported by this connection.
         """
 
     def get_ssl_certificate() :
@@ -134,10 +180,10 @@ class IHTTPConnection( Interface ):
 
         ``chunk``,
             If the new request is chunked Transfer-Encoded, `body` will be
-            None, instead this argument will contain the request chunk in
-            byte-string. Passed a tuple of,
+            None while this argument will contain the request chunk in
+            byte-string. Passed as tuple of,
                 (chunk_size, chunk_ext, chunk_data).
-            
+
         ``trailers``,
             If the new request is chunked Transfer-Encoded, and `chunk` is the
             last chunk, then trailers might optionally contain a dictionary of
@@ -152,7 +198,7 @@ class IHTTPConnection( Interface ):
         """For every request chunk received, this method will be called. For
         the last chunk `trailers`, if present, will also be passed. In case of
         chunked request, ``request`` attribute of this plugin will preserve
-        the on-going request's :class:`IHTTPRequest` plugin.
+        the on-going request as :class:`IHTTPRequest` plugin.
 
         ``chunk`,
             Request chunk to be handled. Passed as a tuple of,
@@ -165,7 +211,7 @@ class IHTTPConnection( Interface ):
         """
 
     def write( chunk, callback=None ):
-        """Write the ``chunk`` of data (bytes) to the connection and optionally
+        """Write a ``chunk`` of data (bytes) to the connection and optionally
         subscribe a ``callback`` function to be called when data is successfully
         transfered.
         
@@ -181,24 +227,26 @@ class IHTTPConnection( Interface ):
 
 
 class IWebApp( Interface ):
-    """In pluggdapps, a web-Application is a plugin, whereby, a plugin is a
-    bunch of configuration parameters implementing one or more interface
-    specification. For this interface to be relevant,
+    """In pluggdapps, a web-Application is a plugin implementing this
+    interface. And for this interface to be relevant,
     :class:`pluggdapps.platform.Webapps` must be used to boot the platform.
-    There is also a base class :class:`WebApp` which implements this interface
-    and provides necessary support functions for application creators.
-    Therefore application plugins must derive from this base class.
+    There is also a base class :class:`WebApp` which implements this
+    interface and provides necessary support functions for application
+    creators. Therefore application plugins must derive from this base
+    class.
     """
+
     instkey = tuple()
     """A tuple of (appsec, netpath, configini)"""
 
-    # TODO : Make this as read only copy.
     appsettings = {}
-    """Optional read only copy of application's settings."""
+    """Optional read only copy of application's settings. Gathered from
+    plugin's default settings, ini configuration file(s) and optionally a
+    backend store."""
 
     netpath = ''
-    """Net location and script-path on which the instance of webapp plugin is 
-    mounted. This is obtained from configuration settings."""
+    """Net location and script-path on which the instance of webapp is mounted.
+    This is obtained from configuration settings."""
 
     baseurl = ''
     """Computed string of base url for web application."""
@@ -221,20 +269,22 @@ class IWebApp( Interface ):
 
     out_transformers = []
     """List of plugins implmenting :class:`IHTTPOutBound` interface. Out bound
-    responses will be passed through this list of plugins before being flushed
-    out."""
+    responses will be passed through this list of plugins before writing it on
+    the connection."""
 
     def startapp():
-        """Boot this applications. Called at platform boot-time."""
+        """Boot the applications. Called at platform boot-time."""
 
     def dorequest( request, body=None, chunk=None, trailers=None ):
         """This method is called after a new request is resolved to an
         application, typically by :class:`IHTTPConnection` plugin. The 
         callback will be issued when,
-          * A new request without body is received, where the request
-            data is available in ``request``.
-          * A new request with a body is received, in which case kwarg
-            ``body`` gives the request body as byte-string.
+
+          * A new request without body is received, where the request data is 
+            available in ``request``.
+
+          * A new request with a body is received, in which case kwarg ``body`` 
+            gives the request body as byte-string.
         """
  
     def dochunk( request, chunk=None, trailers=None ):
@@ -243,21 +293,26 @@ class IWebApp( Interface ):
         chunked request, for every chunk of the request, in which case the
         web-application and related framework instances are preserved across
         the chunks. This is typically done by :class:`IHTTPConnection`.
+
         The callback will be issued when,
+
           * A new request with a chunk is received, in which case kwarg
             `chunks` gives a single element list with received chunk as,
             ``(chunk_size, chunk_ext, chunk_data)``.
+
           * A request is being received in chunked mode and a request chunk
             just received, in which case `chunk` is a tuple of,
             ``(chunk_size, chunk_ext, chunk_data)``.
+
           * The last chunk of the request is received without a trailer.
+
           * The last chunk of the request is received with a trailer.
         """
  
     def onfinish( request ):
-        """When a finish is called on the :attr:`request.response`, by calling
-        a ``flush( finished=True )``, onfinish() callbacks will be issued by
-        the :class:`pluggdapps.web.interfaces.IHTTPResponse`."""
+        """When finish is called on the :attr:`request.response`, by calling
+        ``flush( finished=True )``, a chain of onfinish() callbacks will be 
+        issued by :class:`pluggdapps.web.interfaces.IHTTPResponse`."""
 
     def shutdown():
         """Shutdown this application. Reverse of :meth:`startapp`."""
@@ -307,26 +362,3 @@ class IScaffold( Interface ):
         about this scaffolding plugin and variables that can be defined."""
 
 
-class IConfigDB( Interface ):
-    """Interface specification for managing platform configuration via
-    database and webadmin."""
-
-    def connect():
-        """Do necessary initialization to connection with data-store."""
-
-    def dbinit():
-        """If datastore does not exite, create one.
-        
-        If ``settings`` key-word argument is supplied then update platform 
-        settings in the data-store with ``settings.
-
-        If ``appsettings`` key-word argument is preset it must be interpreted
-        as a list of tuples, ``(netpath, appsetting)`` where each element
-        specifies application setting for application mounted on ``netpath``.
-        """
-
-    def config( **kwargs ):
-        """Get or set configuration parameter for platform."""
-
-    def close():
-        """Reverse of :meth:`connect`."""

@@ -4,9 +4,16 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""Plugin definitions for configuration backend-store."""
+"""Platform can be configured via ini files. For ease of administration,
+platform can be configured via web as well, where the configuration
+information (basically the key, value pair) will be persisted by a backend
+store like sqlite3.
 
-import sqlite3 
+Note that configuration parameters from database backend will override 
+default-configuration and configurations from ini file.
+"""
+
+import sqlite3
 
 from   pluggdapps.plugin      import Plugin, implements
 from   pluggdapps.interfaces  import IConfigDB
@@ -14,14 +21,14 @@ import pluggdapps.utils       as h
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = (
-    "Configuration settings for HTTPRequest implementing IHTTPRequest "
-    "interface." )
+    "Backend interface to persist configuration information in sqlite "
+    "database." )
 
 _default_settings['url'] = {
     'default' : '',
     'types'   : (str,),
-    'help'    : "Location of sqlite3 backend to be used for web-admin "
-                "configuration."
+    'help'    : "Location of sqlite3 backend file. Will be passed to "
+                "sqlite3.connect() API."
 }
 
 class ConfigSqlite3DB( Plugin ):
@@ -36,7 +43,14 @@ class ConfigSqlite3DB( Plugin ):
             self.conn = sqlite3.connect( self['url'] )
 
     def dbinit( self, netpaths=[] ):
-        """:meth:`pluggdapps.interfaces.IConfigDB.dbinit` interface method."""
+        """:meth:`pluggdapps.interfaces.IConfigDB.dbinit` interface method.
+        
+        Optional key-word argument,
+
+        ``netpaths``,
+            list of web-application mount points. A table for each netpath
+            will be created.
+        """
         if self.conn == None : return None
 
         c = self.conn.cursor()

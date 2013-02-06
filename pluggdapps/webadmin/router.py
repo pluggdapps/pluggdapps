@@ -31,6 +31,7 @@ class WebAdminRouter( MatchRouter ):
         self.add_view( 'index', '/',
                        method=b'GET',
                        content_coding='gzip',
+                       media_type='text/html',
                        view=get_index,
                      )
 

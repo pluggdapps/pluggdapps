@@ -526,7 +526,7 @@ def parse_rules( s=b'' ):
 
     Return a list of byte-string rules.
     """
-    return [ x.strip(b' \r\n\t') for x in s.split(b',') ]
+    return list( filter( None, [x.strip(b' \r\n\t') for x in s.split(b',')] ))
 
 def make_rules( rs=[] ):
     """Reverse of parse_rules()

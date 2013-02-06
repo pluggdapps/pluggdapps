@@ -8,7 +8,7 @@
 import http.client, time
 import datetime as dt
 from   http.cookies import SimpleCookie
-from   os.path      import splitext
+from   os.path      import splitext, isfile
 
 from   pluggdapps.plugin         import implements, Plugin
 from   pluggdapps.web.interfaces import IHTTPResponse, IHTTPOutBound, \
@@ -232,6 +232,11 @@ class HTTPResponse( Plugin ):
             tfile = kwargs.get( 'file', '' )
             _, ext = splitext( tfile )
             renderer = self._renderers.get( ext, None ) if ext else None
+
+            # If in debug mode enable ttl file reloading.
+            tfile = h.abspath_from_asset_spec( tfile )
+            if self['debug'] and isfile( tfile ):
+                self.pa._monitoredfiles.append( tfile )
 
         if renderer in self._renderer_plugins :
             plugin = self._renderer_plugins[ renderer ]

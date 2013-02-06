@@ -191,14 +191,14 @@ class HTTPEPollServer( Plugin ):
         # Close listening sockets
         [ sock.close() for sock in self.sockets.values() ]
 
-    #---- Internal methods
-
     def close_connection( self, httpconn ):
-        """Close a client connection `httpconn` which is
-        :class:`IHTTPConnection` plugin."""
+        """:meth:`pluggdapps.interfaces.IHTTPServer.close_connection` 
+        interface method."""
         if httpconn in self.connections :
             self.pa.logdebug("Closing connection %r ..."%(httpconn.address,))
             self.connections.remove( httpconn )
+
+    #---- Internal methods
 
     def listen( self ):
         """Starts accepting connections on the given port. This method may be

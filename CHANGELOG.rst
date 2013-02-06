@@ -1,17 +1,6 @@
 Release changes
 ===============
 
-0.1dev
-------
-
-First release. Provides,
-
-- Component architecture using python meta-classing, a plugin system using 
-  interface specifications and a wonderful configuration system.
-- Pluggable sub-commands accessible via `pa` script.
-- Web-framework to host more than one application in the same environment.
-- Documentation available using sphinx.
-
 0.2dev
 ------
 
@@ -35,4 +24,14 @@ First release. Provides,
 - Fixed bugs, and cleaned up code, in HTTPEPollServer plugin and HTTPResponse
   plugin
 
+0.1dev
+------
+
+First release. Provides,
+
+- Component architecture using python meta-classing, a plugin system using 
+  interface specifications and a wonderful configuration system.
+- Pluggable sub-commands accessible via `pa` script.
+- Web-framework to host more than one application in the same environment.
+- Documentation available using sphinx.
 

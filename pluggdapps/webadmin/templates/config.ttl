@@ -1,11 +1,12 @@
 @doctype html
+@from tayrakit.interfaces import ITTLBreadCrumbs
 
 ## A single page application to do web based platform configuration.
 
 <html>
   <head>
     <script "text/javascript" src="${url_jquery}">
-    <style>
+    <style text/css>
       body { 
         font-size : large; 
         padding : 10px;
@@ -18,27 +19,25 @@
       }
 
   <body>
-    ## All configurations.
-    ${plugin_settings( 'platform', settings )}
-    @for netpath, webapp in netpaths.items() :
-      ${plugin_settings( netpath, webapp.appsettings )}
+    <div .navbar>
+      @@ bc = _compiler.query_plugin( ITTLBreadCrumbs, 'tbreadcrumbs' )
+      ${ bc.render( navigate, crumbsmenu ) }
+    <div .section>
+      ${plugin_settings( netpath, section, describe, secsetts )}
 
-@def plugin_settings( appname, setts ) :
-  <div .{'app-'+appname}>
-    @for section, secsetts in sorted( setts.items() ) :
-      <table .{'sec-'+section}.section>
-        @for key, value in sorted( secsetts.items() ) :
-          @@item = defaults[section]._spec.get( key, \
-                              defaults['DEFAULT']._spec.get( key, {} ))
-          @@fn = lambda x : x if isinstance(x, str) else x.__name__
-          @@types = ', '.join( map( fn, item.get( 'types', [] )))
-          @@fn = lambda x : str(x)
-          @@options = ', '.join( map( fn, item.get('options', [] )))
-          @if item and item['webconfig'] :
-            <tr>
-              <td {vertical-align : top; text-align : right;}>${ key }
-              <td>
-                <div>${ value }
-                <div>${ item['help'] }
-                <div>${ types }
-                <div>${ options }
+@def plugin_settings( netpath, section, describe, secsetts ) :
+  <table>
+    @for key, value in sorted( secsetts.items() ) :
+      @@item = describe._spec.get( key, DEFAULT._spec.get( key, {} ))
+      @@fn = lambda x : x if isinstance(x, str) else x.__name__
+      @@types = ', '.join( map( fn, item.get( 'types', [] )))
+      @@fn = lambda x : str(x)
+      @@options = ', '.join( map( fn, item.get('options', [] )))
+      @if item and item['webconfig'] :
+        <tr>
+          <td {vertical-align : top; text-align : right;}>${ key }
+          <td>
+            <div>${ value }
+            <div>${ item['help'] }
+            <div>${ types }
+            <div>${ options }

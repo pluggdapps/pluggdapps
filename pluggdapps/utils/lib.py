@@ -18,8 +18,8 @@ __all__ = [
     'asbool', 'asint', 'asfloat', 'timedelta_to_seconds', 'set_close_exec', 
     'set_nonblocking', 'call_entrypoint', 'docstr', 'cpu_count', 
     'reseed_random', 'mergedict', 'multivalue_dict', 'takewhile', 
-    'dropwhile', 'print_exc', 'eval_import', 'string_import', 'str2module',
-    'locatefile', 'hitch', 'hitch_method', 'colorize', 'strof',
+    'dropwhile', 'flatten', 'print_exc', 'eval_import', 'string_import', 
+    'str2module', 'locatefile', 'hitch', 'hitch_method', 'colorize', 'strof',
     # Classes
     'Context', 'Bunch',
 ]
@@ -177,6 +177,14 @@ def dropwhile( pred, lst ):
         if pred(e) == False : break
         i += 1
     return lst[i:]
+
+def flatten( lst ):
+    """Flatten nested list ``lst`` into a flat list."""
+    l = []
+    for e in lst :
+        if isinstance( e, list ) : l.extend( flatten( e ))
+        else : l.append( e )
+    return l
 
 def print_exc() :
     """Return a string representing exception info."""

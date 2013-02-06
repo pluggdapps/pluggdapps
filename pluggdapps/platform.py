@@ -108,6 +108,7 @@ from   pluggdapps.const      import SPECIAL_SECS, URLSEP
 from   pluggdapps.interfaces import IWebApp, IConfigDB
 import pluggdapps.utils      as h
 
+SPECIAL_SECTIONS = ['DEFAULT', 'pluggdapps']
 
 def DEFAULT():
     """Global default settings that are applicable to all plugins and
@@ -530,6 +531,10 @@ class Webapps( Pluggdapps ):
     _app_resolve_cache = {}
     """A dictionary map of (netloc, script-path) to Web-application object."""
 
+    _monitoredfiles = []
+    """Attribute used in debug mode to collect and monitor files that will be
+    modified during developement."""
+
     def __init__( self, *args, **kwargs ):
         super().__init__( *args, **kwargs )
 
@@ -541,6 +546,19 @@ class Webapps( Pluggdapps ):
             else :
                 return None
         return None
+
+    def monitorfiles( self ):
+        from pluggdapps import papackages
+        if self.inifile :
+            inifiles = [ abspath(self.inifile) ]
+            inifiles.extend( map( lambda x : x[2], self.webapps.keys() ))
+        else :
+            inifiles = []
+
+        ttlfiles = h.flatten( 
+                    [ list( map( h.abspath_from_asset_spec, n['ttlplugins'] ))
+                    for nm, n in papackages.items() if n['ttlplugins'] ])
+        return inifiles + ttlfiles + self._monitoredfiles
 
     #---- Overridable methods
 
