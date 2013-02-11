@@ -4,10 +4,13 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""
-Parse configuration settings from various sources (at present ini-files are
-supported), aggregate them, make them avialable on plugins instances. It also
-provides methods for logging error / warning messages.
+"""This module along with the :mod:`plugin` module implements the component
+architechture. Provides the platform class in whose context plugins are
+instantiated. It is also responsible for parsing configuration parameters from
+various sources, aggregate them, make them avialable on plugins instances. The
+platform classes also provide methods for logging error / warning messages.
+
+The platform is instantiated by calling the :meth:`boot` method.
 
 Configuration:
 --------------

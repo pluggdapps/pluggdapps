@@ -1,16 +1,48 @@
-Configuring the system
+Configuring pluggdapps
 ======================
 
-Pluggdapps provide a powerful, yet convenient configuration system for
-developers and administrators. From administrator's point of view,
-platform configuration can be done via ini file(s) or through browser using 
-pre-packaged application ``webadmin``, which is mounted on the url like
-http://<hostname>/webadmin.
+Another fundamental aspect of software systems is to provide a way to
+configure and customize their programs. Pluggdapps provide a wonderful
+configuration system. It is the responsibility of platform to gather
+configuration settings from various sources (like ini-files, data-base etc..)
+and make them available for plugins.
+
+So how are these configuration settings related to a plugin ? Well, a plugin
+is nothing but a dictionary like object, whose (key,value) pairs are nothing
+but its configuration settings. If the settings for a plugin is changed in
+the ini-file or in the data-base, it is automatically made available as a
+key,value inside the plugin. For example, 
+:class:`pluggdapps.web.server.HTTPEPollServer` plugin has configurable 
+parameters like, host, port, backlog etc ... the settings are configured
+in the ini-file like,
+
+.. code-block:: ini
+
+    [plugin:HTTPEPollServer]
+    host = mysite.com
+    port = 80
+    backlog = 10
+    ...
+
+these settings are automatically made available inside the plugin (refered by 
+``self``) logic like,
+
+.. code-block:: python
+
+    ....
+    sock.listen( self['backlog'] )
+    print( "Server listening host and port" % (self['host'], self['port']) )
+    ...
+
+
+From administrator's point of view, platform configuration can be done via ini 
+file(s) or through browser using pre-packaged application ``webadmin``, which 
+is mounted on the url like http://<hostname>/webadmin.
 
 Master configuration file
 -------------------------
 
-Pluggdapps is typically lauched using a master configuration file. For
+Pluggdapps is typically launched using a master configuration file. For
 instance, the following command provides a way to start the pluggdapps server
 with -c switch supplying master configuration file.
 
@@ -36,8 +68,9 @@ Platform related configuration is expected to go under this section.
 
 **[mountloc] special section**
     
-This section is defined by ``Webapps`` platform. Administrators can mount
-web application instances on subdomains and script-paths. For Eg,
+This section is defined by ``Webapps`` platform, while using ``Pluggdapps``
+platform this section is not supported. Administrators can mount web 
+application instances on subdomains and script-paths. For Eg,
 
 .. code-block:: ini
 
@@ -57,6 +90,29 @@ different behaviour for each web-application.
 Note that, application configuration file will accept only plugin sections and 
 [DEFAULT] special-section. Any other section will be silently ignore.
 
+**An example master configuration file,**
+
+.. code-block:: ini
+
+  master.ini
+  ----------
+
+  [DEFAULT]
+  <option> = <value>
+  ...
+
+  [pluggdapps]
+  <option> = <value>
+  ...
+
+  [plugin:<pluginname>]
+  <option> = <value>
+  ...
+
+  [plugin:<pluginname>]
+  ...
+
+
 Webadmin
 --------
 
@@ -68,8 +124,8 @@ access the configuration system through url - http://<hostname>/webadmin and
 continue configuring the system. Although, the configured parameters will be
 persisted separately by a backend-stored, which by default will be sqlite3.
 
-If you are using ``paenv`` environment to run pluggdapps platform, then the
-backend database will be available as, ``paenv/db/configdb.sqlite3``.
+If you are using ``paenv`` environment to run pluggdapps platform, then
+configuration database is persisted as, ``paenv/db/configdb.sqlite3``.
 
 For developers
 --------------
@@ -77,6 +133,15 @@ For developers
 If you are not intending to develop plugins for pluggdapps you should do good
 just by following previous explanations. In case you intend to develop plugins
 for pluggdapps, there are couple of more things you may need to know.
+
+When a plugin class derives from :class:`pluggdapps.plugin.Plugin`, which is 
+how they become a plugin, it automatically implements an interface called 
+:class:`pluggdapps.plugin.ISettings`. This interface specifies a bunch of 
+methods that handles configuration settings for the plugin class.  While the 
+platform is booted, the configuration settings are gathered from different 
+sources, organised and normalized for plugins' consumption. And when the 
+plugins get instantiated (queried by query_*() methods), these settings are 
+populated inside the plugin-dictionary.
 
 The cute part about plugin configuration is that, configuration information,
 from various sources, are read, parsed aggregated and are automatically

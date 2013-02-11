@@ -51,3 +51,4 @@ Package information
 ``ttlplugins``,
     List of template files with absolute path names. Presence of this
     key indicates that the package is providing tayra template plugins.
+
