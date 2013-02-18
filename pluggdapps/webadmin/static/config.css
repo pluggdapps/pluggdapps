@@ -1,0 +1,52 @@
+body { 
+    padding : 10px;
+    width : 70%;
+    margin : 0px auto;
+}
+.section {
+    margin-top : 50px;
+    clear : both;
+    min-height : 400px;
+}
+.section div.sectitle {
+    text-align : center;
+    color : white;
+    background : gray;
+    margin-top : 40px;
+    font-size : small;
+    font-style : italic;
+    padding : 5px;
+}
+.section table {
+    border-collapse : collapse;
+    width : 100%;
+    border-left : 2px solid gray;
+    border-right : 2px solid gray;
+}
+.section tr {
+    border-bottom : 1px dotted grey;
+}
+.section td.name {
+    padding : 5px;
+    color : red;
+    font-style: italic;
+    font-weight: bold;
+    width : 15%; 
+    vertical-align : top;
+    text-align : center;
+}
+.section td.value {
+    padding : 5px;
+    font-size : small; 
+    font-style: italic;
+    width : 80%;
+}
+.section div.value {
+    font-size : medium; 
+    font-style: normal;
+    padding-bottom : 5px;
+}
+.section div.help { color : gray; }
+.section div.types { color : blue; }
+.section div.options { color : green; }
+
