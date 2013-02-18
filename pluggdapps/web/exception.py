@@ -21,40 +21,6 @@ frame_index = {}    # { <identification-code> : ( globals, locals ) ... }:
 """Each frame has its own globals() and locals() context. To support browser
 based debugging, expressions need to be evaluated under these context."""
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for traceback collector."
-
-_default_settings['limit'] = {
-    'default'  : 200,
-    'types'    : (int,),
-    'help'     : "Limit of trace back frames."
-}
-_default_settings['show_revision'] = {
-    'default'  : False,
-    'types'    : (bool,),
-    'help'     : "Show revision information from frame."""
-}
-_default_settings['error_message'] = {
-    'default'  : '',
-    'types'    : (str,),
-    'help'     : "When debug mode is off, the error message to show to users."
-}
-_default_settings['xmlhttp_key'] = {
-    'default'  : '_',
-    'types'    : (str,),
-    'help'     : "When this key is in the request GET "
-                 "variables (not POST!), expect that this is an "
-                 "XMLHttpRequest, and the response should be more minimal; it "
-                 "should not be a complete HTML page."
-}
-_default_settings['html'] = {
-    'default'  : True,
-    'types'    : (bool,),
-    'help'     : "Render formatted exception in html."
-}
-
-
 class CatchAndDebug( Plugin ):
     """Produces a data structure that can be used by formatters to
     display exception reports.
@@ -185,9 +151,13 @@ class CatchAndDebug( Plugin ):
     def handle_exc( self, request, etype, value, tb ):
         response = request.response
         c = self.collectException( request, etype, value, tb )
-        app_webadmin = self.pa.findapp( appname='webadmin' )
-        c['url_jquery'] = app_webadmin.pathfor(
+        webadmin = self.pa.findapp( appname='webadmin' )
+        c['url_jquery'] = webadmin.pathfor( 
                             request, 'staticfiles', path='jquery-1.8.3.min.js')
+        c['url_css'] = webadmin.pathfor( 
+                            request, 'staticfiles', path='errorpage.css' )
+        c['url_palogo150'] = webadmin.pathfor(
+                            request, 'staticfiles', path='palogo.150.png' )
         if self['html'] :
             html= response.render(
                     request, c, 
@@ -533,4 +503,38 @@ def hash_identifier( s, length, pad=True, hasher=md5, prefix='',
     if upper:
         ident = ident.upper()
     return prefix + ident
+
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = (
+    "Pluggdapps can be configured, via webapp-plugin, to catch exceptions "
+    "and debug them via browser. This plugin can be configured for each "
+    "application."
+)
+
+_default_settings['html'] = {
+    'default'  : True,
+    'types'    : (bool,),
+    'help'     : "Format exception in html and return back an interactive "
+                 "debug page as response."
+}
+_default_settings['limit'] = {
+    'default'  : 200,
+    'types'    : (int,),
+    'help'     : "Maximum number of trace back frames to display in the debug "
+                 "page."
+}
+_default_settings['show_revision'] = {
+    'default'  : False,
+    'types'    : (bool,),
+    'help'     : "Show revision information from frame."""
+}
+_default_settings['xmlhttp_key'] = {
+    'default'  : '_',
+    'types'    : (str,),
+    'help'     : "When this key is in the request GET variables (not POST!), "
+                 "expect that this is an XMLHttpRequest, and the response "
+                 "will be more minimal; it shall not be a complete HTML page."
+}
+
 

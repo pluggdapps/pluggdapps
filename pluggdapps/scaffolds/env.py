@@ -11,34 +11,11 @@ import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
 from   pluggdapps.interfaces        import IScaffold, ICommand
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = (
-    "Basic configuration settings for ``env`` command implementing "
-    "IScaffold interface specification."
-)
-
-_default_settings['template_dir']  = {
-    'default' : join( dirname(__file__), 'env_template'),
-    'types'   : (str,),
-    'help'    : "Obsolute file path of template source-tree to be used for "
-                "the scaffolding logic."
-}
-_default_settings['target_dir'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Target directory to place the generate scaffolding logic."
-}
-_default_settings['host_name'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Host name for the environment :"
-}
-
 class CommandEnv( Plugin ):
-    """Automatically generates scaffolding logic to create a new environment.
-    It also implements :class:`pluggdapps.interfaces.ICommand` so that this
-    can be invoked as a sub-command.
-    """
+    """Sub-command plugin to generate scaffolding logic for pluggdapps
+    development environment. Can be invoked from pa-script and meant for
+    upstream authors."""
+
     implements( IScaffold, ICommand )
 
     description = (
@@ -120,3 +97,25 @@ class CommandEnv( Plugin ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
         method."""
         return sett
+
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = CommandEnv.__doc__
+
+_default_settings['template_dir']  = {
+    'default' : join( dirname(__file__), 'env_template'),
+    'types'   : (str,),
+    'help'    : "Obsolute file path of template source-tree to be used for "
+                "the scaffolding logic."
+}
+_default_settings['target_dir'] = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Target directory to place the scaffolding logic."
+}
+_default_settings['host_name'] = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Host name for the environment :"
+}
+

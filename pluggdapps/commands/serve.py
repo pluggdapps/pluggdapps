@@ -12,54 +12,17 @@ from   pluggdapps.plugin        import implements, ISettings, Singleton, \
 from   pluggdapps.interfaces    import ICommand, IHTTPServer
 import pluggdapps.utils         as h
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = (
-    "Configuration for serve sub-command."
-)
-
-_default_settings['IHTTPServer'] = {
-    'default' : 'httpepollserver',
-    'types'   : (str,),
-    'help'    : "Plugin name implementing :class:`IHTTPServer`."
-}
-_default_settings['reload'] = {
-    'default' : False,
-    'types'   : (bool,),
-    'help'    : "Whether to monitor for changes to module files and watched "
-                "files, and restart the server."
-}
-_default_settings['reload.config'] = {
-    'default' : True,
-    'types'   : (bool,),
-    'help'    : "This parameter specifies whether the server should be "
-                "restarted when a configuration parameter is changed."
-}
-_default_settings['reload.poll_interval'] = {
-    'default' : 1,
-    'types'   : (int,),
-    'help'    : "Number seconds to poll for watched file's modification "
-                "timestamp. When a file is modified server is restarted."
-}
-_default_settings['reload.config'] = {
-    'default' : True,
-    'types'   : (bool,),
-    'help'    : "This parameter specifies whether the server should be "
-                "restarted when a configuration parameter is changed."
-}
-_default_settings['reload.poll_interval'] = {
-    'default' : 1,
-    'types'   : (int,),
-    'help'    : "Number seconds to poll for watched file's modification "
-                "timestamp. When a file is modified server is restarted."
-}
-
 class CommandServe( Singleton ):
-    """Sub-command to starts a web server (using epoll) for pluggdapps."""
+    """Sub-command for starting native web server. Configuring this plugin
+    does not control the web server, instead refer to the corresponding web
+    server plugin. By default it uses a single threaded / single process 
+    epoll based server."""
 
     implements( ICommand )
 
     description = "Start epoll based http server."
     cmd = 'serve'
+
     def __init__( self, *args, **kwargs ):
         self.module_mtimes = {}
 
@@ -144,14 +107,15 @@ class CommandServe( Singleton ):
         """Check whether any of the module files have modified after loading
         this platform. If so, return True else False."""
         from pluggdapps import papackages
-
-
         modfiles = {}
         for mod in sys.modules.values() :
             if hasattr( mod, '__file__' ) :
                 modfiles.setdefault( getattr(mod, '__file__'), mod )
+        
+        inifiles = self.inifiles() if self['reload.config'] else []
+        files = list(modfiles.keys()) + self.ttlfiles() + inifiles
 
-        for filename in list( modfiles.keys() ) + self.pa.monitorfiles() :
+        for filename in files :
             stat = os.stat(filename)
             mtime = stat.st_mtime if stat else 0
 
@@ -168,6 +132,22 @@ class CommandServe( Singleton ):
                 return True
         return False
 
+    def inifiles( self ):
+        if self.pa.inifile :
+            inifiles = [ abspath(self.pa.inifile) ]
+            inifiles.extend( map( lambda x : x[2], self.pa.webapps.keys() ))
+        else :
+            inifiles = []
+        return inifiles
+
+    def ttlfiles( self ):
+        from pluggdapps import papackages
+        ttlfiles = h.flatten(
+            [ list( map( h.abspath_from_asset_spec, n['ttlplugins'] ))
+              for nm, n in papackages.items() if n['ttlplugins'] ]
+        )
+        return ttlfiles + self.pa._monitoredfiles
+
     #---- ISettings interface methods
 
     @classmethod
@@ -180,9 +160,8 @@ class CommandServe( Singleton ):
     def normalize_settings( cls, sett ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface 
         method."""
-        sett['reload'] = h.asbool( sett['reload'] )
         sett['reload.config'] = h.asbool( sett['reload.config'] )
-        sett['reload.poll_interval'] = h.asbool( sett['reload.poll_interval'] )
+        sett['reload.poll_interval'] = h.asint( sett['reload.poll_interval'] )
         return sett
 
 
@@ -214,3 +193,31 @@ class CommandServe( Singleton ):
 def SIGINT_handler( signal, frame ):
     print( 'You pressed Ctrl+C!' )
     sys.exit(0)
+
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = CommandServe.__doc__
+
+_default_settings['IHTTPServer'] = {
+    'default' : 'HTTPEPollServer',
+    'types'   : (str,),
+    'help'    : "Plugin name implementing :class:`IHTTPServer`. This is the "
+                "actual web server that will be started by the sub-command. "
+                "Can be modified only in the .ini file.",
+    'webconfig' : False,
+}
+_default_settings['reload.config'] = {
+    'default' : True,
+    'types'   : (bool,),
+    'help'    : "Relevant when the sub-command is invoked with monitor and "
+                "reload switch. Specifies whether the server should be "
+                "restarted when a configuration file (.ini) is changed."
+}
+_default_settings['reload.poll_interval'] = {
+    'default' : 1,
+    'types'   : (int,),
+    'help'    : "Relevant when the sub-command is invoked with monitor and "
+                "reload switch. Number of seconds to poll for file "
+                "modifications. When a file is modified, server is restarted."
+}
+

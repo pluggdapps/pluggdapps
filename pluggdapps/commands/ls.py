@@ -13,7 +13,7 @@ from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
 class CommandLs( Singleton ):
-    """Subcommand for pa-script to list various information about pluggdapps
+    """Subcommand for pa-script to list internal state of pluggdapps' virtual
     environment."""
     implements( ICommand )
 
@@ -181,3 +181,20 @@ class CommandLs( Singleton ):
             intrfs = list( map( lambda x : x.__name__, info['cls']._interfs ))
             print( "  %-20s" % name, end='' )
             pprint( intrfs, indent=8 )
+
+    #---- ISettings interface methods
+
+    @classmethod
+    def default_settings( cls ):
+        """:meth:`pluggdapps.plugin.ISettings.default_settings` interface
+        method."""
+        return _default_settings
+
+    @classmethod
+    def normalize_settings( cls, sett ):
+        """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
+        method."""
+        return sett
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = CommandLs.__doc__

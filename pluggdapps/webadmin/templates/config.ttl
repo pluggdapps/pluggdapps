@@ -1,43 +1,75 @@
 @doctype html
-@from tayrakit.interfaces import ITTLBreadCrumbs
+@from tayrakit.interfaces import ITTLBreadCrumbs, ITTLFooter
 
 ## A single page application to do web based platform configuration.
 
 <html>
   <head>
-    <script "text/javascript" src="${url_jquery}">
-    <style text/css>
-      body { 
-        font-size : large; 
-        padding : 10px;
-        width : 50%;
-        margin : 0px auto;
-      }
-      .section td {
-        padding : 5px;
-        border : 1px solid gray;
-      }
+    <script text/javascript "${url_jquery}">
+    <link rel="stylesheet" text/css "${url_css}">
+    <script defer text/javascript> 
+      $(document).ready( function() {
+        $('span.value').each( function(idx) {
+          if( $(this).attr('contenteditable') == 'true' ) {
+            $(this).css( 'border-bottom', '1px dotted gray' );
+            $(this).blur( function( e ) {
+              $(this).data('value', $(this).html());
+              console.log( $(this).data() );
+              $.ajax({
+                url : "${url_putconfig}",
+                type : "PUT",
+                data : $(this).data()
+              })
+            })
+          }
+        })
+      });
 
   <body>
     <div .navbar>
-      @@ bc = _compiler.query_plugin( ITTLBreadCrumbs, 'tbreadcrumbs' )
+      @@ bc = _compiler.query_plugin( ITTLBreadCrumbs, 'TBreadCrumbs' )
       ${ bc.render( navigate, crumbsmenu ) }
     <div .section>
-      ${plugin_settings( netpath, section, describe, secsetts )}
+      ${plugin_settings( section, describe, secsetts )}
+    <div .footer>
+      @@ footer = _compiler.query_plugin( ITTLFooter, 'PluggdappsFooter' )
+      :py:
+        counts = { 
+          'interfaces' : interfaces_no,
+          'plugins' : plugins_no,
+        }
+      :py:
+      ${ footer.render( counts ) }
 
-@def plugin_settings( netpath, section, describe, secsetts ) :
+
+@def plugin_settings( section, describe, secsetts ) :
+  @@doc, setts = secsetts
+  <div .sectitle> ${ doc }
   <table>
-    @for key, value in sorted( secsetts.items() ) :
+    @for key, value in sorted( setts.items() ) :
       @@item = describe._spec.get( key, DEFAULT._spec.get( key, {} ))
       @@fn = lambda x : x if isinstance(x, str) else x.__name__
       @@types = ', '.join( map( fn, item.get( 'types', [] )))
-      @@fn = lambda x : str(x)
-      @@options = ', '.join( map( fn, item.get('options', [] )))
-      @if item and item['webconfig'] :
+      @@options = ', '.join( map( lambda x : str(x), item.get('options', [] )))
+      @@value = ', '.join(value) if isinstance( value, list ) else value
+      @@webconfig = item['webconfig']
+      @if item :
         <tr>
-          <td {vertical-align : top; text-align : right;}>${ key }
-          <td>
-            <div>${ value }
-            <div>${ item['help'] }
-            <div>${ types }
-            <div>${ options }
+          <td .name>${ key }
+          <td .value>
+            <div .value>
+              <span .value ${'edit' if webconfig else 'noedit' | t}
+                    data-key="${key}" data-value="${value}">
+                ${ value or '-' }
+            <div .help>
+              <span> ${ item['help'] }
+            @if types :
+              <div .types>
+                <span .types>
+                  <span {color : #8888FF}> Allowed-types :
+                  ${ types }
+            @if options :
+              <div .options>
+                <span .options>
+                  <span {color : #22AA22}> Available Options :
+                  ${ options }

@@ -19,19 +19,10 @@ from   pluggdapps.plugin      import Plugin, implements
 from   pluggdapps.interfaces  import IConfigDB
 import pluggdapps.utils       as h
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = (
-    "Backend interface to persist configuration information in sqlite "
-    "database." )
-
-_default_settings['url'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Location of sqlite3 backend file. Will be passed to "
-                "sqlite3.connect() API."
-}
-
 class ConfigSqlite3DB( Plugin ):
+    """Backend interface to persist configuration information in sqlite
+    database."""
+
     implements( IConfigDB )
 
     def __init__( self ):
@@ -105,15 +96,20 @@ class ConfigSqlite3DB( Plugin ):
 
         c = self.conn.cursor()
         if section :
-            c.execute('SELECT * FROM %s WHERE section=%s' % (netpath,section))
-            secsetts = h.json_decode( list(c)[0][1] ) or {}
-            if secsetts and name and value :
+            c.execute(
+                "SELECT * FROM '%s' WHERE section='%s'" % (netpath,section))
+            result = list(c) 
+            secsetts = h.json_decode( result[0][1] ) if result else {}
+            if name and value :
                 secsetts[name] = value
-                c.execute( 'INSERT INTO %s VALUES (%s, %s)' %
-                           (netpath, section, h.json_encode(secsetts)) )
+                secsetts = h.json_encode(secsetts)
+                c.execute( "DELETE FROM '%s' WHERE section='%s'" % 
+                           (netpath, section) )
+                c.execute( "INSERT INTO '%s' VALUES ('%s', '%s')" %
+                           (netpath, section, secsetts) )
                 self.conn.commit()
                 rc = value
-            elif secsetts and name :
+            elif name :
                 rc = secsetts[name]
             else :
                 rc = secsetts
@@ -145,3 +141,16 @@ class ConfigSqlite3DB( Plugin ):
         method.
         """
         return sett
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = ConfigSqlite3DB.__doc__
+
+_default_settings['url'] = {
+    'default'   : '',
+    'types'     : (str,),
+    'help'      : "Location of sqlite3 backend file. Will be passed to "
+                  "sqlite3.connect() API. Can be modified only in the .ini "
+                  "file.",
+    'webconfig' : False,
+}
+

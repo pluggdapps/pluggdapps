@@ -5,6 +5,7 @@
 <html>
   <head>
     <script "text/javascript" src="${url_jquery}">
+    <link rel="stylesheet" text/css "${url_css}">
     <script text/javascript async>
       $(document).ready( function() {
         // Handle click event on line-text
@@ -32,18 +33,24 @@
         });
       });
 
-  <body {width : 80%; margin : 0px auto}>
-    <div {font-size : xx-large}>
-      <span {font-weight : bold}>${exception_type} : 
-      <span {font-size : normal}>${exception_value}
-    <div {font-size : small}> ${date}
+  <body>
+    <div .header>
+      <div .title> Web Debug
+      <img "${url_palogo150}">
     <hr>
-    @for frame in frames :
-      ${display_frame(frame)}
-      <hr>
+    <ul .debuglist>
+      <li> Exception 
+    <div .content>
+      <div {margin-bottom: 10px;}>
+        <span {font-size : x-large; font-weight : bold}>${exception_type} : 
+        <span {font-size : normal}>${exception_value}
+        <div {font-size : small}> ${date}
+      @for frame in frames :
+        ${display_frame( frame)}
+        <hr>
 
 @def display_frame( frame ):
-  <div #{frameid} .frame {margin : 5px 0px}>
+  <div .frame {margin : 5px 0px}>
     <span {font-weight : bold}>File : 
     <span {font-style: italic; color : blue}}>${frame.filename},
     <span>line 

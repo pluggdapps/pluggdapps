@@ -25,102 +25,6 @@ from   pluggdapps.interfaces     import IHTTPServer, IHTTPConnection
 #     Request) status code to any HTTP/1.1 request message which lacks a Host
 #     header field.
 
-_ds1 = h.ConfigDict()
-_ds1.__doc__ = \
-    "Configuration settings for event poll based HTTP server."
-
-_ds1['scheme'] = {
-    'default'  : 'http',
-    'types'    : (str,),
-    'help'     : "HTTP Scheme to use, either `http` or `https`. If left "
-                 "empty `scheme` parameter from [pluggdapps] section will be "
-                 "used."
-}
-_ds1['host']  = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Address may be either an IP address or hostname.  If it's a "
-                "hostname, the server will listen on all IP addresses "
-                "associated with the name. Address may be an empty string "
-                "or None to listen on all available interfaces. Family may "
-                "be set to either ``socket.AF_INET`` or ``socket.AF_INET6`` "
-                "to restrict to ipv4 or ipv6 addresses, otherwise both will "
-                "be used if available. If left empty `host` parameter from "
-                "[pluggdapps] section will be used.",
-
-}
-_ds1['port']  = {
-    'default' : 0,
-    'types'   : (int,),
-    'help'    : "Port addres to bind the http server. If left empty `port` "
-                "paramter from [pluggdapps] section will be used."
-}
-_ds1['family'] = {
-    'default' : 'AF_INET',
-    'types'   : (str,),
-    'help'    : "Family may be set to either ``AF_INET`` or ``AF_INET6`` "
-                "to restrict to ipv4 or ipv6 addresses, otherwise both will "
-                "be used if available.",
-}
-_ds1['backlog']  = {
-    'default' : 128,
-    'types'   : (int,),
-    'help'    : "Back log of http request that can be queued at listening "
-                "port. This option is directly passed to socket.listen()."
-}
-_ds1['IHTTPConnection']  = {
-    'default' : 'httpconnection',
-    'types'   : (str,),
-    'help'    : "Plugin to handle client connections."
-}
-
-#---- SSL settings, for scheme `https`
-_ds1['ssl.certfile']  = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "SSL Certificate file location.",
-}
-_ds1['ssl.keyfile']   = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "SSL Key file location.",
-}
-_ds1['ssl.cert_reqs']  = {
-    'default' : ssl.CERT_REQUIRED,
-    'types'   : (int,),
-    'options' : [ ssl.CERT_NONE, ssl.CERT_OPTIONAL, ssl.CERT_REQUIRED ],
-    'help'    : "Whether a certificate is required from the other side of "
-                "the connection, and whether it will be validated if "
-                "provided. It must be one of the three values CERT_NONE "
-                "(certificates ignored), CERT_OPTIONAL (not required, but "
-                "validated if provided), or CERT_REQUIRED (required and "
-                "validated). If the value of this value is not CERT_NONE, "
-                "then the `ca_certs` parameter must point to a file of CA "
-                "certificates."
-}
-_ds1['ssl.ca_certs']   = {
-    'default' : None,
-    'types'   : (str,),
-    'help'    : "The ca_certs file contains a set of concatenated "
-                "certification authority. certificates, which are used to "
-                "validate certificates passed from the other end of the "
-                "connection."
-}
-#---- Setting for HTTPIOLoop
-_ds1['poll_threshold']     = {
-    'default' : 1000,
-    'types'   : (int,),
-    'help'    : "A warning limit for number of descriptors being polled by a "
-                "single poll instance. Will be used by HTTPIOLoop definition",
-}
-_ds1['poll_timeout']       = {
-    'default' : 3600.0,
-    'types'   : (float,),
-    'help'    : "In seconds. Poll instance will timeout after so many "
-                "seconds and perform callbacks (if any) and start a fresh "
-                "poll. Will be used by HTTPIOLoop definition",
-}
-
 def run_callback( server, callback, *args, **kwargs ):
     """Run a callback with `args`."""
     try:
@@ -138,9 +42,7 @@ class HTTPEPollServer( Plugin ):
     Server resolves application for HTTP requests and dispatches them to
     corresponding :class:`IWebApp` plugin. Finishing the request does
     not necessarily close the connection in the case of HTTP/1.1 keep-alive
-    requests. Server features,
-
-      * Basic connection handler parsing request startline, headers and body.
+    requests.
     """
 
     implements( IHTTPServer )
@@ -328,6 +230,103 @@ class HTTPEPollServer( Plugin ):
                 h.asfloat( sett['poll_timeout'], _ds1['poll_timeout'] )
         return sett
 
+
+_ds1 = h.ConfigDict()
+_ds1.__doc__ = HTTPEPollServer.__doc__
+
+_ds1['IHTTPConnection']  = {
+    'default' : 'httpconnection',
+    'types'   : (str,),
+    'help'    : "Plugin to handle client connections."
+}
+_ds1['backlog']  = {
+    'default' : 128,
+    'types'   : (int,),
+    'help'    : "Back log of http request that can be queued at listening "
+                "port. This option is directly passed to socket.listen()."
+}
+_ds1['family'] = {
+    'default' : 'AF_INET',
+    'types'   : (str,),
+    'help'    : "Family may be set to either ``AF_INET`` or ``AF_INET6`` "
+                "to restrict to ipv4 or ipv6 addresses, otherwise both will "
+                "be used if available.",
+    'options' : ['AF_NET', 'AF_INET6'],
+}
+_ds1['host']  = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Address may be either an IP address or hostname.  If it's a "
+                "hostname, the server will listen on all IP addresses "
+                "associated with the name. Address may be an empty string "
+                "or None to listen on all available interfaces. Family may "
+                "be set to either ``socket.AF_INET`` or ``socket.AF_INET6`` "
+                "to restrict to ipv4 or ipv6 addresses, otherwise both will "
+                "be used if available. If left empty `host` parameter from "
+                "[pluggdapps] section will be used.",
+
+}
+_ds1['port']  = {
+    'default' : 0,
+    'types'   : (int,),
+    'help'    : "Port addres to bind the http server. If left empty `port` "
+                "paramter from [pluggdapps] section will be used."
+}
+_ds1['scheme'] = {
+    'default'  : 'http',
+    'types'    : (str,),
+    'help'     : "HTTP Scheme to use, either `http` or `https`. If left "
+                 "empty `scheme` parameter from [pluggdapps] section will be "
+                 "used."
+}
+#---- Setting for HTTPIOLoop
+_ds1['poll_threshold']     = {
+    'default' : 1000,
+    'types'   : (int,),
+    'help'    : "A warning limit for number of descriptors being polled by a "
+                "single poll instance. Will be used by HTTPIOLoop plugin.",
+}
+_ds1['poll_timeout']       = {
+    'default' : 3600.0,
+    'types'   : (float,),
+    'help'    : "Poll instance will timeout after the specified number of "
+                "seconds and perform callbacks (if any) and start a fresh "
+                "poll. Will be used by HTTPIOLoop definition",
+}
+#---- SSL settings, for scheme `https`
+_ds1['ssl.certfile']  = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "SSL Certificate file location. SSL options can be set only "
+                "in the .ini file.",
+}
+_ds1['ssl.keyfile']   = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "SSL Key file location. SSL options can be set only in the "
+                ".ini file."
+}
+_ds1['ssl.cert_reqs']  = {
+    'default' : ssl.CERT_REQUIRED,
+    'types'   : (int,),
+    'options' : [ ssl.CERT_NONE, ssl.CERT_OPTIONAL, ssl.CERT_REQUIRED ],
+    'help'    : "Whether a certificate is required from the other side of "
+                "the connection, and whether it will be validated if "
+                "provided. It must be one of the three values CERT_NONE "
+                "(certificates ignored), CERT_OPTIONAL (not required, but "
+                "validated if provided), or CERT_REQUIRED (required and "
+                "validated). If the value of this value is not CERT_NONE, "
+                "then the `ca_certs` parameter must point to a file of CA "
+                "certificates. SSL options can be set only in the .ini file."
+}
+_ds1['ssl.ca_certs']   = {
+    'default' : None,
+    'types'   : (str,),
+    'help'    : "The ca_certs file contains a set of concatenated "
+                "certification authority. certificates, which are used to "
+                "validate certificates passed from the other end of the "
+                "connection. SSL options can be set only in the .ini file."
+}
 
 def add_accept_handler( server, sock, callback, ioloop ):
     """Adds an ``IOLoop`` event handler to accept new connections on 
@@ -623,41 +622,14 @@ class IOLoop( object ):
                     "Events are pending to be handled: %r" % self._events )
 
 
-
-_ds2 = h.ConfigDict()
-_ds2.__doc__ = \
-    "Configuration settings for event poll based HTTP server."
-
-_ds2['no_keep_alive']  = {
-    'default' : False,
-    'types'   : (bool,),
-    'help'    : "HTTP /1.1, whether to close the connection after every "
-                "request.",
-}
-_ds2['connection_timeout']  = {
-    'default' : 60*60*1,    # 1 hours
-    'types'   : (int,),
-    'help'    : "Timeout after which an idle connection is gracefully closed."
-}
-_ds2['max_buffer_size'] = {
-    'default' : 104857600,  # 100MB
-    'types'   : (int,),
-    'help'    : "Maximum size of read / write buffer."
-}
-_ds2['read_chunk_size'] = {
-    'default' : 4096,
-    'types'   : (int,),
-    'help'    : "Chunk of data to read at a time."
-}
-
-
 class HTTPConnection( Plugin ):
-    """Handles a connection to an HTTP client, executing HTTP requests. We 
-    parse HTTP headers and bodies, and execute the request callback until the
-    HTTP conection is closed.
+    """:class:`IHTTPConnection` plugin to handle http connections. Every
+    client connection corresponds to an instance of this plugin, handle
+    request, parse headers and bodies, and execute the request callback and 
+    writes the response back.
 
-      * Accepts only HTTP/1.1 request. If otherwise, reponds with bad-request
-        (400) and closes the connection.
+    Accepts only HTTP/1.1 request. If otherwise, reponds with bad-request
+    (400) and closes the connection.
     """
 
     implements( IHTTPConnection )
@@ -1028,6 +1000,34 @@ class HTTPConnection( Plugin ):
         sett['read_chunk_size'] = \
                 h.asint( sett['read_chunk_size'], _ds2['read_chunk_size'] )
         return sett
+
+
+_ds2 = h.ConfigDict()
+_ds2.__doc__ = HTTPConnection.__doc__
+
+_ds2['connection_timeout']  = {
+    'default' : 60*60*1,    # 1 hours
+    'types'   : (int,),
+    'help'    : "Timeout in seconds after which an idle connection is "
+                "gracefully closed."
+}
+_ds2['max_buffer_size'] = {
+    'default' : 104857600,  # 100MB
+    'types'   : (int,),
+    'help'    : "Maximum size of read / write buffer in bytes."
+}
+_ds2['no_keep_alive']  = {
+    'default' : False,
+    'types'   : (bool,),
+    'help'    : "HTTP /1.1, whether to close the connection after every "
+                "request.",
+}
+_ds2['read_chunk_size'] = {
+    'default' : 4096,
+    'types'   : (int,),
+    'help'    : "Chunk of data, size in bytes, to read at a time."
+}
+
 
 
 class Timeout( object ):

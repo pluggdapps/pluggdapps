@@ -34,24 +34,6 @@ from   pluggdapps.web.interfaces import IHTTPRouter, IHTTPResource, \
 #   - An Allow header field MUST be present in a 405 (Method Not Allowed)
 #     response.
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for url-routing plugin using pattern matching."""
-
-_default_settings['defaultview']  = {
-    'default' : 'pluggdapps.web.views.HTTPNotFound',
-    'types'   : (str,),
-    'help'    : "Use this :class:`IHTTPView` view callable plugin to generate "
-                "a response for request that can't be resolved into a valid "
-                "view-callable."
-}
-_default_settings['negotiate_content']  = {
-    'default' : True,
-    'types'   : (bool,),
-    'help'    : "Do content-negotiation when more than one representation is "
-                "available for the same resource."
-}
-
 re_patt = re.compile( r'([^{]+)?(\{.+\})?([^}]+)?' )
           # prefix, interpolater, suffix
 
@@ -405,3 +387,21 @@ class MatchRouter( Plugin ):
         method.
         """
         return sett
+
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = MatchRouter.__doc__
+
+_default_settings['defaultview']  = {
+    'default' : 'pluggdapps.web.views.HTTPNotFound',
+    'types'   : (str,),
+    'help'    : "Default view callable plugin. Will be used when request "
+                "cannot be resolved to a valid view-callable."
+}
+_default_settings['negotiate_content']  = {
+    'default' : True,
+    'types'   : (bool,),
+    'help'    : "If True, then content-negotiation will be invoked when more "
+                "than one representation is available for the same resource."
+}
+

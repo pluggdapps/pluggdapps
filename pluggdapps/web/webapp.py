@@ -15,82 +15,10 @@ from   pluggdapps.web.interfaces import IHTTPRouter,IHTTPCookie,IHTTPResponse, \
                                         IHTTPOutBound, IHTTPWebDebug
 import pluggdapps.utils          as h
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for WebApp base class inherited by all " \
-    "pluggdapps web-applications."
-
-_default_settings['encoding']  = {
-    'default' : 'utf-8',
-    'types'   : (str,),
-    'help'    : "Default character encoding to use on HTTP response. This can " 
-                "be customized for each view (or resource-variant)"
-}
-_default_settings['language']  = {
-    'default' : 'en',
-    'types'   : (str,),
-    'help'    : "Default language to use for content negotiation. This can "
-                "be customized for each view (or resource-variant)"
-}
-_default_settings['IHTTPRouter']  = {
-    'default' : 'matchrouter',
-    'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPRouter` "
-                "interface. A request is resolved for a view-callable by this "
-                "router plugin."
-}
-_default_settings['IHTTPCookie']  = {
-    'default' : 'httpcookie',
-    'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPCookie` "
-                "interface spec. Methods from this plugin will be used "
-                "to process both request cookies and response cookies. "
-                "This configuration can be overriden by corresponding "
-                "request / response plugin settings."
-}
-_default_settings['IHTTPSession']  = {
-    'default' : 'httpsession',
-    'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPSession` "
-                "interface spec. Will be used to handle cookie based "
-                "user-sessions."
-}
-_default_settings['IHTTPRequest']  = {
-    'default' : 'httprequest',
-    'types'   : (str,),
-    'help'    : "Name of the plugin to encapsulate HTTP request. "
-}
-_default_settings['IHTTPResponse']  = {
-    'default' : 'httpresponse',
-    'types'   : (str,),
-    'help'    : "Name of the plugin to encapsulate HTTP response."
-}
-_default_settings['IHTTPInBound'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "A string of comma seperated value, where each value names a "
-                ":class:`IHTTPInBound` plugin. Transforms will be applied in "
-                "specified order."
-}
-_default_settings['IHTTPOutBound'] = {
-    'default' : 'ResponseHeaders, GZipOutBound',
-    'types'   : (str,),
-    'help'    : "A string of comma seperated value, where each value names a "
-                ":class:`IHTTPOutBound` plugin. Transforms will be applied in "
-                "specified order."
-}
-_default_settings['IHTTPWebDebug']  = {
-    'default' : 'CatchAndDebug',
-    'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPWebDebug` "
-                "interface spec. Will be used to catch application exception "
-                "and render them on browser. Provides browser based debug "
-                "interface."
-}
-
-
 class WebApp( Plugin ):
-    """Base class for all web applications."""
+    """Base class for all web applications plugins. Every http request enters
+    the application through this plugin class. And provides a comprehensible
+    set of configuration."""
 
     implements( IWebApp )
 
@@ -183,4 +111,73 @@ class WebApp( Plugin ):
         sett['IHTTPOutBound'] = h.parsecsvlines( sett['IHTTPOutBound'] )
         sett['IHTTPInBound'] = h.parsecsvlines( sett['IHTTPInBound'] )
         return sett
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = WebApp.__doc__
+
+_default_settings['encoding']  = {
+    'default' : 'utf-8',
+    'types'   : (str,),
+    'help'    : "Default character encoding to use on HTTP response. This can " 
+                "be customized for each view (or resource-variant)"
+}
+_default_settings['language']  = {
+    'default' : 'en',
+    'types'   : (str,),
+    'help'    : "Default language to use for content negotiation. This can "
+                "be customized for each view (or resource-variant)"
+}
+_default_settings['IHTTPRouter']  = {
+    'default' : 'matchrouter',
+    'types'   : (str,),
+    'help'    : "IHTTPRouter plugin. A request is resolved for a "
+                "view-callable by this router plugin."
+}
+_default_settings['IHTTPCookie']  = {
+    'default' : 'httpcookie',
+    'types'   : (str,),
+    'help'    : "Plugin implementing IHTTPCookie interface spec. Methods "
+                "from this plugin will be used to process both request "
+                "cookies and response cookies. This configuration can be "
+                "overriden by corresponding request / response plugin "
+                "settings."
+}
+_default_settings['IHTTPSession']  = {
+    'default' : 'httpsession',
+    'types'   : (str,),
+    'help'    : "Plugin implementing IHTTPSession interface spec. Will be "
+                "used to handle cookie based user-sessions."
+}
+_default_settings['IHTTPRequest']  = {
+    'default' : 'httprequest',
+    'types'   : (str,),
+    'help'    : "Name of the plugin to encapsulate HTTP request. "
+}
+_default_settings['IHTTPResponse']  = {
+    'default' : 'httpresponse',
+    'types'   : (str,),
+    'help'    : "Name of the plugin to encapsulate HTTP response."
+}
+_default_settings['IHTTPInBound'] = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "A string of comma seperated value, where each value names a "
+                "IHTTPInBound plugin. Transforms will be applied in "
+                "specified order."
+}
+_default_settings['IHTTPOutBound'] = {
+    'default' : 'ResponseHeaders, GZipOutBound',
+    'types'   : (str,),
+    'help'    : "A string of comma seperated value, where each value names a "
+                "IHTTPOutBound plugin. Transforms will be applied in "
+                "specified order."
+}
+_default_settings['IHTTPWebDebug']  = {
+    'default' : 'CatchAndDebug',
+    'types'   : (str,),
+    'help'    : "Plugin implementing IHTTPWebDebug interface spec. Will be "
+                "used to catch application exception and render them on "
+                "browser. Provides browser based debug interface."
+}
+
 

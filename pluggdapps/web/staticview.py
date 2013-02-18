@@ -11,16 +11,6 @@ import pluggdapps.utils             as h
 from   pluggdapps.plugin            import Plugin, implements
 from   pluggdapps.web.interfaces import IHTTPView
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for serving static files "
-
-_default_settings['max_age']  = {
-    'default' : 60*60*24,   # 1 day
-    'types'   : (int,),
-    'help'    : "How long this file can remain fresh in a HTTP cache."
-}
-
 class StaticView( Plugin ):
     """Plugin to serve static files over HTTP."""
     implements( IHTTPView )
@@ -78,4 +68,14 @@ class StaticView( Plugin ):
     def normalize_settings( cls, sett ):
         sett['max_age'] = h.asint( sett['max_age'] )
         return sett
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = StaticView.__doc__
+
+_default_settings['max_age']  = {
+    'default' : 60*60*24,   # 1 day
+    'types'   : (int,),
+    'help'    : "Response max_age in seconds. How long this file can remain "
+                "fresh in a HTTP cache."
+}
 

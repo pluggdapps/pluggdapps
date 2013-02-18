@@ -11,34 +11,11 @@ import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
 from   pluggdapps.interfaces        import IScaffold, ICommand
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = (
-    "Basic configuration settings for ``webapp`` command implementing "
-    "IScaffold interface specification."
-)
-
-_default_settings['template_dir']  = {
-    'default' : join( dirname(__file__), 'webapp_template'),
-    'types'   : (str,),
-    'help'    : "Obsolute file path of template source-tree to be used for "
-                "the scaffolding logic."
-}
-_default_settings['target_dir'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Target directory to place the generate scaffolding logic."
-}
-_default_settings['webapp_name'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Web application name."
-}
-
 class CommandWebApp( Plugin ):
-    """Automatically generates scaffolding logic for a new web-application.
-    It also implements :class:`pluggdapps.interfaces.ICommand` so that this
-    can be invoked as a sub-command.
-    """
+    """Sub-command to create a new web application under project source tree.
+    This command creates relevant scaffolds, as modules and directories,
+    under the specified target directory."""
+
     implements( IScaffold, ICommand )
 
     description = (
@@ -118,3 +95,26 @@ class CommandWebApp( Plugin ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
         method."""
         return sett
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = CommandWebApp.__doc__
+
+_default_settings['template_dir']  = {
+    'default' : join( dirname(__file__), 'webapp_template'),
+    'types'   : (str,),
+    'help'    : "Obsolute file path of template source-tree to be used for "
+                "the scaffolding logic."
+}
+_default_settings['target_dir'] = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Target directory to place the generated modules and "
+                "directories. If not specified uses the current working "
+                "directory."
+}
+_default_settings['webapp_name'] = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Name of the web application. Since a web application is "
+                "also a plugin, it must be a unique name."
+}

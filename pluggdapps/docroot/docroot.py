@@ -9,46 +9,8 @@ from   pluggdapps.web.webapp        import WebApp
 from   pluggdapps.web.interfaces import IHTTPRouter
 import pluggdapps.utils             as h
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for WebApp base class inherited by all " \
-    "pluggdapps web-applications."
-
-_default_settings['encoding']  = {
-    'default' : 'utf-8',
-    'types'   : (str,),
-    'help'    : "Default character encoding to use on HTTP response.",
-}
-_default_settings['language']  = {
-    'default' : 'en',
-    'types'   : (str,),
-    'help'    : "Default language to use for content negotiation."
-}
-_default_settings['rootloc'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Root location containing the web-site documents."
-}
-_default_settings['index_page'] = {
-    'default' : 'index.html',
-    'types'   : (str,),
-    'help'    : "Specify the index page for the hosted site."
-}
-_default_settings['favicon'] = {
-    'default' : 'favicon.ico',
-    'types'   : (str,),
-    'help'    : "To use a different file for favorite icon, configure the "
-                "file path here. File path must be relative to ``rootloc``."
-}
-_default_settings['IHTTPRouter']  = {
-    'default' : 'DocRootRouter',
-    'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPRouter` "
-                "interface. A request is resolved for a view-callable by this "
-                "router plugin."
-}
-
-class docroot( WebApp ):
+class DocRoot( WebApp ):
+    """Application to publish static web sites."""
 
     def startapp( self ):
         super().startapp()
@@ -74,4 +36,40 @@ class docroot( WebApp ):
     @classmethod
     def normalize_settings( cls, sett ):
         return sett
+
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = DocRoot.__doc__
+
+_default_settings['IHTTPRouter']  = {
+    'default' : 'DocRootRouter',
+    'types'   : (str,),
+    'help'    : "IHTTPRouter plugin to resolve request into view-callables."
+}
+_default_settings['encoding']  = {
+    'default' : 'utf-8',
+    'types'   : (str,),
+    'help'    : "Default character encoding to use for HTTP response.",
+}
+_default_settings['favicon'] = {
+    'default' : 'favicon.ico',
+    'types'   : (str,),
+    'help'    : "To use a different file for favorite icon, configure the "
+                "file path here. File path must be relative to ``rootloc``."
+}
+_default_settings['language']  = {
+    'default' : 'en',
+    'types'   : (str,),
+    'help'    : "Default language to use for content negotiation."
+}
+_default_settings['rootloc'] = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Root location containing the web-site documents."
+}
+_default_settings['index_page'] = {
+    'default' : 'index.html',
+    'types'   : (str,),
+    'help'    : "Specify the index page for the hosted site."
+}
 

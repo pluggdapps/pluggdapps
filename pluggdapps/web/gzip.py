@@ -12,16 +12,6 @@ import pluggdapps.utils          as h
 from   pluggdapps.plugin         import Plugin, implements
 from   pluggdapps.web.interfaces import IHTTPOutBound
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for Gzip transformer on response entity."
-
-_default_settings['level']  = {
-    'default' : 6,
-    'types'   : (int,),
-    'help'    : "Compression level while applying gzip."
-}
-
 class GZipOutBound( Plugin ) :
     """Out-bound transformer to compress response entity using gzip
     compression technology."""
@@ -78,3 +68,14 @@ class GZipOutBound( Plugin ) :
         """
         sett['level'] = h.asint( sett['level'] )
         return sett
+
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = GZipOutBound.__doc__
+
+_default_settings['level']  = {
+    'default' : 6,
+    'types'   : (int,),
+    'help'    : "Compression level while applying gzip."
+}
+

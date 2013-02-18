@@ -244,8 +244,8 @@ def str2module( s ):
 def locatefile( phile, lookup_directories=[] ):
     """Locate the absolute path in which file ``phile` is located."""
 
-    if phile.startswith('/') and isfile(phile) :
-        return phile
+    if phile.startswith('/') :
+        return phile if isfile(phile) else None
 
     # First assume that file is relative to lookup_directories
     files = list( filter( 

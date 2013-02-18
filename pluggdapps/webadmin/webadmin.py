@@ -8,29 +8,8 @@
 from   pluggdapps.web.webapp        import WebApp
 import pluggdapps.utils             as h
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for webadmin application "
-
-_default_settings['encoding']  = {
-    'default' : 'utf-8',
-    'types'   : (str,),
-    'help'    : "Default character encoding to use on HTTP response.",
-}
-_default_settings['language']  = {
-    'default' : 'en',
-    'types'   : (str,),
-    'help'    : "Default language to use for content negotiation."
-}
-_default_settings['IHTTPRouter']  = {
-    'default' : 'WebAdminRouter',
-    'types'   : (str,),
-    'help'    : "Name of the plugin implementing :class:`IHTTPRouter` "
-                "interface. A request is resolved for a view-callable by this "
-                "router plugin."
-}
-
 class WebAdmin( WebApp ):
+    """Configuration application plugin."""
 
     def startapp( self ):
         super().startapp()
@@ -58,4 +37,24 @@ class WebAdmin( WebApp ):
     def normalize_settings( cls, sett ):
         return sett
 
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = WebAdmin.__doc__
+
+_default_settings['encoding']  = {
+    'default' : 'utf-8',
+    'types'   : (str,),
+    'help'    : "Default character encoding to use on HTTP response.",
+}
+_default_settings['language']  = {
+    'default' : 'en',
+    'types'   : (str,),
+    'help'    : "Default language to use for content negotiation."
+}
+_default_settings['IHTTPRouter']  = {
+    'default' : 'WebAdminRouter',
+    'types'   : (str,),
+    'help'    : "IHTTPRouter plugin. A request is resolved to a view-callable "
+                "by this router plugin."
+}
 

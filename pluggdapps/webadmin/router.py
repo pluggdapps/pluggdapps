@@ -13,12 +13,9 @@ from   pluggdapps.webadmin.views    import *
 #   - An Allow header field MUST be present in a 405 (Method Not Allowed)
 #     response.
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for routing web admin configuration URLs."""
-
 class WebAdminRouter( MatchRouter ):
-    """IHTTPRouter plugin to route static web sites."""
+    """Router plugin deriving from :class:`MatchRouter` base class. Configures
+    url patterns and static pages for webadmin application."""
 
     def onboot( self ):
         """:meth:`pluggapps.web.interfaces.IHTTPRouter.onboot` interface
@@ -78,3 +75,7 @@ class WebAdminRouter( MatchRouter ):
         method.
         """
         return sett
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = WebAdminRouter.__doc__
+

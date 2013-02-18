@@ -8,21 +8,6 @@ from   pluggdapps.plugin        import implements, Singleton, pluginname
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings `commands` plugin."
-
-_default_settings['description_width']  = {
-    'default' : 60,
-    'types'   : (int,),
-    'help'    : "Maximum width of description column."
-}
-_default_settings['command_width']  = {
-    'default' : 18,
-    'types'   : (int,),
-    'help'    : "Maximum width of command name column."
-}
-
 class CommandCommands( Singleton ):
     """Subcommand plugin under pa-script to list all available sub-commands 
     along with a short description."""
@@ -79,3 +64,18 @@ class CommandCommands( Singleton ):
         settings['description_width'] = h.asint(settings['description_width'])
         settings['command_width'] = h.asint(settings['command_width'])
         return settings
+
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = CommandCommands.__doc__
+
+_default_settings['command_width']  = {
+    'default' : 18,
+    'types'   : (int,),
+    'help'    : "Maximum width of command name column."
+}
+_default_settings['description_width']  = {
+    'default' : 60,
+    'types'   : (int,),
+    'help'    : "Maximum width of description column."
+}

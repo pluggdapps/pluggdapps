@@ -119,11 +119,17 @@ def DEFAULT():
     section. Semantic meaning of [DEFAULT] section is same as described by
     ``configparser`` module from stdlib."""
     sett = h.ConfigDict()
-    sett.__doc__ = "Global configuration settings with system-wide scope."
+    sett.__doc__ = (
+        "Configuration settings under this section are global and applicable "
+        "every other sections."
+    )
     sett['debug']  = {
         'default'  : False,
         'types'    : (bool,),
-        'help'     : "Boot and run pluggdapps system in debug mode.",
+        'help'     : "Set this to True while developing with pluggdapps. This "
+                     "will enable useful logging and other features like "
+                     "module reloading. Can be modified only in the .ini "
+                     "file.",
         'webconfig': False,
     }
     return sett
@@ -138,39 +144,52 @@ def normalize_defaults( sett ):
 def pluggdapps_defaultsett():
     """Default settings for [pluggdapps] section in ini file."""
     sett = h.ConfigDict()
-    sett.__doc__ = "Pluggdapps platform settings."
-    sett['scheme'] = {
-        'default'  : 'http',
-        'types'    : (str,),
-        'help'     : "HTTP Scheme to use, either `http` or `https`."
+    sett.__doc__ = "Platform settings."
+    sett['configdb'] = {
+        'default'   : 'ConfigSqlite3DB',
+        'types'     : (str,),
+        'help'      : "Backend plugin to persist configurations done via "
+                      "webadmin application. Can be modified only in the .ini "
+                      "file.",
+        'webconfig' : False,
     }
     sett['host'] = {
-        'default'  : 'localhost',
-        'types'    : (str,),
-        'help'     : "Top level domain name of host, web server, which "
-                     "receives the request."
+        'default'   : 'localhost',
+        'types'     : (str,),
+        'help'      : "Top level domain name of host, web server, which "
+                      "receives the request. Can be modified only in the .ini "
+                      "file.",
+        'webconfig' : False,
     }
-    sett['port'] = {
-        'default' : 8080,
-        'types'   : (int,),
-        'help'    : "Port addres to bind the http server."
-    }
-    sett['configdb'] = {
-        'default' : 'ConfigSqlite3DB',
-        'types'   : (str,),
-        'help'    : "Backend store to be used for web-admin configuration."
+    sett['logging.file'] = {
+        'default'   : '',
+        'types'     : (str,),
+        'help'      : "File name to log messages. Make sure to add `file` in "
+                      "`logging.output` parameter."
     }
     sett['logging.output'] = {
         'default' : 'console',
         'types'   : (str,),
         'help'    : "Comma separated value of names to log messages. Supported "
-                    "names are `console`, `file`."
+                    "names are `console`, `file`.",
+        'options' : [ 'console', 'file' ],
     }
-    sett['logging.file'] = {
-        'default' : '',
-        'types'   : (str,),
-        'help'    : "File name to log messages. Make sure to add `file` in "
-                    "`logging` parameter."
+    sett['port'] = {
+        'default'   : 8080,
+        'types'     : (int,),
+        'help'      : "Port addres to bind the http server. This configuration "
+                      "will be used when using pluggdapps' native HTTP "
+                      "server. Can be modified only in the .ini file.",
+        'webconfig' : False,
+    }
+    sett['scheme'] = {
+        'default'   : 'http',
+        'types'     : (str,),
+        'help'      : "HTTP Scheme to use, either `http` or `https`. This "
+                      "configuration will be used when using pluggdapps' "
+                      "native HTTP server. Can be modified only in the .ini "
+                      "file.",
+        'webconfig' : False,
     }
     return sett
 
@@ -550,19 +569,6 @@ class Webapps( Pluggdapps ):
                 return None
         return None
 
-    def monitorfiles( self ):
-        from pluggdapps import papackages
-        if self.inifile :
-            inifiles = [ abspath(self.inifile) ]
-            inifiles.extend( map( lambda x : x[2], self.webapps.keys() ))
-        else :
-            inifiles = []
-
-        ttlfiles = h.flatten( 
-                    [ list( map( h.abspath_from_asset_spec, n['ttlplugins'] ))
-                    for nm, n in papackages.items() if n['ttlplugins'] ])
-        return inifiles + ttlfiles + self._monitoredfiles
-
     #---- Overridable methods
 
     @classmethod
@@ -698,9 +704,12 @@ class Webapps( Pluggdapps ):
             section = kwargs.get( 'section', None )
             name = kwargs.get( 'name', None )
             value = kwargs.get( 'value', None )
-            webapp = self.netpath[ netpath ]
+            if netpath == 'platform' :
+                settings = self.settings
+            else :
+                settings = self.netpaths[ netpath ].appsettings
             if section and name and value :
-                webapp.appsettings[section][name] = value
+                settings[section][name] = value
             return self.configdb.config( **kwargs )
 
     #---- Internal methods

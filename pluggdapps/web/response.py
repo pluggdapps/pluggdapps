@@ -367,12 +367,15 @@ class HTTPResponse( Plugin ):
 
 
 _ds2 = h.ConfigDict()
-_ds2.__doc__ = (
-    "Configuration settings" )
+_ds2.__doc__ = ( 
+    "IHTTPOutBound plugin to populate HTTP reponse with standard "
+    "response-headers"
+)
 
 class ResponseHeaders( Plugin ):
-    """:class:`IHTTPOutBound` plugin populating a reponse plugin with standard
+    """:class:`IHTTPOutBound` plugin to populate HTTP reponse with standard
     response-headers,
+
       * `Date, `Server`, `Content-Type`, `Content-Encoding`,
         `Content-Language`, `Connection`, `Content-Length`, `Last-Modified`,
         `Etag`.

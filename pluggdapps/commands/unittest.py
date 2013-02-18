@@ -10,6 +10,7 @@ from   os.path      import dirname, join
 from   pluggdapps.plugin      import implements, Singleton, pluginname
 from   pluggdapps.platform    import Pluggdapps
 from   pluggdapps.interfaces  import ICommand
+import pluggdapps.utils       as h
 
 TESTDIR = join( dirname( dirname( __file__ )), 'tests' )
 
@@ -48,4 +49,22 @@ class CommandUnitTest( Singleton ):
                              dest="verbosity",
                              help="Verbosity for running test cases" )
         return parser
+
+    #---- ISettings interface methods
+
+    @classmethod
+    def default_settings( cls ):
+        """:meth:`pluggdapps.plugin.ISettings.default_settings` interface 
+        method."""
+        return _default_settings
+
+    @classmethod
+    def normalize_settings( cls, sett ):
+        """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface 
+        method."""
+        return sett
+
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = CommandUnitTest.__doc__
 

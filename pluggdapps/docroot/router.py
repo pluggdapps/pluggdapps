@@ -13,21 +13,10 @@ from   pluggdapps.web.matchrouter   import MatchRouter
 #   - An Allow header field MUST be present in a 405 (Method Not Allowed)
 #     response.
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for static website routing."""
-
-_default_settings['routemapper'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Filename along with its path, in asset specification "
-                "format. Referred file contains route mapping information "
-                "which will get transformed into add_view() calls during "
-                "boot time."
-}
-
 class DocRootRouter( MatchRouter ):
-    """IHTTPRouter plugin to route static web sites."""
+    """IHTTPRouter plugin to map static documents as web pages. Supports gzip
+    content coding on document resource. Implemented as part of docroot
+    web-application."""
 
     def onboot( self ):
         """:meth:`pluggapps.web.interfaces.IHTTPRouter.onboot` interface
@@ -62,3 +51,19 @@ class DocRootRouter( MatchRouter ):
         """
         sett['routemapper'] = sett['routemapper'].strip()
         return sett
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = DocRootRouter.__doc__
+
+_default_settings['routemapper'] = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Other than mapping static documents as web pages via "
+                "``rootloc`` parameter, more view can be added via "
+                "routemapper module, to be provided here in asset "
+                "specification format. The module is expected to contain a "
+                "list of dictionaries, where each dictionary will be passed "
+                "to router's add_view() method as keyword argument, at boot "
+                "time."
+}
+

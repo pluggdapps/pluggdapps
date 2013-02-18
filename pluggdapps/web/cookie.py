@@ -13,29 +13,6 @@ from   pluggdapps.web.interfaces import IHTTPCookie
 import pluggdapps.utils          as h
 
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = \
-    "Configuration settings for HTTPCookie."
-
-_default_settings['secret']  = {
-    'default' : 'secure cookie signature',
-    'types'   : (str,),
-    'help'    : "Use this to sign the cookie value before sending it with the "
-                "response.",
-}
-_default_settings['value_encoding']  = {
-    'default' : 'latin1',
-    'types'   : (str,),
-    'help'    : "While computing signed cookie value, use this encoding before "
-                "return the value."
-}
-_default_settings['max_age_seconds']  = {
-    'default' : 3600 * 24 * 30,
-    'types'   : (int,),
-    'help'    : "Maximum age, in seconds, for a cookie to live after its "
-                "creation time. The default is 30 days.",
-}
-
 class HTTPCookie( Plugin ):
     """Cookie handling plugin. This plugin uses python standard library's
     http.cookies module to process request and response cookies."""
@@ -170,3 +147,25 @@ class HTTPCookie( Plugin ):
         sett['max_age_seconds'] = h.asint( sett['max_age_seconds'] )
         return sett
 
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = HTTPCookie.__doc__
+
+_default_settings['max_age_seconds']  = {
+    'default' : 3600 * 24 * 30,
+    'types'   : (int,),
+    'help'    : "Maximum age, in seconds, for a cookie to live after its "
+                "creation time. The default is 30 days.",
+}
+_default_settings['secret']  = {
+    'default'   : 'secure cookie signature',
+    'types'     : (str,),
+    'help'      : "Use this to sign the cookie value before sending it with "
+                  "the response.",
+    'webconfig' : False,
+}
+_default_settings['value_encoding']  = {
+    'default' : 'latin1',
+    'types'   : (str,),
+    'help'    : "While computing signed cookie value, use this encoding before "
+                "return the value."
+}
