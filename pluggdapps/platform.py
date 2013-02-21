@@ -369,6 +369,7 @@ class Pluggdapps( object ):
         s = deepcopy( defaultsett['pluggdapps'] )
         if cp.has_section('pluggdapps') :
             s.update( dict( cp.items( 'pluggdapps', vars=_vars )))
+            s.pop( 'here', None )   # TODO : how `here` gets populated ??
             settings['pluggdapps'] = normalize_pluggdapps( s )
 
         # Override plugin's package default settings with [DEFAULT] settings.
@@ -377,12 +378,12 @@ class Pluggdapps( object ):
             sett = h.mergedict( sett, settings['DEFAULT'] )
             if cp.has_section( pluginsec ) :
                 sett.update( dict( cp.items( pluginsec, vars=_vars )))
+                sett.pop( 'here', None )    # TODO : how `here` ??
             cls = plugin_info( h.sec2plugin( pluginsec ) )['cls']
             for b in reversed( cls.mro() ) :
                 if hasattr( b, 'normalize_settings' ) :
                     sett = b.normalize_settings( sett )
             settings[ pluginsec ] = sett
-
         return settings
 
     def _defaultsettings( self ):
@@ -724,7 +725,6 @@ class Webapps( Pluggdapps ):
         # context for parsing ini files.
         _vars = { 'here' : abspath( dirname( self.inifile )) }
 
-
         # Fetch special section [mountloc]. And override them with [DEFAULT]
         # settings.
         cp = SafeConfigParser()
@@ -734,6 +734,7 @@ class Webapps( Pluggdapps ):
         else :
             mountloc = []
         settings['mountloc'] = dict( mountloc )
+        settings.pop( 'here', None ) # TODO : how `here` gets populated.
 
         # Parse mount configuration.
         appsecs = list( map( h.plugin2sec, webapps() ))
@@ -783,6 +784,7 @@ class Webapps( Pluggdapps ):
         for sec in cp.sections() :
             if not sec.startswith( 'plugin:' ) : continue
             sett = dict( cp.items( sec, vars=_vars ))
+            sett.pop( 'here', None )    # TODO : how `here` gets populated ??
             appsett[sec].update( sett )
             cls = plugin_info( h.sec2plugin( sec ) )['cls']
             for b in reversed( cls.mro() ) :
