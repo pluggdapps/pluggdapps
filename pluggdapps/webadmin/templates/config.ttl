@@ -30,7 +30,7 @@
       @@ bc = _compiler.query_plugin( ITTLBreadCrumbs, 'TBreadCrumbs' )
       ${ bc.render( navigate, crumbsmenu ) }
     <div .section>
-      ${plugin_settings( section, describe, secsetts )}
+      ${plugin_settings( pluginname, describe, secsetts )}
     <div .footer>
       @@ footer = _compiler.query_plugin( ITTLFooter, 'PluggdappsFooter' )
       :py:
@@ -42,7 +42,7 @@
       ${ footer.render( counts ) }
 
 
-@def plugin_settings( section, describe, secsetts ) :
+@def plugin_settings( pluginname, describe, secsetts ) :
   @@doc, setts = secsetts
   <div .sectitle> ${ doc }
   <table>

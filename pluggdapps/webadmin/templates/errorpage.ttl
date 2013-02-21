@@ -4,7 +4,7 @@
 
 <html>
   <head>
-    <script "text/javascript" src="${url_jquery}">
+    <script text/javascript src="${url_jquery}">
     <link rel="stylesheet" text/css "${url_css}">
     <script text/javascript async>
       $(document).ready( function() {
@@ -35,11 +35,11 @@
 
   <body>
     <div .header>
-      <div .title> Web Debug
       <img "${url_palogo150}">
+      <div .title> Live-debug
+      <ul .debuglist>
+        <li> Exception 
     <hr>
-    <ul .debuglist>
-      <li> Exception 
     <div .content>
       <div {margin-bottom: 10px;}>
         <span {font-size : x-large; font-weight : bold}>${exception_type} : 

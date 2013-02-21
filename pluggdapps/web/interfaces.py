@@ -9,7 +9,7 @@ from pluggdapps.plugin import Interface
 __all__ = [
     'IHTTPRouter', 'IHTTPResource', 'IHTTPRequest', 
     'IHTTPResponse', 'IHTTPView', 'IHTTPRenderer', 'IHTTPCookie',
-    'IHTTPSession', 'IHTTPWebDebug',
+    'IHTTPSession', 'IHTTPLiveDebug',
 ]
 
 class IHTTPRouter( Interface ):
@@ -695,8 +695,14 @@ class IHTTPContentNegotiation( Interface ):
     pass
 
 
-class IHTTPWebDebug( Interface ):
+class IHTTPLiveDebug( Interface ):
     """Catch exceptions in application code and handle them. Typically the
     exceptions can be formated and logged and/or sent as email and/or rendered
     as html page in debug mode and optionally provide interactive debugging
     via browser."""
+
+    def render( request, etype, value, tb ):
+        """Handle exception in the context of a HTTP request ``request``.
+        (etype, value, tb) tuple is what is returned by sys.exc_info().
+        
+        Return a web page, capable of live debuging."""

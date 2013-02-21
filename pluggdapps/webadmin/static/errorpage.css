@@ -10,19 +10,19 @@ div.header img {
 div.title {
     font-size : xx-large;
     color : brown;
-    margin-top : 20px;
+    margin-top : 10px;
     float : left;
 }
 ul.debuglist {
     list-style: none; float : left;
-    margin : 0px; padding: 0px;
+    margin: 20px 0px 0px;
+    padding: 0px;
+    clear : left;
 }
 ul.debuglist li {
-    background-color : #444;
-    color : white;
-    padding: 3px;
-}
-div.content {
-    margin-left : 10%;
+    color : blue;
+    font-weight : bold;
+    cursor : pointer;
+    padding-right : 10px;
 }
 

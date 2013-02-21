@@ -19,7 +19,7 @@ environment and choosen by configuration files.
 """
 
 import pluggdapps.web.cookie
-import pluggdapps.web.exception
+import pluggdapps.web.catch_debug
 import pluggdapps.web.gzip
 import pluggdapps.web.matchrouter
 import pluggdapps.web.request

@@ -31,47 +31,42 @@ def get_html_config( request, c ):
     common_context( request, c )
     netpath = request.matchdict['netpath']
     section = request.matchdict['section']
-    c['section'] = sec = h.sec2plugin( section )
+    c['pluginname'] = plugin = h.sec2plugin( section )
+
+    # URL.
     c['url_putconfig'] = \
         request.pathfor( 'updateconfig', netpath=netpath, section=section )
     
-    # Gather ConfigDict from the specified `netpath` and `section`
-    if section == 'DEFAULT' :
-        c['describe'] = DEFAULT()
-    elif section == 'pluggdapps' :
-        c['describe'] = pluggdapps_defaultsett()
-    else :
-        c['describe'] = PluginMeta._pluginmap[ sec ]['cls'].default_settings()
-
+    #Context
+    c['describe'] = h.conf_descriptionfor( plugin )
     # Gather ConfigDict for DEFAULT section, as a fall back in .ttl file.
     c['DEFAULT'] = DEFAULT()
 
-    # Section settings.
-    if netpath == 'platform' :
-        setts = deepcopy( request.pa.settings[section] )
-    else :
-        setts = deepcopy( request.pa.netpaths[ netpath ].appsettings[section] )
-    [ setts.pop( k, None ) for k in ['here'] ]
+    # Section settings, TODO : What to do about `here` variables in section.
+    setts = deepcopy( h.section_settings( request.pa, netpath, section ))
     c['secsetts'] = ( c['describe'].__doc__, setts )
 
     # Breadcrumbs
-    pluginnames = list(PluginMeta._pluginmap.keys())
     c['navigate'] = [ (netpath, None), (section, None) ]
     appmenu = [
-        ( s,
-          request.pathfor( 'htmlconfig1', netpath=s, section='DEFAULT' )
-        ) for s in request.pa.netpaths ] + [
         ( 'platform',
           request.pathfor('htmlconfig1', netpath='platform', section='DEFAULT')
-        ) ]
-    secmenu = [
-        ( h.plugin2sec( pn ),
-          request.pathfor(
-              'htmlconfig1', netpath=netpath, section=h.plugin2sec(pn) )
-        ) for pn in PluginMeta._pluginmap.keys() ] + [
-        ( pn,
-          request.pathfor( 'htmlconfig1', netpath=netpath, section=pn )
-        ) for pn in SPECIAL_SECTIONS ]
+        )
+    ]
+    for s in request.pa.netpaths :
+        appmenu.append(
+            ( s,
+              request.pathfor('htmlconfig1', netpath=s, section='DEFAULT')
+            ))
+
+    secmenu = []
+    for pn in h.netpath_settings( request.pa, netpath ).keys() :
+        if pn in [ 'mountloc'] : continue
+        name = h.plugin2sec( pn )
+        secmenu.append(
+            ( name,
+              request.pathfor( 'htmlconfig1', netpath=netpath, section=name )
+            ))
 
     c['crumbsmenu'] = { netpath : appmenu, section : secmenu }
 
@@ -113,7 +108,8 @@ def get_json_config( request, c ):
     response.flush( finishing=True )
 
 def frame_debug( request, c ):
-    from pluggdapps.web.exception import frame_index
+    from pluggdapps.web.catch_debug import frame_index
+    frame_index = request.webapp.livedebug.frame_index 
     frameid = request.matchdict['frameid']
     response = request.response
     if frameid not in frame_index :
