@@ -12,7 +12,7 @@ from   pluggdapps.plugin         import implements, Plugin
 from   pluggdapps.interfaces     import IWebApp
 from   pluggdapps.web.interfaces import IHTTPRouter,IHTTPCookie,IHTTPResponse, \
                                         IHTTPSession, IHTTPInBound, \
-                                        IHTTPOutBound, IHTTPWebDebug
+                                        IHTTPOutBound, IHTTPLiveDebug
 import pluggdapps.utils          as h
 
 class WebApp( Plugin ):
@@ -29,7 +29,8 @@ class WebApp( Plugin ):
         """:meth:`pluggdapps.interfaces.IWebApps.startapp` interface method."""
         self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
         self.cookie = self.query_plugin( IHTTPCookie, self['IHTTPCookie'] )
-        self.webdebug = self.query_plugin(IHTTPWebDebug, self['IHTTPWebDebug'])
+        self.livedebug = \
+            self.query_plugin( IHTTPLiveDebug, self['IHTTPLiveDebug'] )
         self.in_transformers = [
                 self.query_plugin( IHTTPInBound, name )
                 for name in self['IHTTPInBound'] ]
@@ -56,7 +57,7 @@ class WebApp( Plugin ):
             self.pa.logerror( h.print_exc() )
             response.set_header( 'content_type', b'text/html' )
             if self['debug'] :
-                data = self.webdebug.handle_exc( request, *sys.exc_info() )
+                data = self.livedebug.render( request, *sys.exc_info() )
                 response.set_status( b'200' )
             else :
                 response.set_status( b'500' )
@@ -172,10 +173,10 @@ _default_settings['IHTTPOutBound'] = {
                 "IHTTPOutBound plugin. Transforms will be applied in "
                 "specified order."
 }
-_default_settings['IHTTPWebDebug']  = {
+_default_settings['IHTTPLiveDebug']  = {
     'default' : 'CatchAndDebug',
     'types'   : (str,),
-    'help'    : "Plugin implementing IHTTPWebDebug interface spec. Will be "
+    'help'    : "Plugin implementing IHTTPLiveDebug interface spec. Will be "
                 "used to catch application exception and render them on "
                 "browser. Provides browser based debug interface."
 }

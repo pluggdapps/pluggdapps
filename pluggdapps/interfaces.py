@@ -262,6 +262,9 @@ class IWebApp( Interface ):
     from this plugin will be used to process both request cookies and response
     cookies."""
 
+    livedebug = None
+    """Plugin to handle we based interactive debugging."""
+
     in_transformers = []
     """List of plugins implmenting :class:`IHTTPInBound` interface. In bound
     requests will be passed through this list of plugins before being
