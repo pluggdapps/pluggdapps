@@ -9,7 +9,8 @@ plugins and process them.
 """
 
 __all__ = [ 'ConfigDict', 'settingsfor', 'sec2plugin', 'plugin2sec',
-            'is_plugin_section' ]
+            'is_plugin_section', 'conf_descriptionfor', 'section_settings',
+            'netpath_settings' ]
 
 class ConfigDict( dict ):
     """A collection of configuration settings. When a fresh key, a.k.a 
@@ -105,18 +106,66 @@ def settingsfor( prefix, sett ):
     return { k[l:] : sett[k] for k in sett if k.startswith(prefix) }
 
 
+map_plugin2sec = { 'DEFAULT' : 'DEFAULT',
+                   'mountloc' : 'mountloc',
+                   'pluggdapps' : 'pluggdapps',
+                 }
 def plugin2sec( pluginname ):
     """Convert ``pluginname`` to plugin section name in ini-file. For Eg,
     for plugin-name ``httpepollserver``, will return
     ``plugin:httpepollserver``.
     """
-    return 'plugin:' + pluginname
+    if pluginname.startswith( 'plugin:' ) :
+        return pluginname
+    else :
+        return map_plugin2sec.get( pluginname, 'plugin:'+pluginname )
 
 def sec2plugin( secname ):
     """Reverse of :meth:`plugin2sec`."""
-    return secname[7:]
+    if secname.startswith('plugin:') :
+        return secname[7:]
+    else :
+        return secname
 
 def is_plugin_section( secname ):
     """Check whether ``secname`` starts with ``plugin:``."""
     return secname.startswith('plugin:')
 
+
+def conf_descriptionfor( plugin ):
+    """Gather description information for configuration settings for
+    ``plugin``, which might derive from other plugin class and therefore we
+    need to read the default_settings() from its base classes as well.
+
+    Returns a dictionary of configuration key and its ConfigItem value.
+    """
+    from pluggdapps.plugin      import PluginMeta
+    from pluggdapps.platform    import DEFAULT, pluggdapps_defaultsett
+
+    if plugin == 'DEFAULT' : # Description of configuration settings.
+        describe = DEFAULT()
+    elif plugin == 'pluggdapps' :
+        describe = pluggdapps_defaultsett()
+    else :
+        info = PluginMeta._pluginmap[ plugin ]
+        bases = reversed( info['cls'].mro() )
+        describe = info['cls'].default_settings()
+        for b in bases :
+            if hasattr( b, 'default_settings' ) :
+                describe.update( dict( b.default_settings().items() ))
+                describe._spec.update( b.default_settings()._spec )
+    return describe
+
+def section_settings( pa, netpath, section ):
+    """Return configuration settings for ``section`` under the context of
+    ``netpath``. ``pa`` must be an instance of :class:`Webapps` platform class.
+    """
+    appsettings = netpath_settings( pa, netpath )
+    return appsettings[section]
+
+def netpath_settings( pa, netpath ):
+    """Return configuration settings for web app mounted on ``netpath``.
+    ``pa`` must be an instance of :class:`Webapps` platform class.
+    """
+    return pa.settings \
+            if netpath == 'platform' else pa.netpaths[netpath].appsettings
