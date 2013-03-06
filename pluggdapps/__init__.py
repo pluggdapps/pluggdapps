@@ -24,11 +24,11 @@ Plugins,
   A plugin class can implement more than one interface. When a plugin 
   implements an interface, it should define methods and attributes specified
   by that interface. Plugin developers must stick to the semantic meaning of
-  the interface(s) that the plugin is going to implement.
-  Also note that, **every plugin is a dictionary of configuration settings**.
-  It is the responsibility of the platform to gather configuration information
-  from different sources like ini-file(s) and database, initialize the plugin
-  dictionary while instantiating them.
+  the interface(s) implemented by the plugin. Also note that, **every plugin
+  is a dictionary of configuration settings**. It is the responsibility of 
+  the platform to gather configuration information from different sources like
+  ini-file(s) and database, initialize the plugin dictionary while
+  instantiating them.
 
 Plugins and interfaces can be defined by any number of packages. Make sure
 that the modules containing them are imported by package's __init__.py
@@ -73,8 +73,21 @@ import pluggdapps.plugin
 import pluggdapps.platform
 import pluggdapps.interfaces
 
+# plugins
+import pluggdapps.config    # Load plugins for configuration backends.
+import pluggdapps.erl       # Load netscale interfaces.
+import pluggdapps.commands  # Load pa-script sub-command framework
+import pluggdapps.scaffolds # Load scaffolding framework
+import pluggdapps.web       # Load web framework
+import pluggdapps.console   # Load console framework
+
+# applications
+import pluggdapps.docroot   # Application to serve static files.
+import pluggdapps.webadmin  # Application to serve static files.
+
 __version__ = '0.3dev'
 
+pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
 papackages = {}
 
 def package( pa ) :
@@ -88,6 +101,18 @@ def package( pa ) :
         'ttlplugins' : []
     }
 
+# A gotcha here !
+#   The following lines executed when `pluggdapps` package is imported. As a
+#   side-effect, it loops on valid pluggdapps packages to which this package
+#   is also part of. Hence, make sure that package() entry-point is defined
+#   before executing the following lines.
+def loadpackages():
+    for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
+        if d.get_entry_info( 'pluggdapps', 'package' ) :
+            __import__( pkgname )
+    # Initialize plugin data structures
+    pluggdapps.plugin.plugin_init()
+
 def initialize( pa ):
     for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
         if d.get_entry_info( 'pluggdapps', 'package' ) :
@@ -95,28 +120,4 @@ def initialize( pa ):
             papackages[ pkgname ] = info
     # Initialize plugin data structures
     pluggdapps.plugin.plugin_init()
-
-import pluggdapps.config    # Load plugins for configuration backends.
-import pluggdapps.erl       # Load netscale interfaces.
-import pluggdapps.commands  # Load pa-script sub-command framework
-import pluggdapps.scaffolds # Load scaffolding framework
-import pluggdapps.web       # Load web framework
-import pluggdapps.console   # Load console framework
-
-# Load applications
-import pluggdapps.docroot   # Application to serve static files.
-import pluggdapps.webadmin  # Application to serve static files.
-
-pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
-
-# A gotcha here !
-#   The following lines executed when `pluggdapps` package is imported. As a
-#   side-effect, it loops on valid pluggdapps packages to which this package
-#   is also part of. Hence, make sure that package() entry-point is defined
-#   before executing the following lines.
-for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
-    if d.get_entry_info( 'pluggdapps', 'package' ) :
-        __import__( pkgname )
-# Initialize plugin data structures
-pluggdapps.plugin.plugin_init()
 

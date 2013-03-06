@@ -236,16 +236,19 @@ class Pluggdapps( object ):
         Return a new instance of this class object. This is the only way to
         create a platform instance.
         """
-        from pluggdapps import initialize
+        from pluggdapps import loadpackages, initialize
 
         # Prebooting. We need pre-booting because package() entry point can
         # have option of creating dynamic plugins when it is called. The
         # package() entry point for each and every package will be called only
-        # when initialize() is called. Since initialize() needs a platform
+        # when initialize() is called. Since boot() needs a platform
         # context, we pre-boot the system for initialize then then actually
         # boot the system.
+        loadpackages()
+
         pa = Pluggdapps( *args, **kwargs )
         pa.settings = pa._loadsettings( baseini )
+
         # Configuration from backend store.
         storetype = pa.settings['pluggdapps']['configdb']
         configdb = pa.query_plugin( pa, IConfigDB, storetype )
@@ -263,6 +266,7 @@ class Pluggdapps( object ):
         pa.inifile = baseini
         pa.settings = pa._loadsettings( baseini )
         pa.configdb = configdb
+
         # Configuration from backend store
         dbsett = pa.configdb.config()
         if dbsett :

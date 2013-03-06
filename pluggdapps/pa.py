@@ -37,6 +37,11 @@ def mainoptions():
     return mainparser
 
 def main():
+    from pluggdapps import loadpackages
+
+    loadpackages()  # This is important, otherwise plugins in other packages 
+                    # will be detected.
+
     # Create command line parser.
     # Get a list of sub-commands supported in command line.
     # Take only the command-line parameters uptil a subcommand.
