@@ -4,6 +4,9 @@ APIDOC_EXCLUDE_PATH=$(PWD)/pluggdapps/scaffolds/*/ \
 
 SPHINXDOC_OPTIONS=-f -d 1
 
+.PHONY: develop bdist_egg sdist sphinx-compile sphinx upload pushcode \
+		push-googlecode push-bitbucket push-github cleanall clean
+
 develop :
 	@rm -rf pa-env
 	@echo "Setting up virtual environment for python 3.x ..."
@@ -17,11 +20,13 @@ bdist_egg :
 sdist :
 	python ./setup.py sdist
 
-sphinx-doc :
+sphinx-compile :
 	cp README.rst sphinxdoc/source/
 	cp CHANGELOG.rst sphinxdoc/source/
 	rm -rf sphinxdoc/build/html/
 	make -C sphinxdoc html
+
+sphinx : sphinx-compile
 	cd sphinxdoc/build/html; zip -r pluggdapps.sphinxdoc.zip ./
 
 upload :
