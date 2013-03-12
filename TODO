@@ -60,27 +60,23 @@ Release check-list
                   sphinxdoc/source/ pluggdapps \
                   $(APIDOC_EXCLUDE_PATH)"
 
+* Change the release version in 
+    ./CHANGELOG.rst,
+    ./pluggdapps/__init__.py
+
+* Update setup.py and MANIFEST.in for release
+
 * Make sure that sphinxdoc/modules/ has all the modules that need to be
   documented.
 
-* Change the release version in 
-    ./CHANGELOG.rst,
-    ./Makefile
-    ./pluggdapps/__init__.py
-    ./sphinxdoc/source/conf.py
-
-* Sphinx documentation,
-    update APIDOC_EXCLUDE_PATH in Makefile
-  before executing `make html`
-
-* Update setup.py and MANIFEST.in for release
+* Upload the source into pypi.
+    make upload
 
 * Create a tag and push the tagged branch to 
     code.google.com 
     bitbucket.com
     github.com
 
-* Upload the source into pypi.
-    make upload
+* Upload documentation zip.
 
 * After making the release, taging the branch, increment the version number.

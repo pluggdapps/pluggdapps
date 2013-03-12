@@ -10,7 +10,6 @@ Module contents
 .. autoclass:: IHTTPRouter
     :members: onboot, add_view, route, urlpath, onfinish
     :show-inheritance:
-.. autoclass:: IHTTPContentNegotiation
 .. autoclass:: IHTTPNegotiator
     :members: negotiate
     :show-inheritance:
