@@ -5,12 +5,14 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 import re
-from   copy import deepcopy
+from   copy     import deepcopy
+from   os.path  import isfile
 
 import pluggdapps.utils          as h
 from   pluggdapps.const          import URLSEP, CONTENT_IDENTITY
 from   pluggdapps.plugin         import Plugin, implements, isplugin
-from   pluggdapps.web.interfaces import IHTTPRouter, IHTTPResource, IHTTPView
+from   pluggdapps.web.interfaces import IHTTPRouter, IHTTPResource, IHTTPView, \
+                                        IHTTPNegotiator
 
 # Notes :
 #   - An Allow header field MUST be present in a 405 (Method Not Allowed)
@@ -233,7 +235,8 @@ class MatchRouter( Plugin ):
         dictionary. Populates context with special key `etag` and clears
         ``c.etag`` before sending the context to view-callable.
         """
-        resp, c = request.response, resp.context
+        resp = request.response
+        c = resp.context
 
         # Three phases of request resolution to view-callable
         matches = self._match_url( request, self.viewlist )
@@ -342,7 +345,7 @@ class MatchRouter( Plugin ):
         for name, viewd in viewlist :  # Match urls.
             m = viewd['compiled_pattern'].match( request.uriparts['path'] )
             if m :
-                viewd = deepcopy( viewd )
+                viewd = dict( viewd.items() )
                 viewd['_regexmatch'] = m
                 matches.append( viewd )
         return matches
@@ -431,8 +434,8 @@ class MatchRouter( Plugin ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
         method.
         """
-        sett['routemapper'] = \
-                h.abspath_from_asset_spec( sett['routemapper'].strip() )
+        x = sett['routemapper'].strip() 
+        sett['routemapper'] = h.abspath_from_asset_spec(x) if x else x
         return sett
 
 

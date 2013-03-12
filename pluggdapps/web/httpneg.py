@@ -8,8 +8,8 @@ from   copy import deepcopy
 
 import pluggdapps.utils          as h
 from   pluggdapps.const          import CONTENT_IDENTITY
-from   pluggdapps.plugin         import Plugin, implements, isplugin
-from   pluggdapps.web.interfaces import IHTTPRouter, IHTTPResource, IHTTPView
+from   pluggdapps.plugin         import Plugin, implements
+from   pluggdapps.web.interfaces import IHTTPNegotiator
 
 class HTTPNegotiator( Plugin ):
     """Plugin handle server side negotiation. Gather client side negotiable
@@ -27,6 +27,7 @@ class HTTPNegotiator( Plugin ):
     If a configured variant matches any of the combination supported by
     client, pick that variant and return the same. Otherwise return None.
     """
+    implements( IHTTPNegotiator )
     
     #---- IHTTPNegotiator interface methods
 
@@ -37,6 +38,7 @@ class HTTPNegotiator( Plugin ):
         cltbl = self._compile_client_negotiation( request )
         variants_ = []
         for viewd in variants :
+            self._variant_keys( viewd )
             q = max( cltbl.get( k, 0.0 ) for k in viewd['_http_negotiator'] )
             variants_.append(( viewd, q )) if q else None
         variants_ = sorted( variants_, key=lambda x : x[1], reverse=True )

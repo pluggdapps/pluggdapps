@@ -931,7 +931,6 @@ class Webapps( Pluggdapps ):
         return cls( pa, webapp, *args, **kwargs )
 
 
-
     #---- APIs related to hosting multiple-applications.
 
     def resolveapp( self, uri, hdrs ):

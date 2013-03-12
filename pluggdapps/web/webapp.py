@@ -101,7 +101,13 @@ class WebApp( Plugin ):
 
     def pathfor( self, request, *args, **kwargs ):
         """:meth:`pluggdapps.interfaces.IWebApps.pathfor` interface method."""
+        path = self.router.urlpath( request, *args, **kwargs )
+        if path.startswith( URLSEP ) :  # Prefix uriparts['script']
+            if request.uriparts['script'] :
+                path = request.uriparts['script'] + path
+        return path
         return self.router.urlpath( request, *args, **kwargs )
+
 
 
     #---- ISettings interface methods

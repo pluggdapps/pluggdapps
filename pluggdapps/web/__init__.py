@@ -18,6 +18,7 @@ implementing the framework are defined under the package :mod:`pluggdapps.web`.
 import pluggdapps.web.cookie
 import pluggdapps.web.catch_debug
 import pluggdapps.web.gzip
+import pluggdapps.web.httpneg
 import pluggdapps.web.matchrouter
 import pluggdapps.web.request
 import pluggdapps.web.response

@@ -7,7 +7,7 @@
 from pluggdapps.plugin import Interface
 
 __all__ = [
-    'IHTTPRouter', 'IHTTPResource', 'IHTTPRequest', 
+    'IHTTPRouter', 'IHTTPResource', 'IHTTPRequest', 'IHTTPNegotiator',
     'IHTTPResponse', 'IHTTPView', 'IHTTPRenderer', 'IHTTPCookie',
     'IHTTPSession', 'IHTTPLiveDebug',
 ]
@@ -728,18 +728,6 @@ class IHTTPRenderer( Interface ):
             :class:`IHTTPResource` and view-callable, made 
             availabe inside HTML templates.
         """
-
-class IHTTPContentNegotiation( Interface ):
-    """Interface specification to handle HTTP content negotiation. Refer
-    RFC2616.txt. Web resource can have more than one representation, and each
-    representation is called a variant of the same resource. Based on
-    media-type, language, charset and content-encoding it is possible for the
-    client to suggest the desired representation (prioritized by q-value).
-    And based on request data, plugins on the server side can provide the best
-    representation compatible with the client.
-    """
-    pass
-
 
 class IHTTPLiveDebug( Interface ):
     """Catch exceptions in application code and handle them. Typically the
