@@ -1,5 +1,5 @@
-:mod:`pluggdapps.utils.asset` -- A collection of utility library.
-===========================================================
+:mod:`asset` -- A collection of utility library.
+================================================
 
 .. automodule:: pluggdapps.utils.asset
 

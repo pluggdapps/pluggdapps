@@ -1,5 +1,5 @@
-:mod:`pluggdapps.utils.scaff` -- A collection of utility library.
-===========================================================
+:mod:`scaff` -- A collection of utility library.
+================================================
 
 .. automodule:: pluggdapps.utils.scaff
 

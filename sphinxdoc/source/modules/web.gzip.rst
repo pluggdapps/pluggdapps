@@ -1,6 +1,11 @@
-:mod:`pluggdapps.web.gzip` -- Outbound transform to apply gzip content-encoding
-===============================================================================
+:mod:`gzip` -- Outbound transform for gzip content-encoding.
+============================================================
 
 .. automodule:: pluggdapps.web.gzip
-    :members:
+
+Module contents
+---------------
+
+.. autoclass:: GZipOutBound
+    :members: transform
     :show-inheritance:

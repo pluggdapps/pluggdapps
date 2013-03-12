@@ -1,5 +1,5 @@
-:mod:`pluggdapps.scaffolds` -- Collection of plugins providing scaffold logic.
-==============================================================================
+:mod:`scaffolds` -- Project scaffolds.
+======================================
 
 .. automodule:: pluggdapps.scaffolds
     :members:

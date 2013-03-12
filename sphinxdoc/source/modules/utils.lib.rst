@@ -1,5 +1,5 @@
-:mod:`pluggdapps.utils.lib` -- Common library functions.
-========================================================
+:mod:`lib` -- Common library functions.
+=======================================
 
 .. automodule:: pluggdapps.utils.lib
 

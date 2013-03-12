@@ -1,5 +1,5 @@
-:mod:`pluggdapps.utils.jsonlib` -- Library functions to parse/generate JSON.
-============================================================================
+:mod:`jsonlib` -- Library functions to parse/generate JSON.
+===========================================================
 
 .. automodule:: pluggdapps.utils.jsonlib
 

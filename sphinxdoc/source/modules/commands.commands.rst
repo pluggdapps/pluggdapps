@@ -1,6 +1,11 @@
-:mod:`pluggdapps.commands.commands` -- List sub commands
-========================================================
+:mod:`commands` -- List sub commands.
+=====================================
 
 .. automodule:: pluggdapps.commands.commands
-    :members:
+
+Module contents
+---------------
+
+.. autoclass:: CommandCommands
+    :members: description, cmd, subparser, handle
     :show-inheritance:

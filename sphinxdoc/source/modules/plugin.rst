@@ -1,5 +1,5 @@
-:mod:`pluggdapps.plugin` -- Pluggdapps component architecture.
-================================================================
+:mod:`plugin` -- Component architecture.
+========================================
 
 .. automodule:: pluggdapps.plugin
 
@@ -33,3 +33,4 @@ Module contents
 .. autofunction:: pluginclass
 .. autofunction:: webapps
 .. autofunction:: whichmodule
+.. autofunction:: plugin_init

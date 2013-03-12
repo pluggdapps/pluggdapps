@@ -1,6 +1,12 @@
-:mod:`pluggdapps.commands.ls` -- Sub command to list platform information.
-==========================================================================
+:mod:`ls` -- List Internals of pluggdapps.
+==========================================
 
 .. automodule:: pluggdapps.commands.ls
-    :members:
+
+Module contents
+---------------
+
+.. autoclass:: CommandLs
+    :members: description, cmd, subparser, handle
     :show-inheritance:
+

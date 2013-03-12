@@ -1,5 +1,5 @@
-:mod:`pluggdapps.utils.config` -- Library functions for configuration settings.
-===============================================================================
+:mod:`config` -- Library functions for configuration settings.
+==============================================================
 
 .. automodule:: pluggdapps.utils.config
 

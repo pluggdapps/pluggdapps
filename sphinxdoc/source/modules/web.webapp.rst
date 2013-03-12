@@ -1,7 +1,12 @@
-:mod:`pluggdapps.web.webapp` -- Base definition for all web-applications.
-=========================================================================
+:mod:`webapp` -- Base class for all web-applications.
+=====================================================
 
 .. automodule:: pluggdapps.web.webapp
-    :members:
-    :show-inheritance:
 
+Module contents
+---------------
+
+.. autoclass:: WebApp
+    :members: startapp, dorequest, dochunk, onfinish, shutdown,
+              urlfor, pathfor
+    :show-inheritance:

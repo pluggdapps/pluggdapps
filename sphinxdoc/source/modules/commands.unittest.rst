@@ -1,6 +1,11 @@
-:mod:`pluggdapps.commands.unittest` -- Sub command to run all unit test.
-=======================================================================
+:mod:`unittest` -- Run all unit test.
+=====================================
 
 .. automodule:: pluggdapps.commands.unittest
-    :members:
+
+Module contents
+---------------
+
+.. autoclass:: CommandUnitTest
+    :members: description, cmd, subparser, handle
     :show-inheritance:

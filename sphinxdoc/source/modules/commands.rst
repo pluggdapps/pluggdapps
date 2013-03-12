@@ -1,6 +1,15 @@
-:mod:`pluggdapps.commands` -- A collection of sub-commands for `pa` script.
-===========================================================================
+:mod:`commands` -- Sub-commands for `pa` script.
+================================================
 
 .. automodule:: pluggdapps.commands
-    :members:
-    :show-inheritance:
+
+Module Listing
+--------------
+
+.. toctree::
+    :maxdepth: 1
+
+    commands.commands
+    commands.ls
+    commands.serve
+    commands.unittest

@@ -1,6 +1,11 @@
-:mod:`pluggdapps.commands.serve` -- Sub command to start web-server.
-====================================================================
+:mod:`serve` -- Start web-server.
+=================================
 
 .. automodule:: pluggdapps.commands.serve
-    :members:
+
+Module contents
+---------------
+
+.. autoclass:: CommandServe
+    :members: description, cmd, subparser, handle
     :show-inheritance:
