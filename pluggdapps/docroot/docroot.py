@@ -6,7 +6,7 @@
 
 
 from   pluggdapps.web.webapp        import WebApp
-from   pluggdapps.web.interfaces import IHTTPRouter
+from   pluggdapps.web.interfaces    import IHTTPRouter
 import pluggdapps.utils             as h
 
 class DocRoot( WebApp ):

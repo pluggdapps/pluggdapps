@@ -5,34 +5,12 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 """ 
-Pluggdapps in a nutshell :
-==========================
+Pluggdapps, at its core, is a component architecture in python. It provides a
+platform to specify interfaces and implement them as plugins.
 
-Pluggdapps, at its core, is a component architechture in python. It provides a
-platform to specify interfaces and define plugins that can implement one or more
-interfaces.
-
-Interface,
-
-  An interface specification is a python psuedo-class defining a collection of
-  attributes and methods, where methods are mostly used as callbacks and 
-  attributes are used to preserve context across callbacks. Once interfaces 
-  are defined, they are implemented by one or more plugin classes.
-
-Plugins,
-
-  A plugin class can implement more than one interface. When a plugin 
-  implements an interface, it should define methods and attributes specified
-  by that interface. Plugin developers must stick to the semantic meaning of
-  the interface(s) implemented by the plugin. Also note that, **every plugin
-  is a dictionary of configuration settings**. It is the responsibility of 
-  the platform to gather configuration information from different sources like
-  ini-file(s) and database, initialize the plugin dictionary while
-  instantiating them.
-
-Plugins and interfaces can be defined by any number of packages. Make sure
-that the modules containing them are imported by package's __init__.py
-file. When `pluggdapps` is imported for the first time, it will probe for 
+Plugins and interfaces can be defined by any number of packages, provided
+modules containing them are imported by package's `__init__.py` file. When
+`pluggdapps` is imported for the first time, it will probe for 
 all packages in current environment's working set. When finding a package
 which defines the following entry-point (refer setuptools to know more about
 package entry-points),
@@ -46,27 +24,24 @@ the package will be considered as pluggdapps compatible and will be imported
 into the environment during platform startup. Corresponding packages must, in
 turn, load interfaces and plugins defined by the them. Finally, when all 
 packages are loaded (and blueprint for all interface-specs and 
-plugin-definitions are gathered) plugin_init() should be called to start
-using the plugins.
+plugin-definitions are gathered) platform will be initialized by calling 
+:func:`pluggdapps.plugin.plugin_init`.
 
-Platform:
----------
+The platform gets instantiated, and initialized by calling the platform class'
+`boot()` method. Refer to :mod:`pluggdapps.platform` module for more
+information on pluggdapps platform and how it gets booted.
 
-Pluggdapps component architecture is always instantiated in the context of a
-platform defined by :class:`pluggdapps.platform.Pluggdapps` or by classes
-deriving from :class:`pluggdapps.platform.Pluggdapps`. We expect that most of
-the logic written using pluggdapps will, one way or the other, be organised as
-plugins. Since all plugins automatically implement
-:class:`pluggdapps.plugin.ISettings` interface, a plugin can define
-configuration parameters to customize its function and behaviour. It is the
-reponsibility of platform classes to aggregate configuration settings from
-various sources like .ini files, data-stores during startup and make them
-available for plugins when they are instantiated.
+**package()** entrypoint. Like mentioned above, every pluggdapps project must
+implement `package` entrypoint, a function callabled that will be called
+during platform booting. The callable can return a dictionary of information
+about the package which is documented in :func:`package` function.
+
+Refer to :ref:`glossary` for terminologies used.
 """
 
-import pkg_resources as pkg
+import pkg_resources    as pkg
 
-import pluggdapps.utils       as h
+import pluggdapps.utils as h
 
 # pluggdapps core
 import pluggdapps.plugin
@@ -79,11 +54,11 @@ import pluggdapps.erl       # Load netscale interfaces.
 import pluggdapps.commands  # Load pa-script sub-command framework
 import pluggdapps.scaffolds # Load scaffolding framework
 import pluggdapps.web       # Load web framework
-import pluggdapps.console   # Load console framework
 
 # applications
 import pluggdapps.docroot   # Application to serve static files.
-import pluggdapps.webadmin  # Application to serve static files.
+import pluggdapps.webadmin  # Application to configure platform through
+                            # browser.
 
 __version__ = '0.3dev'
 
@@ -95,7 +70,15 @@ def package( pa ) :
     package.
 
     ``pa``,
-        platform object deriving from :class:`Pluggdapps`.
+        platform object deriving from :class:`pluggdapps.platform.Pluggdapps`.
+
+    Returns a dictionary of information about the package. Recognised keys
+    are,
+
+    ttlplugins,
+        list of template files. If package implements tayra template plugins,
+        then a list of template files implementing the plugin must be
+        supplied in :term:`asset specification` format.
     """
     return {
         'ttlplugins' : []
@@ -113,11 +96,19 @@ def loadpackages():
     # Initialize plugin data structures
     pluggdapps.plugin.plugin_init()
 
+# Called during actual boot.
 def initialize( pa ):
+    from  pluggdapps.plugin import PluginMeta
     for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
         if d.get_entry_info( 'pluggdapps', 'package' ) :
             info = h.call_entrypoint( d,  'pluggdapps', 'package', pa )
+            info.setdefault( 'package', d )
+            info.setdefault( 'location', d.location )
             papackages[ pkgname ] = info
+    # Re-initialize _interfs list for each plugin class, so that plugin_init()
+    # will not create duplicate entries.
+    [ setattr( info['cls'], '_interfs', [] )
+                for nm, info in PluginMeta._pluginmap.items() ]
     # Initialize plugin data structures
     pluggdapps.plugin.plugin_init()
 

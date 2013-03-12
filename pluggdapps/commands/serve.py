@@ -15,8 +15,25 @@ import pluggdapps.utils         as h
 class CommandServe( Singleton ):
     """Sub-command for starting native web server. Configuring this plugin
     does not control the web server, instead refer to the corresponding web
-    server plugin. By default it uses a single threaded / single process 
-    epoll based server."""
+    server plugin. By default it uses :class:`HTTPEPollServer`, a single
+    threaded / single process epoll based server.
+
+    For automatic server restart, when a module or configuration file is
+    modified, pass ``-m`` switch to main script and ``-r`` switch to this
+    sub-command. Typically used in development mode,
+    
+    .. code-block:: bash
+
+        $ pa -w -m -c <master.ini> serve -r
+
+    .. code-block:: text
+
+        fork ---> child ------> poll-thread
+          |        |      |
+          *--------*      |
+           monitor        *---> pluggdapps-thread
+
+    """
 
     implements( ICommand )
 
@@ -45,13 +62,7 @@ class CommandServe( Singleton ):
     #---- Local function.
 
     def gemini( self, args ):
-        """If reload is enabled, then create a thread to poll for changing
-        files, based on mtime, and serve http requests. When a file gets
-        changed, return with a predefined exit code so that waiting process
-        will restart the gemini server again.
-
-        Typically used in development mode.
-        """
+        """Start a poll thread and then start pluggdapps platform."""
         server = self.query_plugin( IHTTPServer, self['IHTTPServer'] )
         if args.mreload :
             # Launch a thread to poll and then start serving http
@@ -72,7 +83,9 @@ class CommandServe( Singleton ):
         os._exit(3)
 
     def fork_and_monitor( self, args ):
-        """Install the reloading monitor."""
+        """Fork a child process with same command line arguments except the
+        ``-m`` switch. Monitor and reload the child process until normal
+        exit."""
         while True :
             self.pa.logdebug( "Forking monitor ..." )
             pid = os.fork()
@@ -82,9 +95,7 @@ class CommandServe( Singleton ):
                 cmdargs.append( os.environ )
                 h.reseed_random()
                 os.execlpe( sys.argv[0], *cmdargs )
-                # signal.signal( signal.SIGIO, self._watch_handler )
-                # self._watch_files( args )
-                # self.gemini( args )
+
             else :          # parent 
                 try :
                     pid, status = os.wait()
@@ -133,6 +144,8 @@ class CommandServe( Singleton ):
         return False
 
     def inifiles( self ):
+        """Return a list of .ini files that are related to this
+        environment."""
         if self.pa.inifile :
             inifiles = [ abspath(self.pa.inifile) ]
             inifiles.extend( map( lambda x : x[2], self.pa.webapps.keys() ))
@@ -141,6 +154,7 @@ class CommandServe( Singleton ):
         return inifiles
 
     def ttlfiles( self ):
+        """Return a list of ttlfile related to this environment."""
         from pluggdapps import papackages
         ttlfiles = h.flatten(
             [ list( map( h.abspath_from_asset_spec, n['ttlplugins'] ))

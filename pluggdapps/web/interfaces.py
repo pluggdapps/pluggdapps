@@ -14,29 +14,38 @@ __all__ = [
 
 class IHTTPRouter( Interface ):
     """Interface specification for resolving application request to view
-    callable.  An `IHTTPRouter` plugin typically compares request's url,
-    method and few other header fields with pre-configured router mapping and
-    resolves the request to view callable. The router plugin will be 
-    instantiated by the web-application during boot time and re-used till the 
-    platform is shutdown."""
+    callable.  A plugin implementing this interfaces, typically, compares
+    request's url, method and few other header fields with pre-configured
+    router mapping, added via :meth:`add_view` method, and resolve the request
+    to view callable.
+    
+    The router plugin will be instantiated by the web-application during boot
+    time and re-used till the platform is shutdown."""
     
     def onboot():
         """Chained call from :meth:`IWebApp.startapp`. Implementation 
-        can chain this onboot() call further down.
+        can chain this onboot() call further down to other framwork /
+        application plugins.
 
-        Typically, url route-mapping is constructed here either
-        programatically or by parsing a mapper file. By the end of this
-        method, require route-mapping must be compiled and cached for
-        resolving request's view-callables."""
+        While building a web application, this method can be used to configure 
+        url route-mapping by calling :meth:`add_view` or by parsing a mapper
+        file. In any case, when this method returns, route-mapping must be
+        compiled and cached for resolving request's view-callables.
+        """
 
     def add_view( *args, **kwargs ):
         """A view is the representation of a resource. During boot-time
-        applications can add resource representation callables using this API.
+        applications can add resource representation as callables using this
+        API. Since there can be more than one representation of a resource,
+        there can be more than one view-callable for the same request-URL. In
+        which case the view callable had to be resolved based on request
+        predicates.
+        
         ``args`` and ``kwargs`` specific to router plugins, for more details
         refer to the corresponding router plugin."""
 
     def route( request, c ):
-        """Resolve ``request`` view-callable. For a successful match,
+        """Resolve ``request`` to view-callable. For a successful match,
         populate relevant attributes, like `matchdict` and `view`, in 
         ``request`` plugin.  A view-callable can be a plain python callable
         that accepts request and context arguments or a plugin implementing
@@ -51,24 +60,59 @@ class IHTTPRouter( Interface ):
 
     def urlpath( request, *args, **kwargs ):
         """Generate path, including query and fragment (aka anchor), for
-        `request` using arguments, using ``args`` and ``kwargs``, to learn
-        specific signature of positional and key-word arguments refer to
-        corresponding router plugin. Returns urlpath string. This does not
-        include SCRIPT_NAME, netlocation and scheme.
+        ``request`` using positional arguments ``args`` and keyword arguments 
+        ``kwargs``. Refer to corresponding router plugin for specific signature
+        for positional and key-word arguments. Returns urlpath string. This 
+        does not include SCRIPT_NAME, netlocation and scheme.
+
+        ``request``,
+            Plugin instance implementing :class:`IHTTPRequest` interface.
+        """
+
+    def onfinish( request ):
+        """Callback for asyncrhonous finish(). Means the response is sent and
+        the request is forgotten. Chained call originating from 
+        :meth:`IHTTPResponse.onfinish`.
 
         ``request``,
             Plugin instance implementing :class:`IHTTPRequest` interface.
         """
 
 
+class IHTTPNegotiator( Interface ):
+    """Interface specification to handle server side negotiation for resource
+    variant."""
+
+    def negotiate( request, variants ):
+        """When the router finds that a resource (typically indicated by the
+        request-URL) has multiple representations, where each representation is
+        called a variant, it has to pick the best representation negotiated by
+        the client. Negotiation is handled through attributes like media-type,
+        language, charset and content-encoding.
+        
+        ``request``,
+            Plugin instance implementing :class:`IHTTPRequest` interface.
+
+        ``variants``,
+            Dictionary of view configuration containing the following keys,
+            media_type, charset, content_coding, language.
+
+        Returns the best matching variant from variants.
+        """
+
 class IHTTPResource( Interface ):
-    """Interface specification for resource or model plugins."""
+    """Interface specification for resource or model plugins. Resource plugins
+    can be configured for view-callables. In which case they are expected to
+    be called before calling view-callable. They can lookup backend database
+    and populate context that can be consumed by view-callable and
+    view-template."""
 
     def __call__( request, c ):
-        """Resource object to gather necessary data, before a request is
-        handled by the view (and templates). Return updated :class:`Context`.
-        The context dictionary is also preserved in the :class:`IHTTPResponse`
-        plugin for chunked transdfer-encoding.
+        """Resource object to gather necessary data before a request is
+        handled by the view (and templates). Return updated
+        :class:`pluggdapps.utils.lib.Context`. The context dictionary is also
+        preserved in the :class:`pluggdapps.web.interfaces.IHTTPResponse`
+        plugin for chunked transfer-encoding.
 
         ``request``,
             Plugin instance implementing :class:`IHTTPRequest` interface.
@@ -84,19 +128,21 @@ class IHTTPCookie( Interface ):
 
     def parse_cookies( headers ):
         """Use HTTP `headers` dictionary, to parse cookie name/value pairs, 
-        along with its meta-information, into Cookie Morsels, ::
+        along with its meta-information, into Cookie Morsels. Get the cookie
+        string from ``headers`` like,
+
+        .. code-block:: python
             
             headers.get( 'cookie', '' ) 
 
-        should give the cookie string from `headers`. Return a
-        ``SimpleCookie`` object from python's standard-library.
+        Return a ``SimpleCookie`` object from python's standard-library.
         """
 
     def set_cookie( cookies, name, morsel, **kwargs ) :
         """Update ``cookies`` dictionary with cookie ``name`` and its
-        ``morsel``. Optional Key-word arguments typically contains,
-        ``domain``, ``expires_days``, ``expires``, ``path``, which are 
-        set on the Cookie.Morsel directly.
+        ``morsel``. Optional Key-word arguments, typically, contain ``domain``,
+        ``expires_days``, ``expires``, ``path``, which are set on the 
+        Cookie.Morsel directly.
 
         ``cookies``,
             Dictionary like object mapping cookie name and its morsel.
@@ -115,13 +161,13 @@ class IHTTPCookie( Interface ):
 
     def create_signed_value( name, value ):
         """Encode `name` and `value` string into byte-string using 'utf-8'
-        encoding settings, convert value into base64 and return a byte-string
-        like,::
+        encoding settings, convert value into base64. Return signed value as
+        string,::
 
           <base64-encoded-value>|<timestamp>|<signature>
 
-        <signature> is generated using `secret`, `name`, base64 encoded 
-        ``value`` and timestamp-in-seconds and return as string.
+        <signature> is generated using a ``secret``, ``name``, base64 encoded 
+        ``value`` and timestamp-in-seconds.
         """
 
     def decode_signed_value( name, value ):
@@ -133,7 +179,7 @@ class IHTTPSession( Interface ):
 
 
 class IHTTPRequest( Interface ):
-    """Interface specification for a request object."""
+    """Interface specification to encapulate HTTP request."""
 
     # ---- Socket and HTTP Attributes, initialized during plugin instantiation
     httpconn = None     # Socket attribute
@@ -167,8 +213,8 @@ class IHTTPRequest( Interface ):
     them, until the request is finished."""
 
     trailers = {}
-    """Similar to `headers` attribute. But received after the last chunk of
-    request in chunked transfer-coding."""
+    """Similar to :attr:`headers` attribute. But received after the last chunk
+    of request in chunked transfer-coding."""
 
     #---- Processed attributes
     uriparts = {}
@@ -240,6 +286,7 @@ class IHTTPRequest( Interface ):
     resource = None
     """When a view is resolved, along with that an optional resource callable
     might be available. If so this attribute can be one of the following,
+
       * plugin implementing :class:`IHTTPResource` interface.
       * An importable string which points to a callable object.
       * Or any python callable object.
@@ -256,7 +303,7 @@ class IHTTPRequest( Interface ):
         """Instance of plugin implementing this interface corresponds to a
         single HTTP request. Note that instantiating this class does not
         essentially mean the entire request is received. Only when
-        :method:`IHTTPRequest.handle` is called complete request is available
+        :meth:`IHTTPRequest.handle` is called complete request is available
         and partially parsed.
 
         ``httpconn``,
@@ -357,7 +404,7 @@ class IHTTPRequest( Interface ):
 
 
 class IHTTPResponse( Interface ):
-    """Interface specification for a response object."""
+    """Interface specification to encapulate HTTP response."""
 
     #---- HTTP attributes
     statuscode = b''
@@ -467,7 +514,7 @@ class IHTTPResponse( Interface ):
             Any type which can be converted to string.
         """
 
-    def set_trailers( name, value ):
+    def set_trailer( name, value ):
         """Sets the given chunk trailing header, ``name`` and ``value``. If 
         there is already a trailing header by ``name`` present, it will be
         overwritten. Returns the new value for header name as byte-string.
@@ -644,7 +691,7 @@ class IHTTPInBound( Interface ):
         """
 
 class IHTTPOutBound( Interface ):
-    """Specification to transform response headers and body. A chain of
+    """Specification to transform response headers and message-body. A chain of
     transforms can be configured on :class:`IWebApp` plugin."""
 
     def transform( request, data, finishing=False ):
@@ -665,7 +712,7 @@ class IHTTPOutBound( Interface ):
         """
 
 class IHTTPRenderer( Interface ): 
-    """Attributes and methods to render a page using a supplied context."""
+    """Attributes and methods to render a page using supplied context."""
 
     def render( request, c, *args, **kwargs ):
         """Implementing plugin should interpret `args` and ``kwargs``
@@ -691,7 +738,6 @@ class IHTTPContentNegotiation( Interface ):
     And based on request data, plugins on the server side can provide the best
     representation compatible with the client.
     """
-
     pass
 
 

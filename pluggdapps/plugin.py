@@ -5,13 +5,14 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 """Core module for pluggdapps plugin framework. It uses metaclassing to
-automagically register and load plugins into query-able classes. Developers can create plugin by deriving their class from :class:`Plugin`. A plugin is expected
-to implement, by calling :meth:`implement()` function, one or more interfaces 
-inside their plugin class' scope. The base class :class:`Plugin` itself is a
-plugin implementing :class:`ISettings` interface, thus all configuration
-related methods are automatically added to the plugin. To provide
-configurable plugins, authors need to override methods from :class:`ISettings`
-interface.
+automagically load and register a blue-print of interfaces and plugins into
+query-able classes. Developers can create plugin by deriving their class from
+:class:`Plugin`. A plugin is expected to implement, by calling
+:meth:`implement()` function, one or more interfaces inside their plugin
+class' scope. The base class :class:`Plugin` itself is a plugin implementing
+:class:`ISettings` interface, thus all configuration related methods are
+automatically added to the plugin. To provide configurable plugins, authors
+need to override methods from :class:`ISettings` interface.
 
 There is also a :class:`Singleton` base class available for plugin authors to
 create singleton plugins. A singleton plugin is created only once for the
@@ -20,17 +21,18 @@ plugin is queried for the first time. Subsequent queries will fetch the
 singleton instance of the plugin.
 
 As mentioned else-where all plugins are but a dictionary of configuration
-settings gathered from sources like package-defaults, ini-files and web-admin
-backend. Platform classes will aggregate these configuration settings during
-statup-time and make them available during plugins instantiation.
-Refer :mod:`pluggdapps.platform` to learn more.
+settings gathered from sources like package-defaults, ini-files and
+backend-config-store. Platform classes will aggregate these configuration
+settings during statup-time and make them available during plugins
+instantiation.  Refer :mod:`pluggdapps.platform` to learn more.
 
 Plugins are instantiated by quering with APIs like `query_plugin()` or
 `query_plugins()`. These APIs are automatically avilable on every instantiated
 plugin and platform objects from :class:`Pluggdapps`.
 
-Deriving a plugin from another plugin class
--------------------------------------------
+
+Plugin inheritance
+------------------
 
 It is also possible to create a plugin by deriving from another plugin class.
 Remember that a plugin class is any class that derives from the
@@ -50,8 +52,8 @@ accepts two constructor arguments.
 Another class `MyPlugin` wants to extend `YourPlugin`, hence can simply derive
 from `YourPlugin` class. And thus automatically becomes a plugin class. Note
 that MyPlugin class accepts 3 constructor arguments and to initialize the base
-class it uses a special method, _super_init() instead of using the builtin
-super(). 
+class it uses a special method, ``_super_init()`` instead of using the builtin
+`super()`.
 """
 
 import sys, inspect
@@ -78,9 +80,11 @@ core_classes = [ 'Interface', 'PluginBase', 'Plugin', 'Singleton' ]
 
 class PluginMeta( type ):
     """Plugin component manager. Tracks interface specifications, plugin
-    definitions and plugins implementing interfaces. Also responsibile for
-    making plugin's configuration settings available as a dictionary of
-    settings."""
+    definitions and plugins implementing interfaces. All interfaces and
+    plugins defined across pluggdapps are blueprinted and handles
+    instantiation of plugins via query_plugin().
+    Also responsibile for making plugin's configuration settings available as
+    a dictionary of settings."""
 
     _pluginmap = {}
     """A map of plugin name (which is lower-cased name of the plugin class)
@@ -196,6 +200,7 @@ class PluginMeta( type ):
             'cls' : newcls,
             'name' : name,
             'file' : clsmod.__file__ if clsmod else '',
+            'assetspec' : '',
             'attributes' : {},  # Map of attribute names and its value
             'methods' : {},     # Map of method names and method object
         }
@@ -216,9 +221,10 @@ class PluginMeta( type ):
         """
         clsmod = whichmodule( newcls )
         info = {
-            'cls'    : newcls,
-            'name'   : nm,
-            'file'   : clsmod.__file__ if clsmod else '',
+            'cls'       : newcls,
+            'name'      : nm,
+            'file'      : clsmod.__file__ if clsmod else '',
+            'assetspec' : '',
         }
         return info
 
@@ -226,16 +232,19 @@ class PluginMeta( type ):
 #---- plugin core access functions.
 
 def isimplement( plugin, interface ):
-    """Check whether `plugin` implements the interface `interface`."""
+    """Check whether ``plugin`` implements the interface ``interface``."""
     return interface in  plugin._interfs
 
 def isplugin( plugin ):
-    """Return True if `plugin` is a plugin-object."""
+    """Return True if ``plugin`` is a plugin-object."""
     return pluginname(plugin) in PluginMeta._pluginmap
 
 def plugincall( obj, fn ):
     """If ``obj`` string is a plugin name, then call ``fn`` and return its
-    value. Other wise import obj, if it is a string. Else return obj as is."""
+    value. Other wise import obj, if it is a string. Else return obj as is.
+
+    TODO : document this function in sphinx. 
+    """
     if isinstance(obj, str) and isplugin(obj) :
         return fn()
     elif isinstance(obj, str) :
@@ -281,7 +290,7 @@ def interface_info( *args ):
         return PluginMeta._interfmap.get( interf, *args[1:] )
 
 def pluginnames( interface=None ):
-    """Return a list of plugin names implementing `interface`. If `interface`
+    """Return a list of plugin names implementing ``interface``. If `interface`
     is None, then return a list of all plugins"""
     if interface :
         return list( PluginMeta._implementers[interface].keys() )
@@ -293,9 +302,9 @@ def pluginname( o ):
     where normalization is done by lower casing plugin's class name.
     
     `o` can be one of the following,
-      * string
-      * plugin class
-      * plugin class instance
+    * string
+    * plugin class
+    * plugin class instance
     """
     if isinstance(o, str) :
         return o.lower()
@@ -317,7 +326,7 @@ def webapps():
     return list( PluginMeta._implementers.get( IWebApp, {} ).keys() )
 
 def whichmodule( attr ):
-    """Try to fetch the module name in which `attr` is defined."""
+    """Try to fetch the module name in which ``attr`` is defined."""
     modname = getattr( attr, '__module__' )
     return sys.modules.get( modname, None ) if modname else None
 
@@ -357,14 +366,17 @@ class Interface( object, metaclass=PluginMeta ):
         
 
 class Attribute( object ):
-    """Doc specifier for interface attributes."""
+    """Doc specifier for interface attributes.
+    
+    IMPORTANT : Deprecated !!! 
+    """
     def __init__( self, docstring ):
         self.docstring = docstring
 
 
 def implements( *interfaces ):
-    """Plugin classes can use this function to declare interfaces that are 
-    implemented by them. This function can be called only in the context 
+    """Plugin classes can use this function to declare ``interfaces`` that are 
+    implemented by them. This function can be called only inside the scope
     of a class deriving from :class:`Plugin`."""
     frame = sys._getframe(1)
 
@@ -388,15 +400,14 @@ class ISettings( Interface ):
 
     While instantiating plugins via `query_plugin()` or `query_plugins()`
     method, passing a ``settings`` key-word argument will override plugin's
-    settings defined by ini files and web-admin.
+    settings defined by ini files and backend-store.
 
     All the attributes specified in this interface will automagically be
     initialised by :class:`PluginMeta`.
     """
 
     pa = None
-    """Platfrom plugin instance of :class:`Pluggdapps` or one of its 
-    derivatives."""
+    """Platfrom instance, of :class:`Pluggdapps` or one of its derivatives."""
 
     @classmethod
     def default_settings():
@@ -446,10 +457,10 @@ class Plugin( PluginBase ):     # Plugin base class implementing ISettings
 
     A plugin is a dictionary of configuration settings, that also implements
     one or more interface. Note that class:`Plugin` does not directly derive
-    from built in type :type:`dict` because dictionary methods from dict
+    from built in type `dict` because dictionary methods from dict
     type might clash with one or more interface methods implemented by the
     derving plugin class. Instead, it provides necessary operator methods, to
-    morph plugin instances into settings dictionaries.
+    access plugin instances as a dictionary of settings.
 
     Every other plugin class `must` derive from this class and can override
     the interface specification methods defined by :class:`ISettings`.
@@ -459,15 +470,25 @@ class Plugin( PluginBase ):     # Plugin base class implementing ISettings
     key,value pairs on plugin instance.
 
     **Important Note**
-      * All plugin classes must be defined at module top-level.
-      * For the plugins to be automatically available for querying, make sure to
-        import the module implementing the plugin inside <package>/__init.py
+
+    * All plugin classes must be defined at module top-level.
+    * For the plugins to be automatically available for querying, make sure to
+      import the module implementing the plugin inside <package>/__init__.py
 
     Similarly to facilitate meth:`query_plugins`, interfaces implemented by a
     plugin class (and all of its base classes) are saved under the plugin class
     attribute :attr:`_interfs`,
 
     <plugin-cls>._interfs = [ <interface-class>, ... ]
+
+    A list of methods supplied to access plugin instance like a dictionary,
+
+    * __len__, a count of configurable parameters.
+    * __getitem__, access settings like ``self['item']``.
+    * __setitem__, update settings like ``self['item'] = value``.
+    * __delitem__, delete settings like ``del self['item']``.
+    * __iter__, iterate on settings like ``[ ... for item in self ]``.
+    * __contains__, membership check like ``item in self``
     """
     implements( ISettings )
 
@@ -522,12 +543,14 @@ def plugin_init():
       loading.
 
     Additionally,
+
     * Every plugin class object's `_interfs` attribute is populated with a
       list of interfaces implemented by the class.
 
     Hence the automagic of plugin system is supplemented by a call to this
     function, once during startup, after all pluggdapps packages are loaded.
     """
+    from pluggdapps import papackages
     # Optimize _implementers and _interfs for query_*
     d = {}
     for i, pmap in PluginMeta._implementers.items() :
@@ -540,5 +563,16 @@ def plugin_init():
     # All plugins, because they derive from :class:`Plugin`, implement
     # ISettings interface.
     d[ ISettings ] = { nm : info['cls'] 
-                       for nm, info in Plugin._pluginmap.items() }
+                       for nm, info in PluginMeta._pluginmap.items() }
     PluginMeta._implementers = d
+
+    # Compute asset-specification for all interfaces and plugins
+    for nm, info in PluginMeta._interfmap.items() :
+        assetspec = h.asset_spec_from_abspath( info['file'], papackages )
+        if assetspec :
+            info['assetspec'] = assetspec
+        
+    for nm, info in PluginMeta._pluginmap.items() :
+        assetspec = h.asset_spec_from_abspath( info['file'], papackages )
+        if assetspec :
+            info['assetspec'] = assetspec

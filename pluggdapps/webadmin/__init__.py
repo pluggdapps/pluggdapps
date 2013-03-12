@@ -5,7 +5,15 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 
-"""Web-application to do platform configuration via web."""
+"""Configuration is normally done in .ini files. To facilitate safe and easy
+administration, a web application ``webadmin`` is automatically hosted by the
+platform.
+
+* access and change configuration settings for all installed plugin.
+* access and change application-wise configuration settings for plugins.
+* webadmin also comes with interactive debugging via web to catch and
+  introspect exceptions during development.
+"""
 
 # - Make sure that to import this package in parent package's __init__ 
 #   module.

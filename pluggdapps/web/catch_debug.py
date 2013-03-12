@@ -7,8 +7,6 @@
 # Originally zExceptions.ExceptionFormatter from Zope, subsequently from
 # paste
 
-"""An exception collector that finds traceback information plus supplements."""
-
 import sys, traceback, linecache, cgi, time
 from   hashlib              import md5
 from   os.path              import isfile
@@ -19,7 +17,8 @@ from   pluggdapps.plugin        import Plugin, implements
 from   pluggdapps.web.interfaces import IHTTPLiveDebug
 
 class CatchAndDebug( Plugin ):
-    """Produces a data structure that can be used by formatters to
+    """An exception collector that finds traceback information plus
+    supplements. Produces a data structure that can be used by formatters to
     render them as an interactive web page.
 
     Magic variables:
@@ -106,6 +105,8 @@ class CatchAndDebug( Plugin ):
     #---- IHTTPLiveDebug method APIs
 
     def render( self, request, etype, value, tb ):
+        """:meth:`pluggdapps.web.interfaces.IHTTPLiveDebug.render` interface 
+        method."""
         response = request.response
         c = self.collectException( request, etype, value, tb )
         weba = self.pa.findapp( appname='webadmin' )

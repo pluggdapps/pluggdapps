@@ -4,41 +4,70 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""
-Site-variant map specification:
--------------------------------
-
-This is a python module containing a list of dictionaries, where each
-dictionary has a structure of,
-
-{ 'name'             : <variant-name>,
-  'pattern'          : <pattern-to-match-with-request-URL>,
-  'resource'         : <resource-name>,
-  'media_type'       : <content-type>,
-  'language'         : <language-string>,
-  'charset'          : <charset-string>,
-  'content_coding'   : <content-coding-string>
-}
-"""
-
 import re
 from   copy import deepcopy
-from   os.path import isfile
 
 import pluggdapps.utils          as h
 from   pluggdapps.const          import URLSEP, CONTENT_IDENTITY
 from   pluggdapps.plugin         import Plugin, implements, isplugin
-from   pluggdapps.web.interfaces import IHTTPRouter, IHTTPResource, \
-                                        IHTTPView, IHTTPResponse
+from   pluggdapps.web.interfaces import IHTTPRouter, IHTTPResource, IHTTPView
+
 # Notes :
 #   - An Allow header field MUST be present in a 405 (Method Not Allowed)
 #     response.
 
 re_patt = re.compile( r'([^{]+)?(\{.+\})?([^}]+)?' )
-          # prefix, interpolater, suffix
+          # prefix, { interpolater }, suffix
 
 class MatchRouter( Plugin ):
-    """IHTTPRouter plugin to route request based on URL pattern matching."""
+    """Plugin to resolve HTTP request to a view-callable by matching patterns
+    on request-URL. Refer to :class:`pluggdapps.web.interfaces.IHTTPRouter`
+    interface spec. to understand the general intent and purpose of this
+    plugin. On top of that, this plugin also supports server side HTTP content
+    negotiation.
+    
+    When creating a web application using pluggdapps, developers must
+    implement a router class, a plugin, implementing
+    :class:`pluggdapps.web.interfaces.IHTTPRouter` interfaces. The general
+    thumb rule is to derive their router class from one of the base routers
+    defined under :mod:`pluggdapps.web` package. :class:`MatchRouter` is one
+    such base class. When an application derives its router from this base
+    class, it can override :meth:`onboot` method and call :meth:`add_view` to
+    add view representations for matching resource.
+
+    This router plugin adheres to HTTP concepts like resource, representation
+    and views. As per the nomenclature, a resource is always identified by
+    request-URL and same resource can have any number of representation. View
+    is a callable entity that is capable of generating the desired
+    representation. Note that a web page that is encoded with `gzip`
+    compression is a different representation of the same resource that does
+    not use `gzip` compression.
+
+    Instead of programmatically configuring URL routing, it is possible to
+    configure them using a mapper file. Which is a python file containing a
+    list of dictionaries where each dictionary element will be converted to
+    add_view() method call during onboot().
+    
+    **map file specification,**
+
+    .. code-block:: python
+
+      [ { 'name'             : <variant-name as string>,
+          'pattern'          : <regex pattern-to-match-with-request-URL>,
+          'view'             : <view-callable as string>,
+          'resource'         : <resource-name as string>,
+          'attr'             : <attribute on view callable, as string>,
+          'method'           : <HTTP request method as byte string>,
+          'media_type'       : <content-type as string>,
+          'language'         : <language-string as string>,
+          'charset'          : <charset-string as string>,
+          'content_coding'   : <content-coding as comma separated values>,
+          'cache_control'    : <response header value>,
+          'rootloc'          : <path to root location for static documents>,
+        },
+        ...
+      ]
+    """
 
     implements( IHTTPRouter )
 
@@ -48,14 +77,37 @@ class MatchRouter( Plugin ):
 
     viewlist = []
     """same as views.items() except that this list will maintain the order in
-    which the views where added."""
+    which the views where added. The same order will be used while resolving
+    the request to view-callable."""
+
+    negotiator = None
+    """:class:`pluggdapps.web.interface.IHTTPNegotiator` plugin to handle HTTP
+    negotiation."""
 
     def onboot( self ):
         """:meth:`pluggapps.web.interfaces.IHTTPRouter.onboot` interface
-        method."""
+        method. Deriving class must override this method and use
+        :meth:`add_view` to create router mapping."""
         self.views = {}
         self.viewlist = []
+        self.negotiator = None
+        if self['IHTTPNegotiator'] :
+            self.negotiator = \
+                self.query_plugin( IHTTPNegotiator, self['IHTTPNegotiator'] )
         self['defaultview'] = h.string_import( self['defaultview'] )
+
+        # Route mapping file is configured, populate view-callables from the
+        # file.
+        mapfile = self['routemapper']
+        if mapfile and isfile( mapfile ) :
+            for kwargs in eval( open( mapfile ).read() ) :
+                name = kwargs.pop('name')
+                pattern = kwargs.pop('pattern')
+                self.add_view( name, pattern, **kwargs )
+
+        elif mapfile :
+            msg = "Wrong configuration for routemapper : %r" % mapfile
+            raise Exception( msg )
 
     def add_view( self, name, pattern, **kwargs ):
         """Add a router mapping rule.
@@ -65,9 +117,15 @@ class MatchRouter( Plugin ):
             unique among all defined routes in a given web-application.
 
         ``pattern``,
-            The pattern of the route like blog/{year}/{month}/{date}. This 
-            argument is required. If the pattern doesn't match the current 
-            URL, route matching continues.
+            The pattern of the route. This argument is required. If pattern
+            doesn't match the current URL, route matching continues.
+
+        For EG,
+
+        .. code-block:: python
+
+            self.add_view( 'article', 'blog/{year}/{month}/{date}' )
+
 
         Optional key-word arguments,
 
@@ -85,27 +143,32 @@ class MatchRouter( Plugin ):
             interface specification before authoring a resource-callable.
 
         ``attr``,
-            Callable method attribute for ``view`` plugin.
+            If view-callable is a method on ``view`` object then supply this
+            argument with a valid method name.
 
         ``method``,
-            HTTP method string supported by the view. Eg. b'GET', b'PUT' etc.
+            Request predicate. HTTP-method as byte string to be matched with
+            incoming request.
 
         ``media_type``,
-            Media type/subtype string specifying the resource variant. If
-            unspecified will be automatically detected using heuristics.
+            Request predicate. Media type/subtype string specifying the
+            resource variant. If unspecified, will be automatically detected
+            using heuristics.
 
         ``language``,
-            Language-range string specifying the resource variant. If
-            unspecified defaults to webapp['language'] configuration settings.
+            Request predicate. Language-range string specifying the resource
+            variant. If unspecified, assumes webapp['language'] from
+            configuration settings.
 
         ``charset``,
-            Charset string specifying the resource variant. If unspecified
-            defaults to use webapp['encoding']
+            Request predicate. Charset string specifying the resource variant.
+            If unspecified, assumes webapp['encoding'] from configuration
+            settings.
 
         ``content_coding``,
             Comma separated list of content coding that will be applied, in
             the same order as given, on the resource variant. Defaults to 
-            'identity'.
+            `identity`.
 
         ``cache_control``,
             Cache-Control response header value to be used for the resource's
@@ -119,9 +182,17 @@ class MatchRouter( Plugin ):
         ``media_type``, ``language``, ``content_coding`` and ``charset``
         kwargs, if supplied, will be used during content negotiation.
         """
+        # Positional arguments.
         self.views[ name ] = view = {}
-        view['view'] = kwargs.pop( 'view', None )
+        view['name'] = name
+        view['pattern'] = pattern
+        regex, tmpl, redict = self._compile_pattern( pattern )
+        view['compiled_pattern'] = re.compile( regex )
+        view['path_template'] = tmpl
+        view['match_segments'] = redict
 
+        # Supported key-word arguments
+        view['view'] = kwargs.pop( 'view', None )
         view['resource'] = kwargs.pop( 'resource', None )
         view['attr'] = kwargs.pop( 'attr', None )
         view['method'] = h.strof( kwargs.pop( 'method', None ))
@@ -131,30 +202,51 @@ class MatchRouter( Plugin ):
         view['language'] = kwargs.pop( 'language', self.webapp['language'] )
         view['charset'] = kwargs.pop( 'charset', self.webapp['encoding'] )
         
-        # Populate the remaining items.
+        # Content Negotiation attributes
         view.update( kwargs )
-
-        view['pattern'] = pattern
-        regex, tmpl, redict = self.compile_pattern( pattern )
-        view['compiled_pattern'] = re.compile( regex )
-        view['path_template'] = tmpl
-        view['match_segments'] = redict
         self.viewlist.append( (name, view) )
+
 
     def route( self, request ):
         """:meth:`pluggdapps.web.interfaces.IHTTPRouter.route` interface
         method.
+
+        Three phases of request resolution to view-callable,
+
+        * From configured list of views, filter out views that maps to same
+          request-URL.
+        * From the previous list, filter the variants that match with request
+          predicates.
+        * If content negotiation is enable, apply server-side negotiation
+          algorithm to single out a resource variant.
+
+        If than one variant remains at the end of all three phases, then pick
+        the first one in the list. And that is why the sequence in which
+        :meth:`add_view` is called for each view representation is important.
+
+        If ``resource`` attribute is configured on a view, it will be called
+        with ``request`` plugin and ``context`` dictionary. Resource-callable
+        can populate the context with relavant data that will subsequently 
+        be used by the view callable, view-template etc. Additionally, if a
+        resource callable populates the context dictionary, it automatically
+        generates the etag for data that was populated through ``c.etag``
+        dictionary. Populates context with special key `etag` and clears
+        ``c.etag`` before sending the context to view-callable.
         """
-        resp = request.response
-        c = resp.context
+        resp, c = request.response, resp.context
 
         # Three phases of request resolution to view-callable
-        matches = self.match_url( request, self.viewlist )
-        variants = self.match_predicates( request, matches )
-        variant = self.negotiate( request, variants )
+        matches = self._match_url( request, self.viewlist )
+        variants = self._match_predicates( request, matches )
+        if self.negotiator :
+            variant = self.negotiator.negotiate( request, variants )
+        elif variants :     # First come first served.
+            variant = variants[0]
+        else :
+            variant = None
 
-        if variant :
-            name, viewd, m = variant
+        if variant :        # If a variant is resolved
+            name, viewd, m = variant['name'], variant, variant['_regexmatch']
             resp.media_type = viewd['media_type']
             resp.charset = viewd['charset']
             resp.language = viewd['language']
@@ -162,15 +254,15 @@ class MatchRouter( Plugin ):
             request.matchdict = m.groupdict()
 
             # Call IHTTPResource plugin configured for this view callable.
-            resource = self.resourceof( request, viewd )
+            resource = self._resourceof( request, viewd )
             resource( request, c ) if resource else None
 
             # If etag is available, compute and subsequently clear them.
-            etag = c.etag.hashout( prefix='resp-' )
+            etag = c.etag.hashout( prefix='res-' )
             c.setdefault( 'etag', etag ) if etag else None
             c.etag.clear()
 
-            request.view = self.viewof( request, name, viewd )
+            request.view = self._viewof( request, name, viewd )
 
         elif matches :
             from pluggdapps.web.views import HTTPNotAcceptable
@@ -185,8 +277,10 @@ class MatchRouter( Plugin ):
 
     def urlpath( self, request, name, **matchdict ):
         """:meth:`pluggdapps.web.interfaces.IHTTPRouter.route` interface
-        method. Generate url path for request using view-patterns. Return a
-        string of URL-path, with query and anchore elements.
+        method.
+        
+        Generate url path for request using view-patterns. Return a string of
+        URL-path, with query and anchore elements.
 
         ``name``,
             Name of the view pattern to use for generating this url
@@ -198,8 +292,8 @@ class MatchRouter( Plugin ):
             url. If matchdict contains the following keys,
 
             `_query`, its value, which must be a dictionary similar to 
-            :attr:`IHTTPRequest.getparams`, will be interpreted as query
-            parameters and encoded to query string.
+            :attr:`pluggdapps.web.interfaces.IHTTPRequest.getparams`, will be
+            interpreted as query parameters and encoded to query string.
 
             `_anchor`, its value will be attached at the end of the url as
             "#<_anchor>".
@@ -210,72 +304,19 @@ class MatchRouter( Plugin ):
         path = view['path_template'].format( **matchdict )
         return h.make_url( None, path, query, fragment )
 
-
-    #---- Internal methods.
-
-    def match_url( self, request, viewlist ):
-        """Match view pattern with request url and filter out views with
-        matching urls."""
-        matches = []
-        for name, viewd in viewlist :  # Match urls.
-            m = viewd['compiled_pattern'].match( request.uriparts['path'] )
-            matches.append( (name, viewd, m) ) if m else None
-        return matches
-
-    def match_predicates( self, request, matches ):
-        """Filter matching views, whose pattern matches with request-url,
-        based on view-predicates"""
-        variants = []
-        for name, viewd, m in matches :
-            x = True
-            if viewd['method'] != None :
-                x = x and viewd['method'] == h.strof( request.method )
-            variants.append( (name, viewd, m) ) if x else None
-
-        return variants
-
-    def negotiate( self, request, variants ):
-        """When the router finds that a resource (typically indicated by the
-        request-URL) is multiple representations, where each representation is
-        called a variant, it has to pick the best representation negotiated by
-        the client. Negotiation is handled through attributes like media-type,
-        language, charset and content-encoding. Returns the best matching
-        variant from ``variants``. 
-
-        ``request``,
-            Plugin instance implementing :class:`IHTTPRequest` interface.
-
-        Return matching variant.
+    def onfinish( self, request ):
+        """:meth:`pluggdapps.web.interfaces.IHTTPRouter.onfinish` interface
+        method.
         """
-        if self['negotiate_content'] == False :
-            return variants[0] if variants else None
+        pass
 
-        negot_tbl = self.compile_client_negotiation( request )
+    #-- Local methods.
 
-        fn = lambda x : (x,)
-        variants_ = []
-        for name, viewd, m in variants :
-            typ, subtype = viewd['media_type'].split('/', 1)
-            keys = [ (viewd['media_type'],), ('%s/*'%typ,), ('*/*',) ]
-            keys = [ x+y
-                for x in keys 
-                for y in map( fn, [viewd['charset'], '*']) ]
-            keys = [ x+y
-                for x in keys 
-                for y in map(fn, [viewd['content_coding'], CONTENT_IDENTITY]) ]
-            keys = [ x+y
-                for x in keys 
-                for y in map( fn, [viewd['language'], '*']) ]
-            q = max( negot_tbl.get( k, 0.0 ) for k in keys )
-            variants_.append( (name, viewd, m, q) ) if q else None
-        variants_ = sorted( variants_, key=lambda x : x[3], reverse=True )
-        return variants_[0][:3] if variants_ else None
-
-    def viewof( self, request, name, viewd ):
+    def _viewof( self, request, name, viewd ):
         """For resolved view ``viewd``, fetch the view-callable."""
         v = viewd['view']
         self.pa.logdebug( "%r view callable: %r " % (request.uri, v) )
-        if isinstance( v, str ) and isplugin(v) :
+        if isinstance(v, str) and isplugin(v) :
             view = self.query_plugin( IHTTPView, v, name, viewd )
         elif isinstance( v, str ):
             view = h.string_import( v )
@@ -283,7 +324,7 @@ class MatchRouter( Plugin ):
             view = v
         return getattr( view, viewd['attr'] ) if viewd['attr'] else view
 
-    def resourceof( self, request, viewd ):
+    def _resourceof( self, request, viewd ):
         """For resolved view ``viewd``, fetch the resource-callable."""
         res = viewd['resource']
         self.pa.logdebug( "%r resource callable: %r " % (request.uri, res) )
@@ -294,7 +335,33 @@ class MatchRouter( Plugin ):
         else :
             return res
 
-    def compile_pattern( self, pattern ):
+    def _match_url( self, request, viewlist ):
+        """Match view pattern with request url and filter out views with
+        matching urls."""
+        matches = []
+        for name, viewd in viewlist :  # Match urls.
+            m = viewd['compiled_pattern'].match( request.uriparts['path'] )
+            if m :
+                viewd = deepcopy( viewd )
+                viewd['_regexmatch'] = m
+                matches.append( viewd )
+        return matches
+
+    def _match_predicates( self, request, matches ):
+        """Filter matching views, whose pattern matches with request-url,
+        based on view-predicates. 
+        
+        TODO: More predicates to be added."""
+        variants = []
+        for viewd in matches :
+            x = True
+            if viewd['method'] != None :
+                x = x and viewd['method'] == h.strof( request.method )
+            variants.append( viewd ) if x else None
+
+        return variants
+
+    def _compile_pattern( self, pattern ):
         """`pattern` is URL routing pattern.
 
         This method compiles the pattern in three different ways and returns
@@ -303,9 +370,11 @@ class MatchRouter( Plugin ):
         `regex`,
             A regular expression string that can be used to match incoming
             request-url to resolve view-callable.
+
         `tmpl`,
             A template formating string that can be used to generate URLs by
             apps.
+
         `redict`,
             A dictionary of variable components in path segment and optional
             regular expression that must match its value. This can be used for
@@ -348,30 +417,6 @@ class MatchRouter( Plugin ):
         regex += '$'
         return regex, tmpl, redict
 
-    def compile_client_negotiation( self, request ):
-        hs = [ request.headers.get( 'accept', b'' ),
-               request.headers.get( 'accept_charset', b'' ),
-               request.headers.get( 'accept_encoding', b'' ),
-               request.headers.get( 'accept_language', b'' ),
-             ]
-        accept = h.parse_accept( hs[0] ) or [('*/*', 1.0, b'')]
-        accchr = h.parse_accept_charset( hs[1] ) or [('*', 1.0)]
-        accenc = h.parse_accept_encoding( hs[2] ) or [(CONTENT_IDENTITY, 1.0)]
-        acclan = h.parse_accept_language( hs[3] ) or [('*', 1.0)]
-
-        ad = { mt : q for mt, q, params in accept }
-        bd = { (a, ch) : aq*q for ch, q in accchr for a, aq in ad.items() }
-        cd = { b+(enc,) : bq*q for enc, q in accenc for b, bq in bd.items() }
-        tbl = {}
-        for ln, q in acclan :
-            zd, yd = {}, deepcopy( cd )
-            for part in ln.split('-') :
-                yd = { k+(part,) : cq for k, cq in yd.items() }
-                zd.update( yd )
-            tbl.update({ k : cq*q for k, cq in zd.items() })
-        return tbl
-
-
     #---- ISettings interface methods
 
     @classmethod
@@ -386,11 +431,16 @@ class MatchRouter( Plugin ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
         method.
         """
+        sett['routemapper'] = \
+                h.abspath_from_asset_spec( sett['routemapper'].strip() )
         return sett
 
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = MatchRouter.__doc__
+_default_settings.__doc__ = (
+    "Plugin to resolve HTTP request to a view-callable by matching patterns "
+    "on request-URL. On top of that, this plugin also supports server side "
+    "HTTP content negotiation." )
 
 _default_settings['defaultview']  = {
     'default' : 'pluggdapps.web.views.HTTPNotFound',
@@ -398,10 +448,18 @@ _default_settings['defaultview']  = {
     'help'    : "Default view callable plugin. Will be used when request "
                 "cannot be resolved to a valid view-callable."
 }
-_default_settings['negotiate_content']  = {
-    'default' : True,
-    'types'   : (bool,),
-    'help'    : "If True, then content-negotiation will be invoked when more "
-                "than one representation is available for the same resource."
+_default_settings['IHTTPNegotiator']  = {
+    'default' : 'HTTPNegotiator',
+    'types'   : (str,),
+    'help'    : "If configured, will be used to handle server side http "
+                "negotiation for best matching resource variant."
+}
+_default_settings['routemapper'] = {
+    'default' : '',
+    'types'   : (str,),
+    'help'    : "Route mapper file in asset specification format. A python "
+                "file containing a list of dictionaries, where each "
+                "dictionary element will be converted to add_view() "
+                "method-call on the router plugin."
 }
 

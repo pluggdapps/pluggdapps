@@ -29,11 +29,14 @@ these settings are automatically made available inside the plugin (refered by
 
 .. code-block:: python
 
-    ....
-    sock.listen( self['backlog'] )
-    print( "Server listening host and port" % (self['host'], self['port']) )
-    ...
-
+    class HTTPEPollServer( Pluing ):
+        ...
+        def bind( args, kwargs ) :
+            ...
+            sock.listen( self['backlog'] )
+            print( "Listening host and port, " % (self['host'], self['port']) )
+            ...
+        ...
 
 From administrator's point of view, platform configuration can be done via ini 
 file(s) or through browser using pre-packaged application ``webadmin``, which 

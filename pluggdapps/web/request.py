@@ -13,13 +13,11 @@ from   pluggdapps.web.interfaces import IHTTPRequest
 # TODO : Product token, header field `Server` to be automatically added in
 # response.
 
-_default_settings = h.ConfigDict()
-_default_settings.__doc__ = (
-    "Configuration settings for HTTPRequest implementing IHTTPRequest "
-    "interface." )
-
 class HTTPRequest( Plugin ):
-    """Request plugin."""
+    """Plugin encapsulates HTTP request. Refer to 
+    :class:`pluggdapps.web.interfaces.IHTTPRequest` interface spec. to
+    understand the general intent and purpose of this plugin.
+    """
 
     implements( IHTTPRequest )
 
@@ -28,7 +26,8 @@ class HTTPRequest( Plugin ):
 
     # IHTTPRequest interface methods and attributes
     def __init__( self, httpconn, method, uri, uriparts, version, headers ):
-
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.__init__`
+        interface method."""
         self.router = self.cookie = None
         self.response = self.session = None
 
@@ -168,3 +167,7 @@ class HTTPRequest( Plugin ):
         method.
         """
         return _default_settings
+
+_default_settings = h.ConfigDict()
+_default_settings.__doc__ = (
+    "Plugin encapsulates HTTP request." )

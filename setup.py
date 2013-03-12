@@ -74,5 +74,5 @@ setup(
     long_description=LONG_DESCRIPTION,
     platforms='',
     classifiers=classifiers,
-    keywords=[ 'plugin', 'component', 'architecture', 'web' ],
+    keywords=[ 'plugin', 'component', 'architecture', 'web', 'plugin' ],
 )

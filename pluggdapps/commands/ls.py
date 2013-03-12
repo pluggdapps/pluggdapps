@@ -10,11 +10,13 @@ from   copy   import deepcopy
 from   pluggdapps.const      import SPECIAL_SECS
 from   pluggdapps.plugin     import PluginMeta, implements, Singleton, webapps
 from   pluggdapps.interfaces import ICommand
-import pluggdapps.utils as h
+import pluggdapps.utils      as h
 
 class CommandLs( Singleton ):
-    """Subcommand for pa-script to list internal state of pluggdapps' virtual
-    environment."""
+    """Sub-command plugin for pa-script to list internal state of pluggdapps'
+    virtual environment. Instead of using this command, use `sh` sub-command
+    to start a shell and introspect pluggdapps environment.
+    """
     implements( ICommand )
 
     description = 'list various information about Pluggdapps environment.'
@@ -22,54 +24,63 @@ class CommandLs( Singleton ):
 
     #---- ICommand API
     def subparser( self, parser, subparsers ):
-        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface method."""
+        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface method.
+        """
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
-        self.subparser.add_argument( "-p", dest="plugin",
-                                     default=None,
-                                     help="Plugin name" )
-        self.subparser.add_argument( "-i", dest="interface",
-                                     default=None,
-                                     help="Interface name" )
-        self.subparser.add_argument( "-s", dest="ls_summary",
-                                     action="store_true", default=False,
-                                     help="Summary of pluggdapps environment" )
-        self.subparser.add_argument( "-m", dest="ls_implementers",
-                                     action="store_true", default=False,
-                                     help="list of interfaces and their "
-                                          "plugins" )
-        self.subparser.add_argument( "-M", dest="ls_implementers_r",
-                                     action="store_true", default=False,
-                                     help="list of plugins and interfaces they "
-                                          "implement" )
-        self.subparser.add_argument( "-e", dest="ls_settings",
-                                     default=None,
-                                     help="Settings of pluggdapps environment, "
-                                          "special plugin wa default")
-        self.subparser.add_argument( "-K", dest="ls_packages",
-                                     action="store_true", default=False,
-                                     help="List of pluggdapps packages loaded" )
-        self.subparser.add_argument( "-W", dest="ls_webapps",
-                                     action="store_true", default=False,
-                                     help="List all web application and its "
-                                          "mount configuration" )
-        self.subparser.add_argument( "-P", dest="ls_plugins", 
-                                     action="store_true", default=False,
-                                     help="List plugins defined" )
-        self.subparser.add_argument( "-I", dest="ls_interfaces",
-                                     action="store_true", default=False,
-                                     help="List interfaces defined" )
+        self.subparser.add_argument(
+                "-p", dest="plugin",
+                default=None,
+                help="Plugin name" )
+        self.subparser.add_argument(
+                "-i", dest="interface",
+                default=None,
+                help="Interface name" )
+        self.subparser.add_argument(
+                "-s", dest="_ls_summary",
+                action="store_true", default=False,
+                help="Summary of pluggdapps environment" )
+        self.subparser.add_argument(
+                "-e", dest="_ls_settings",
+                default=None,
+                help="list settings" )
+        self.subparser.add_argument(
+                "-P", dest="_ls_plugins", 
+                action="store_true", default=False,
+                help="List plugins defined" )
+        self.subparser.add_argument(
+                "-I", dest="_ls_interfaces",
+                action="store_true", default=False,
+                help="List interfaces defined" )
+        self.subparser.add_argument(
+                "-K", dest="_ls_packages",
+                action="store_true", default=False,
+                help="List of pluggdapps packages loaded" )
+        self.subparser.add_argument(
+                "-W", dest="_ls_webapps",
+                action="store_true", default=False,
+                help="List all web application and its mount configuration" )
+        self.subparser.add_argument(
+                "-m", dest="_ls_implementers",
+                action="store_true", default=False,
+                help="list of interfaces and their plugins" )
+        self.subparser.add_argument(
+                "-M", dest="_ls_implementers_r",
+                action="store_true", default=False,
+                help="list of plugins and interfaces they implement" )
         return parser
 
     def handle( self, args ):
         """:meth:`pluggdapps.interfaces.ICommand.handle` interface method."""
-        opts = [ 'ls_summary', 'ls_settings', 'ls_plugins', 'ls_interfaces',
-                 'ls_webapps', 'ls_packages', 'ls_implementers',
-                 'ls_implementers_r' ]
+
+        opts = [ '_ls_summary', '_ls_settings', '_ls_plugins', '_ls_interfaces',
+                 '_ls_webapps', '_ls_packages', '_ls_implementers',
+                 '_ls_implementers_r' ]
+
         for opt in opts :
             if getattr( args, opt, False ) :
-                getattr( self, '_'+opt )( args )
+                getattr( self, opt )( args )
                 break
         else :
             if args.interface :
@@ -81,38 +92,37 @@ class CommandLs( Singleton ):
     def _ls_summary( self, args ):
         import pluggdapps
 
-        webapps = getattr( self.pa, 'webapps', {} ).keys()
+        webapps_ = webapps()
         print( "Pluggdapps environment" )
         print( "  Configuration file : %s" % self.pa.inifile )
         print( "  Erlang Port        : %s" % (self.pa.erlport or None) )
-        print( "  Loaded packages    : %s" % len(pluggdapps.packages) )
+        print( "  Loaded packages    : %s" % len(pluggdapps.papackages) )
         print( "  Interfaces defined : %s" % len(PluginMeta._interfmap) )
         print( "  Plugins loaded     : %s" % len(PluginMeta._pluginmap) )
-        print( "  Applications loaded: %s" % len(webapps()) )
+        print( "  Applications loaded: %s" % len(webapps_) )
         print( "Web-application instances")
-        pprint( list(webapps), indent=2 )
+        pprint( webapps_, indent=2 )
 
     def _ls_settings( self, args ):
         sett = deepcopy( self.pa.settings )
-        if args.ls_settings.startswith('spec') :
+        if args._ls_settings.startswith('spec') :
             print( "Special sections" )
             pprint(
                 { k : sett.pop( k, {} ) for k in SPECIAL_SECS+['DEFAULT'] },
                 indent=2 )
-        elif args.ls_settings.startswith('plug') :
+        elif args._ls_settings.startswith('plug') :
             print( "Plugin sections" )
             pprint(
                 { k : sett[k] for k in sett if h.is_plugin_section(k) },
                 indent=2 )
-        elif args.ls_settings.startswith('wa') and args.plugin :
-            webapps = getattr( self.pa, 'webapps', {} )
-            for instkey, webapp in webapps.items() :
+        elif args._ls_settings.startswith('wa') and args.plugin :
+            for instkey, webapp in getattr(self.pa, 'webapps', {}).items() :
                 appsec, netpath, instconfig = instkey
                 if h.sec2plugin( appsec ) == args.plugin :
                     print( "Settings for %r" % (instkey,) )
                     pprint( webapp.appsettings, indent=2 )
                     print()
-        elif args.ls_settings.startswith('def') and args.plugin :
+        elif args._ls_settings.startswith('def') and args.plugin :
             print( "Default settings for plugin %r" % args.plugin )
             defaultsett = pa.defaultsettings()
             pprint( defaultsett().get( h.plugin2sec(args.plugin), {} ),
@@ -127,7 +137,7 @@ class CommandLs( Singleton ):
     def _ls_interfaces( self, args ):
         l = sorted( list( PluginMeta._interfmap.items() ))
         for iname, info in l :
-            print(( "  %-15s in %r" % (iname, info['file']) ))
+            print(( "  %-15s in %r" % (iname, info['assetspec']) ))
 
     def _ls_interface( self, args ):
         nm = args.interface
@@ -166,7 +176,7 @@ class CommandLs( Singleton ):
     def _ls_packages( self, args ):
         import pluggdapps
         print( "List of loaded packages" )
-        pprint( pluggdapps.packages, indent=2 )
+        pprint( pluggdapps.papackages, indent=2, width=70 )
 
     def _ls_implementers( self, args ):
         print("List of interfaces and plugins implementing them")
@@ -178,9 +188,10 @@ class CommandLs( Singleton ):
     def _ls_implementers_r( self, args ):
         print("List of plugins and interfaces implemented by them")
         for name, info in PluginMeta._pluginmap.items() :
-            intrfs = list( map( lambda x : x.__name__, info['cls']._interfs ))
+            intrfs = list( sorted( 
+                            map( lambda x : x.__name__, info['cls']._interfs )))
             print( "  %-20s" % name, end='' )
-            pprint( intrfs, indent=8 )
+            pprint( intrfs, indent=8, width = 60 )
 
     #---- ISettings interface methods
 

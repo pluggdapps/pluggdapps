@@ -2,8 +2,8 @@ Clone this repository from github or google-code or bit-bucket, and do,
 
 .. code-block:: bash
 
-   cd paenv
-   make setup
+   $ cd paenv
+   $ make setup
 
 This will create a virtual environment and install latest version of
 pluggdapps and related packages. A note on the directory structure,
@@ -27,16 +27,16 @@ are configured under this directory.
 
 .. code-block:: bash
 
-    ./pa-env/bin/pa -w -c etc/master.ini serve
+    $ ./pa-env/bin/pa -w -c etc/master.ini serve
 
 To learn more about the ``pa`` command try,
 
 .. code-block:: bash
 
-    ./pa-env/bin/pa -h
+    $ ./pa-env/bin/pa -h
 
 To learn more about the ``serve`` sub-command try,
 
 .. code-block:: bash
 
-    ./pa-env/bin/pa serve -h
+    $ ./pa-env/bin/pa serve -h

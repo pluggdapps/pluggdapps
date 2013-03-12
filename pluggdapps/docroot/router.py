@@ -22,18 +22,8 @@ class DocRootRouter( MatchRouter ):
         """:meth:`pluggapps.web.interfaces.IHTTPRouter.onboot` interface
         method."""
         super().onboot()
-        if self['routemapper'] :
-            fl = h.abspath_from_asset_spec( self['routemapper'] )
-            if fl and isfile( fl ) :
-                for vargs in eval( open( fl ).read() ) :
-                    self.add_view( vargs.pop('name'), vargs.pop('pattern'), 
-                                   **vargs )
-            elif fl :
-                raise Exception("Wrong configuration for routemapper : %r"%fl)
-        else :
-            self.add_view( 'staticmap1', '/*path', view='docrootview',
-                           content_coding='gzip' )
-            self.add_view( 'staticmap2', '/*path', view='docrootview' )
+        self.add_view( 'staticmap1', '/*path', view='docrootview',
+                       content_coding='gzip' )
 
     #---- ISettings interface methods
 
@@ -49,21 +39,7 @@ class DocRootRouter( MatchRouter ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
         method.
         """
-        sett['routemapper'] = sett['routemapper'].strip()
         return sett
 
 _default_settings = h.ConfigDict()
 _default_settings.__doc__ = DocRootRouter.__doc__
-
-_default_settings['routemapper'] = {
-    'default' : '',
-    'types'   : (str,),
-    'help'    : "Other than mapping static documents as web pages via "
-                "``rootloc`` parameter, more view can be added via "
-                "routemapper module, to be provided here in asset "
-                "specification format. The module is expected to contain a "
-                "list of dictionaries, where each dictionary will be passed "
-                "to router's add_view() method as keyword argument, at boot "
-                "time."
-}
-

@@ -4,102 +4,148 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""This module along with the :mod:`plugin` module implements the component
-architechture. Provides the platform class in whose context plugins are
-instantiated. It is also responsible for parsing configuration parameters from
-various sources, aggregate them, make them avialable on plugins instances. The
-platform classes also provide methods for logging error / warning messages.
+"""This module along with the :mod:`plugin` module implement the component
+architechture. We expect that most of the logic written using pluggdapps will,
+one way or the other, be organised as plugins implementing one or more
+interface(s). This module,
 
-The platform is instantiated by calling the :meth:`boot` method.
+* provide platform base class in whose context plugins are instantiated.
+* responsible for parsing configuration parameters from various sources,
+  aggregate them, make them avialable on plugin instances.
+* supply methods for logging error and warning messages.
+
+The platform is instantiated by calling the :meth:`Pluggdapps.boot` method.
+
+**Pre-boot and boot**
+
+Pluggdapps component architecture is always instantiated in the context of a
+platform defined by :class:`Pluggdapps` class or by classes deriving from
+`Pluggdapps`.
+
+Platform boots in two phase, first there is a pre-boot which more or less
+does every thing that is done during an actual boot and then the actual
+booting. Pre-booting is designed such a way that other pluggdapps-packages can
+take part in platform booting, such as loading dynamic plugins, pre-compiling
+template scripts etc ...
+
+So here is what happens duing pre-booting,
+
+* all pluggdapps packages are loaded. But entry points are not called.
+* component system is initialized by calling 
+  :func:`pluggdapps.plugin.plugin_init`.
+* a plain vanilla platform is instantiated using :class:`Pluggdapps`.
+* configuration settings from .ini files and database backend, if available,
+  is loaded.
+
+Pre-booting comes to an end by a call to :func:`pluggdapps.initialize`
+function, which in turn is responsible for re-loading pluggdapps packages and 
+calling the package entry-point. Note that package re-loading is handle in the
+context of a plain vanilla platform instantiated during pre-boot phase.
+
+During the actual boot phase, everything that was done in pre-booting phase
+is repeated. But the entire blue-print of interfaces and plugins from all the
+installed packages will be remembered in the context of, probably a more
+sophisticated :class:`Webapps`, platform class. The choice of platform class
+depends on how the user started pluggdapps.
 
 Configuration:
 --------------
 
-Platform's boot method expect an ini-file regarded as master configuration
-file. Settings in this master configuration file will override package default
-settings for plugins and other special sections. Any configuration section not
-prefixed with **plugin:** is considered as special section, which are explained
-further below. Master configuration file can refer to other configuration file.
+Like mentioned before, platform classes are responsible for handling
+configuration.
+
+**default configuration,**
+
+All plugins deriving from :class:`pluggdapps.plugin.Plugin` class, which is
+how plugins are authored, will automatically implement 
+ISettings interface. And configurable plugins must override `ISettings`
+interface methods. Refer to :class:`pluggdapps.plugin.ISettings` interface to
+learn more about their interface methods. When platform is booted,
+default_settings from loaded plugins will be gathered and remembered.
+
+**ini file,**
+
+Platform is typically booted by supplying an ini-file regarded as master
+configuration file. Settings in this master configuration file will override
+package default settings for plugins and other `special sections`.
+Configuration sections not prefixed with ``plugin:`` is considered as special
+section which are explained further below.
+
+Master configuration file can refer to other configuration file.
   
-An example master configuration file,::
+An example master configuration file,
 
-  base.ini
-  --------
+.. code-block:: ini
 
-  [DEFAULT]
-  <option> = <value>
-  ...
+    [DEFAULT]
+    <option> = <value>
+    ... = ...
 
-  [pluggdapps]
-  <option> = <value>
-  ...
+    [pluggdapps]
+    <option> = <value>
+    ... = ...
 
-  [plugin:<pluginname>]
-  <option> = <value>
-  ...
+    [plugin:<pluginname>]
+    <option> = <value>
+    ... = ...
 
-  [plugin:<pluginname>]
-  ...
+    [...]
 
 Special sections:
 -----------------
 
-**[DEFAULT]** special section, settings that are applicable to all
-configuration sections including plugins and refered configuration files.
+**[DEFAULT]** special section. Settings from this section is applicable to all
+configuration sections including plugins and referred configuration files.
 Semantic meaning of [DEFAULT] section is same as described by ``configparser``
-module from stdlib.
+module from python stdlib.
 
-**[pluggdapps]** special section, settings that are applicable to pluggdapps
-platform typically handled by :class:`Pluggdapps`.
+**[pluggdapps]** special section. Settings from this section is applicable to
+pluggdapps platform typically handled by :class:`Pluggdapps`.
 
-**[mountloc]** special section, is specific to web-framework (explained below)
+**[mountloc]** special section. Specific to web-framework (explained below)
 that is built on top of pluggdapps component architecture. Provides 
-configuration settings on how to mount web-applications on web-url. Typically
-handled by :class:`Webapps`.
+configuration settings on how to mount web-applications on web-url. Handled
+by :class:`Webapps` platform class.
+
+To learn more about backend store for configuration settings refer to module,
+:mod:`pluggdapps.config`.
   
 Web-application platform:
 -------------------------
 
 Implemented by :class:`Webapps` class (which derives from base platform class
 :class:`Pluggdapps`), it can host any number web-application, and/or instance
-of same web-application, in a single python environment. Every web-application
+of same web-application in single python environment. Every web-application
 is a plugin implementing :class:`pluggdapps.interfaces.IWebApp` interface.
-When plugins are instantiated by a webapp plugin, either directly or
-indirectly, the instantiated plugins are automatically supplied with
-**.webapp** attribute.
+Like mentioned above every plugin gets instantiated in the context of a
+platform, and in this case, when plugins are instantiated by `IWebApp` plugin,
+either directly or indirectly, the instantiated plugins are automatically
+supplied with **.webapp** attribute which is now part of its context.
+
+**[mountloc] section and application wise ini file,**
 
 Web-applications can be mounted, hosted, on a netlocation and script-path
 (collectively called as ``netpath``). This is configured under **[mountloc]**
 special section. While mounting web-applications under [mountloc] additional 
-configuration files can be referred.
+configuration files can be referred. Example [mountloc] section,
 
-Example [mountloc] section,::
+.. code-block:: ini
 
   [mountloc]
   pluggdapps.com/issues = <appname>, <ini-file>
   tayra.pluggdapps.com/issues = <appname>, <ini-file>
   tayra.pluggdapps.com/source = <appname>, <ini-file>
 
-The referred configuration files are exclusive to the scope of the mounted
+The `lhs` side is called netpath which typically contains subdomain, hostname
+and scripth-path. The `rhs` side is a tuple of two elements. First is the
+name of a `IWebApp` plugin and second is path to application configuration
+file.
+
+Referred configuration files are exclusive to the scope of the mounted
 application, and shall not contain any special sections, except `[DEFAULT]`,
 unless otherwise explicitly mentioned. When a plugin is instantiated in the
 context of a web-application, configuration settings from application-ini-file
 will override settings from the master-ini-file.
-
-Finally the platform can be started like,::
-
-  pa = Webapps.boot( args.config )
-
-where ``args.config`` locates the master-ini file
-
-Dynamic plugins :
-
-  There is also an option to create plugin blue-prints dynamically and this
-  option can be carried out by package() entry point implemented by every
-  pluggdapps pacakge. Note that this entry point is called in the context of
-  platform object ``pa`` which is only a partial implementation platform since
-  they do not contain the dynamic plugins. Once all entry points are called, a
-  fully-aware platform object is created.
 """
 
 from   configparser          import SafeConfigParser
@@ -223,7 +269,7 @@ class Pluggdapps( object ):
     master configuration file and other backend stores, if any."""
 
     configdb = None
-    """:class`IConfigDB` plugin instance."""
+    """:class:`pluggdapps.interfaces.IConfigDB` plugin instance."""
 
     def __init__( self, erlport=None ):
         self.erlport = erlport # TODO: Document this once bolted with netscale
@@ -260,7 +306,6 @@ class Pluggdapps( object ):
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
         initialize( pa ) # Prebooting ends with initialize call.
 
-        # Configuration backend
         # Actual booting
         pa = cls( *args, **kwargs )
         pa.inifile = baseini
@@ -856,8 +901,8 @@ class Webapps( Pluggdapps ):
 
     @staticmethod
     def query_plugin( pa, webapp, interface, name, *args, **kwargs ):
-        """Same as queryPlugins, but returns a single plugin instance as opposed
-        an entire list. `name` will be used to identify that plugin.
+        """Same as queryPlugins, but returns a single plugin instance as
+        opposed an entire list. `name` will be used to identify that plugin.
         Positional and keyword arguments will be used to instantiate the plugin
         object.
 
@@ -867,7 +912,7 @@ class Webapps( Pluggdapps ):
         ``webapp``,
             Web application object, plugin implementing
             :class:`pluggdapps.interfaces.IWebApp` interface. It is an
-            optional argument, which must be passed ``None` otherwise.
+            optional argument, which must be passed ``None`` otherwise.
 
         ``interface``,
             :class:`pluggdapps.plugin.Interface` class.
@@ -902,8 +947,8 @@ class Webapps( Pluggdapps ):
             
         ``uriparts``,
             dictionary of URL parts 
-        ``mountedat``,
-            (type, mountname, webapp-instance)
+        ``webapp``,
+            :class:`IWebApp` plugin instance.
         """
         uriparts = h.parse_url( uri, host=hdrs.get('host', None) )
         for key, webapp in self._app_resolve_cache.items() :

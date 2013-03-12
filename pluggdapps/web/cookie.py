@@ -15,7 +15,9 @@ import pluggdapps.utils          as h
 
 class HTTPCookie( Plugin ):
     """Cookie handling plugin. This plugin uses python standard library's
-    http.cookies module to process request and response cookies."""
+    http.cookies module to process request and response cookies. Refer to
+    :class:`pluggdapps.web.interfaces.IHTTPCookie` interface spec. to
+    understand the general intent and purpose this plugin."""
 
     implements( IHTTPCookie )
 

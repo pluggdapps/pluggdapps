@@ -20,6 +20,7 @@ __all__ = [
     'reseed_random', 'mergedict', 'multivalue_dict', 'takewhile', 
     'dropwhile', 'flatten', 'print_exc', 'eval_import', 'string_import', 
     'str2module', 'locatefile', 'hitch', 'hitch_method', 'colorize', 'strof',
+    'longest_prefix', 'dictsort', 'formated_filesize',
     # Classes
     'Context', 'Bunch',
 ]
@@ -297,6 +298,15 @@ def strof( o ):
     elif o == None : return None
     else : return str(o)
 
+def longest_prefix( prefix_l, s ) :
+    """Among the list of strings ``prefix_l``, find the longest prefix match
+    for string ``s``."""
+    result = None
+    for p in prefix_l :
+        if s.startswith( p ) :
+            result = p if (result==None) or (len(p) > len(result)) else result
+    return result
+
 def dictsort( d, case=False, by='key' ) :
     """Sort a dict and yield (key, value) pairs."""
     pos = { 'key' : 0, 'value' : 1 }[ by ]
@@ -350,19 +360,23 @@ class ETag( dict ):
     """
 
     def __init__( self, context, *args, **kwargs ):
+        """Override dict.__init__ to initalize internal data strucutres."""
         super().__init__( *args, **kwargs )
         self._c = context
         self._init()
 
     def __setitem__( self, key, value ):
+        """Override to populate the context object with key,value."""
         self._c[ key ] = value
         return super().__setitem__( key, value )
 
     def update( self, *args, **kwargs ):
+        """Override to populate the context object with *args and **kwargs."""
         self._c.update( *args, **kwargs )
         return super().update( *args, **kwargs )
 
     def setdefault( self, key, value=None ):
+        """Override to populate the context object with key, value."""
         self._c.setdefault( key, value )
         return super().setdefault( key, value )
 
@@ -375,17 +389,19 @@ class ETag( dict ):
 
     def hashout( self, prefix='', joinwith='', sep=';' ):
         """Return the hash digest so far."""
+        digest = '' # Initialize
         if self.values() or self._hashin :
             [ self._hasher.update(
                 v if isinstance(v, bytes) else str(v).encode('utf-8') 
               ) for v in self.values() ]
             self._hasher.update( self._hashin ) if self._hashin else None
             digest = prefix + self._hasher.hexdigest()
-        else :
-            digest = ''
         return sep.join( filter( None, [joinwith, digest ]))
 
     def clear( self ):
+        """Clear all key,value pairs so far populated on this dictionary
+        object and re-initialize the hash algorithm. Note that the same 
+        key, value pairs are still preserved in the context dictionary."""
         super().clear()
         self._init()
 

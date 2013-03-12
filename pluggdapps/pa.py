@@ -6,8 +6,36 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""Command line program to work with pluggdapps-platform. Use --help to learn
-more about each sub-command and its options.
+"""Control and inspect pluggdapps environment using command line script.
+Almost all functions of command line script are implemented as sub-commands.
+To get a quick summary of available sub-commads, do,
+
+.. code-block:: bash
+
+    $ pa commands
+
+To learn more about available subcommand refer to :mod:`pluggdapps.commands`
+package. Since sub commands are implemented as plugins, there can be other
+sub-commands implemented by different package. Refer to corresponding package
+for their documentation.
+
+You can also use `--help` on the sub-command for supported options.
+
+.. code-block:: bash
+
+    $ pa --help
+
+    usage: pa [-h] [-m] [-c CONFIG] [-w]
+
+    Pluggdapps command line script.
+
+    optional arguments:
+      -h, --help  show this help message and exit
+      -m          Start monitor process.
+      -c CONFIG   Specify config file.
+      -w          Load platform with web-framework
+
+
 """
 
 import sys
@@ -40,7 +68,7 @@ def main():
     from pluggdapps import loadpackages
 
     loadpackages()  # This is important, otherwise plugins in other packages 
-                    # will be detected.
+                    # will not be detected.
 
     # Create command line parser.
     # Get a list of sub-commands supported in command line.
@@ -49,11 +77,6 @@ def main():
     subcmds = [ x[7:] for x in PluginMeta._implementers[ ICommand ].keys() ]
     mainargs = h.takewhile( lambda x : x not in subcmds, sys.argv[1:] )
     args = mainparser.parse_args( mainargs )
-
-    # pluggdapps platform object.
-    if not args.config :
-        print("Please supply a configuration file. Do -h for help")
-        sys.exit(1)
 
     if args.webapps :
         pa = Webapps.boot( args.config )
@@ -69,6 +92,8 @@ def main():
     # Do a full parsing of command line arguments.
     args = mainparser.parse_args()
 
+    # Corresponding handler is expected to be registered during subparser()
+    # call above.
     args.handler( args )
 
 if __name__ == '__main__' :

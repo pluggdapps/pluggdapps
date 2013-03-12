@@ -27,7 +27,7 @@ _ds1.__doc__ = (
     "interface." )
 
 class HTTPResponse( Plugin ):
-    """Reponse plugin."""
+    """Plugin to encapsulate HTTP response."""
 
     implements( IHTTPResponse )
 
@@ -50,6 +50,8 @@ class HTTPResponse( Plugin ):
     the response with finishing=True argument."""
 
     def __init__( self, request ):
+        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.__init__`
+        interface method."""
         # Initialize response attributes
         self.statuscode = b'200'
         self.reason = http.client.responses[ int(self.statuscode) ]

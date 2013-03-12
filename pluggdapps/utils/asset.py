@@ -4,16 +4,14 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""Utility functions to parse and locate file assets using
-asset-specification.
-
-    TODO : Document asset specification in detail.
-"""
+"""Utility functions to parse and locate file assets using 
+asset-specification format."""
 
 import pkg_resources, os
 from   os.path  import isabs, abspath
 
 from   pluggdapps.utils.path import package_name, package_path, join
+from   pluggdapps.utils.lib  import longest_prefix
 
 __all__ = [
     'parse_assetspec', 'asset_spec_from_abspath', 'abspath_from_asset_spec',
@@ -37,17 +35,17 @@ def parse_assetspec( spec, pname ):
         pname, filename = None, spec
     return pname, filename
 
-def asset_spec_from_abspath( abspath, package ):
-    """Try to convert an absolute path to a resource in a package in resource
-    specification format if possible; otherwise return the absolute path. In
-    asset specification format path separator is always '/'"""
-    if getattr(package, '__name__', None) == '__main__':
-        return abspath
-    pp = package_path(package) + os.sep
-    if abspath.startswith(pp):
-        relpath = abspath[len(pp):]
-        return '%s:%s' % (package_name(package), relpath.replace(os.sep, '/'))
-    return abspath
+def asset_spec_from_abspath( abspath, papackages ):
+    """Use the dictionary of ``papackages``, gathered during platform boot
+    time by calling package() entrypoint and convert abspath to
+    asset-specification format."""
+    locations = { pinfo['location'] : p for p, pinfo in papackages.items() }
+    prefix = longest_prefix( locations.keys(), abspath )
+    if prefix :
+        return ( locations[prefix] + ':' + 
+                 abspath[ len(prefix) : ].lstrip(os.sep) )
+    else :
+        return None
 
 def abspath_from_asset_spec( spec, pname='', relativeto=None ):
     """Convert assert sepcification into absolute path. if ``pname`` is

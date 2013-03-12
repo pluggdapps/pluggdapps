@@ -14,11 +14,27 @@ from   pluggdapps.web.interfaces import IHTTPOutBound
 
 class GZipOutBound( Plugin ) :
     """Out-bound transformer to compress response entity using gzip
-    compression technology."""
+    compression technology. Performs gzip encoding if,
+    
+    * b'gzip' is in ``content_encoding`` response header.
+    * if type in ``content_type`` response header is `text` or `application`.
+    * if ``content_type`` response header do not indicate that ``data`` is
+      already compressed variant.
+
+    If ``data`` successfully gets gzipped, then ``etag`` response header value
+    is suffixed with b';gzip'.
+    
+    If gzip encoding is not applied on ``data``, it is made sure that 
+    content_encoding response header does not contain b'gzip' value,
+    """
 
     implements( IHTTPOutBound )
 
+    #---- IHTTPOutBound method APIs
+
     def transform( self, request, data, finishing=True ):
+        """:meth:`pluggdapps.web.interfaces.IHTTPOutBound.transform` interface 
+        method."""
         resp = request.response
         ctype = resp.headers.get( 'content_type', b'' )
         cenc  = resp.headers.get( 'content_encoding', b'' )
@@ -33,6 +49,8 @@ class GZipOutBound( Plugin ) :
             enc = cenc.replace( b'gzip', b'' )
             resp.set_header('content_encoding', enc)
         return data
+
+    #-- local methods
 
     def _is_gzip( self, data, enc, typ, status ):
         return ( bool(data) and
@@ -71,7 +89,9 @@ class GZipOutBound( Plugin ) :
 
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = GZipOutBound.__doc__
+_default_settings.__doc__ = (
+    "Out-bound transformer to compress response entity using gzip compression "
+    "technology." )
 
 _default_settings['level']  = {
     'default' : 6,

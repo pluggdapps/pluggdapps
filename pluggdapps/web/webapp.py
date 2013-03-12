@@ -10,33 +10,44 @@ import sys
 from   pluggdapps.const          import URLSEP
 from   pluggdapps.plugin         import implements, Plugin
 from   pluggdapps.interfaces     import IWebApp
-from   pluggdapps.web.interfaces import IHTTPRouter,IHTTPCookie,IHTTPResponse, \
+from   pluggdapps.web.interfaces import IHTTPRouter,IHTTPCookie, IHTTPResponse,\
                                         IHTTPSession, IHTTPInBound, \
                                         IHTTPOutBound, IHTTPLiveDebug
 import pluggdapps.utils          as h
 
 class WebApp( Plugin ):
-    """Base class for all web applications plugins. Every http request enters
-    the application through this plugin class. And provides a comprehensible
-    set of configuration."""
+    """Base class for all web applications plugins. Implements
+    :class:`pluggdapps.interfaces.IWebApp` interface, refer to interface
+    specification to understand the general intent and purpose of
+    web-application plugins.
+    
+    Every http request enters the application through this plugin class.
+    A comprehensive set of configuration settings are made available by this
+    class.
+    """
 
     implements( IWebApp )
 
-    def __init__( self ):
-        self.router = None  # TODO : Make this into default router
-
     def startapp( self ):
         """:meth:`pluggdapps.interfaces.IWebApps.startapp` interface method."""
+        # Initialize plugins required to handle http request. 
         self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
         self.cookie = self.query_plugin( IHTTPCookie, self['IHTTPCookie'] )
-        self.livedebug = \
-            self.query_plugin( IHTTPLiveDebug, self['IHTTPLiveDebug'] )
         self.in_transformers = [
                 self.query_plugin( IHTTPInBound, name )
                 for name in self['IHTTPInBound'] ]
         self.out_transformers = [
                 self.query_plugin( IHTTPOutBound, name )
                 for name in self['IHTTPOutBound'] ]
+
+        # Live debug.
+        if self['debug'] :
+            self.livedebug = \
+                self.query_plugin( IHTTPLiveDebug, self['IHTTPLiveDebug'] )
+        else :
+            self.livedebug = None
+
+        # Initialize plugins.
         self.router.onboot()
 
     def dorequest( self, request, body=None, chunk=None, trailers=None ):
@@ -74,12 +85,13 @@ class WebApp( Plugin ):
 
     def onfinish( self, request ):
         """:meth:`pluggdapps.interfaces.IWebApps.onfinish` interface method."""
-        pass
+        self.router.onfinish( request )
 
     def shutdown( self ):
         """:meth:`pluggdapps.interfaces.IWebApps.shutdown` interface method."""
         self.router = None
         self.cookie = None
+        self.livedebug = None
         self.in_transformers = []
         self.out_transformers = []
 
@@ -89,11 +101,7 @@ class WebApp( Plugin ):
 
     def pathfor( self, request, *args, **kwargs ):
         """:meth:`pluggdapps.interfaces.IWebApps.pathfor` interface method."""
-        path = self.router.urlpath( request, *args, **kwargs )
-        if path.startswith( URLSEP ) :  # Prefix uriparts['script']
-            if request.uriparts['script'] :
-                path = request.uriparts['script'] + path
-        return path
+        return self.router.urlpath( request, *args, **kwargs )
 
 
     #---- ISettings interface methods
@@ -109,8 +117,8 @@ class WebApp( Plugin ):
         """:meth:`pluggdapps.plugin.ISettings.normalize_settings` interface
         method."""
         sett['encoding'] = sett['encoding'].lower()
-        sett['IHTTPOutBound'] = h.parsecsvlines( sett['IHTTPOutBound'] )
         sett['IHTTPInBound'] = h.parsecsvlines( sett['IHTTPInBound'] )
+        sett['IHTTPOutBound'] = h.parsecsvlines( sett['IHTTPOutBound'] )
         return sett
 
 _default_settings = h.ConfigDict()
@@ -125,23 +133,21 @@ _default_settings['encoding']  = {
 _default_settings['language']  = {
     'default' : 'en',
     'types'   : (str,),
-    'help'    : "Default language to use for content negotiation. This can "
+    'help'    : "Default language to use in content negotiation. This can "
                 "be customized for each view (or resource-variant)"
 }
 _default_settings['IHTTPRouter']  = {
     'default' : 'matchrouter',
     'types'   : (str,),
-    'help'    : "IHTTPRouter plugin. A request is resolved for a "
-                "view-callable by this router plugin."
+    'help'    : "IHTTPRouter plugin. Base router plugin for resolving "
+                "requests to view-callable."
 }
 _default_settings['IHTTPCookie']  = {
     'default' : 'httpcookie',
     'types'   : (str,),
     'help'    : "Plugin implementing IHTTPCookie interface spec. Methods "
                 "from this plugin will be used to process both request "
-                "cookies and response cookies. This configuration can be "
-                "overriden by corresponding request / response plugin "
-                "settings."
+                "cookies and response cookies. "
 }
 _default_settings['IHTTPSession']  = {
     'default' : 'httpsession',
@@ -161,14 +167,14 @@ _default_settings['IHTTPResponse']  = {
 }
 _default_settings['IHTTPInBound'] = {
     'default' : '',
-    'types'   : (str,),
+    'types'   : ('csv',list),
     'help'    : "A string of comma seperated value, where each value names a "
                 "IHTTPInBound plugin. Transforms will be applied in "
                 "specified order."
 }
 _default_settings['IHTTPOutBound'] = {
     'default' : 'ResponseHeaders, GZipOutBound',
-    'types'   : (str,),
+    'types'   : ('csv',list),
     'help'    : "A string of comma seperated value, where each value names a "
                 "IHTTPOutBound plugin. Transforms will be applied in "
                 "specified order."

@@ -9,8 +9,14 @@ from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
 class CommandCommands( Singleton ):
-    """Subcommand plugin under pa-script to list all available sub-commands 
-    along with a short description."""
+    """Subcommand plugin for pa-script to list all available sub-commands 
+    along with a short description. Like,
+    
+    .. code-block:: bash
+        
+        $ pa commands
+
+    """
 
     implements( ICommand )
 
@@ -19,7 +25,8 @@ class CommandCommands( Singleton ):
 
     #---- ICommand API
     def subparser( self, parser, subparsers ):
-        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface method."""
+        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface method.
+        """
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
@@ -70,7 +77,7 @@ _default_settings = h.ConfigDict()
 _default_settings.__doc__ = CommandCommands.__doc__
 
 _default_settings['command_width']  = {
-    'default' : 18,
+    'default' : 15,
     'types'   : (int,),
     'help'    : "Maximum width of command name column."
 }

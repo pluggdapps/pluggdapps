@@ -4,10 +4,7 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-"""Collection of some basic set of interface specifications used by pluggdapps
-platform."""
-
-import socket
+"""Basic set of interface specifications."""
 
 from   pluggdapps.plugin import Interface
 
@@ -18,8 +15,10 @@ __all__ = [
 ]
 
 class IConfigDB( Interface ):
-    """Interface specification to persist platform configuration to a backend
-    data-store or database."""
+    """Interface specification to persist / access platform configuration to
+    backend data-store or database. When platform gets booted and if
+    config-backend is available, then configuration settings from datastore
+    will override settings from `.ini` files."""
 
     def connect():
         """Do necessary initialization to connect with data-store."""
@@ -29,7 +28,7 @@ class IConfigDB( Interface ):
         configuration tables for each mounted application under
         [mountloc] section. Expect this method to be called when ever platform
         starts-up. For more information refer to corresponding plugin's
-        documentation
+        documentation.
         """
 
     def config( **kwargs ):
@@ -43,16 +42,16 @@ class IConfigDB( Interface ):
 class ICommand( Interface ):
     """Handle sub-commands issued from command line script. Plugins are
     expected to parse the command line string arguments into ``options`` and
-    ``arguments`` and handle the sub-commands."""
+    ``arguments`` and execute the sub-command."""
 
     description = ''
-    """A short description about the plugin implementing this specification."""
+    """A short description about plugin implementing this specification."""
 
     usage = ''
     """String describing the program usage"""
 
     cmd = ''
-    """Name of the command"""
+    """Name of sub-command"""
 
     def subparser( parser, subparsers ):
         """Use ``subparsers`` to create a sub-command parser. The `subparsers`
@@ -61,10 +60,10 @@ class ICommand( Interface ):
         """
 
     def handle( args ):
-        """Previously when :meth:`subparser` was invoked, the plugin can 
-        use set_default() method on subparser to set the `handler` attribute 
-        to this method so that this handler will automatically be invoked if
-        the sub-command is used on the command line.
+        """Previously :meth:`subparser` would have used set_default() method
+        on `subparser` to set the `handler` attribute to this method so that
+        this handler will automatically be invoked if the sub-command is used
+        on the command line.
 
         ``args``,
             parsed args from ArgumentParser's parse_args() method.
@@ -99,9 +98,9 @@ class IHTTPServer( Interface ):
         """
 
     def close_connection( httpconn ):
-        """Close a client connection `httpconn` which is
-        :class:`IHTTPConnection` plugin maintained in :attr:`connections`
-        list."""
+        """Close a client connection ``httpconn`` a :class:`IHTTPConnection`
+        plugin maintained in :attr:`connections` list.
+        """
 
 
 class IHTTPConnection( Interface ):
@@ -149,11 +148,11 @@ class IHTTPConnection( Interface ):
         """In case of SSL traffic, return SSL certifacte."""
 
     def set_close_callback( callback ):
-        """Subscribe a ``callback`` function, to be called when this connection
-        closed."""
+        """Subscribe a ``callback`` function, to be called when the connection
+        gets closed."""
 
     def set_finish_callback( callback ):
-        """Subscribe a ``callback` function, to be called when an on-going
+        """Subscribe a ``callback`` function, to be called when an on-going
         request/response is finished."""
 
     def handle_request( method, uri, version, headers, body=None, chunk=None,
@@ -182,7 +181,7 @@ class IHTTPConnection( Interface ):
             If the new request is chunked Transfer-Encoded, `body` will be
             None while this argument will contain the request chunk in
             byte-string. Passed as tuple of,
-                (chunk_size, chunk_ext, chunk_data).
+            ``(chunk_size, chunk_ext, chunk_data)``
 
         ``trailers``,
             If the new request is chunked Transfer-Encoded, and `chunk` is the
@@ -200,9 +199,9 @@ class IHTTPConnection( Interface ):
         chunked request, ``request`` attribute of this plugin will preserve
         the on-going request as :class:`IHTTPRequest` plugin.
 
-        ``chunk`,
+        ``chunk``,
             Request chunk to be handled. Passed as a tuple of,
-                (chunk_size, chunk_ext, chunk_data).
+            ``(chunk_size, chunk_ext, chunk_data)``
 
         ``trailers``,
             Dictionary of chunk trailer headers. Key names in this dictionary
@@ -230,8 +229,8 @@ class IWebApp( Interface ):
     """In pluggdapps, a web-Application is a plugin implementing this
     interface. And for this interface to be relevant,
     :class:`pluggdapps.platform.Webapps` must be used to boot the platform.
-    There is also a base class :class:`WebApp` which implements this
-    interface and provides necessary support functions for application
+    There is also a base class :class:`pluggdapps.web.WebApp` which implements
+    this interface and provides necessary support functions for application
     creators. Therefore application plugins must derive from this base
     class.
     """
@@ -249,11 +248,12 @@ class IWebApp( Interface ):
     This is obtained from configuration settings."""
 
     baseurl = ''
-    """Computed string of base url for web application."""
+    """Computed string of base url for web application, more-or-less similar to
+    netpath."""
 
     router = None
     """Plugin instance implementing :class:`IHTTPRouter` interface. This is
-    the root router using which request urls will be resolved to a view
+    the primary router using which request urls will be resolved to a view
     callable. Must be instantiated during boot time inside :meth:`startapp`
     method."""
 
@@ -263,53 +263,67 @@ class IWebApp( Interface ):
     cookies."""
 
     livedebug = None
-    """Plugin to handle we based interactive debugging."""
+    """Plugin to handle web based interactive debugging. Used only when
+    `debug` is enabled in configuration settings."""
 
     in_transformers = []
-    """List of plugins implmenting :class:`IHTTPInBound` interface. In bound
-    requests will be passed through this list of plugins before being
-    dispatched to the router."""
+    """List of plugins implmenting :class:`pluggdapps.web.IHTTPInBound`
+    interface. In bound requests will be passed through plugins listed here
+    before being dispatched to the router."""
 
     out_transformers = []
-    """List of plugins implmenting :class:`IHTTPOutBound` interface. Out bound
-    responses will be passed through this list of plugins before writing it on
-    the connection."""
+    """List of plugins implmenting :class:`pluggdapps.web.IHTTPOutBound`
+    interface. Out bound responses will be passed through plugins listed here
+    before writing it on the connection."""
 
     def startapp():
         """Boot the applications. Called at platform boot-time."""
 
     def dorequest( request, body=None, chunk=None, trailers=None ):
         """This method is called after a new request is resolved to an
-        application, typically by :class:`IHTTPConnection` plugin. The 
-        callback will be issued when,
+        application, typically by :class:`pluggdapps.web.IHTTPConnection`
+        plugin. This callback will be issued when,
 
-          * A new request without body is received, where the request data is 
-            available in ``request``.
+        * A new request without body is received, where the request data is 
+          available in ``request``.
 
-          * A new request with a body is received, in which case kwarg ``body`` 
-            gives the request body as byte-string.
+        * A new request with a body is received, in which case kwarg ``body`` 
+          gives the request body as byte-string.
+
+        It is responsibility of this method to initialize ``request`` plugin.
+        Callback :meth:`pluggdapps.web.interfaces.IHTTPRequest.handle` method.
+        And finally use the :meth:`pluggdapps.web.interfaces.IHTTPRouter.route`
+        method to handle request.
+
+        ``body``,
+            byte string request body.
+
+        ``chunk``,
+            tuple of (chunk-size, chunk-ext, chunk-data), where chunk-size is
+            integer size of chunk-data, chunk-ext is byte string and
+            chunk-data is request-chunk in byte string.
+
+        ``trailers``,
+            Dictionary of HTTP headers. instance of :class:`HTTPHeaders`
+            class.
         """
  
     def dochunk( request, chunk=None, trailers=None ):
-        """This method is called for a new request (of type chunked encoding)
-        is resolved to an application. Otherwise it is called for an on-going
-        chunked request, for every chunk of the request, in which case the
-        web-application and related framework instances are preserved across
-        the chunks. This is typically done by :class:`IHTTPConnection`.
+        """This method is called for a request of type chunked encoding. Even
+        in this case, a call to :meth:`dorequest` is already made when the
+        request was new. The request plugin is preserved after dorequest and
+        a call back is made to this method for every new chunk that is
+        received.
 
         The callback will be issued when,
 
-          * A new request with a chunk is received, in which case kwarg
-            `chunks` gives a single element list with received chunk as,
-            ``(chunk_size, chunk_ext, chunk_data)``.
+        * A request is being received in chunked mode and a request chunk just
+          received, in which case `chunk` is a tuple of,
+          ``(chunk_size, chunk_ext, chunk_data)``.
 
-          * A request is being received in chunked mode and a request chunk
-            just received, in which case `chunk` is a tuple of,
-            ``(chunk_size, chunk_ext, chunk_data)``.
+        * The last chunk of the request is received without a trailer.
 
-          * The last chunk of the request is received without a trailer.
-
-          * The last chunk of the request is received with a trailer.
+        * The last chunk of the request is received with a trailer.
         """
  
     def onfinish( request ):
@@ -323,18 +337,20 @@ class IWebApp( Interface ):
     def urlfor( request, *args, **kwargs ):
         """Generate url (full url) for request using ``args`` and ``kwargs``.
         Typically, :meth:`pathfor` method shall be used to generate the
-        relative url and join the result with the web-application's
-        :attr:`webapp.base_url`. To know more about method arguments refer 
-        corresponding router's :meth:`urlpath` interface method. Returns an
-        absolute-URL as string.
+        relative url and joined with web-application's :attr:`webapp.base_url`.
+        To know more about method arguments refer corresponding router's
+        :meth:`urlpath` interface method. Returns an absolute-URL as string.
 
         ``request``,
             The :class:`IHTTPRequest` object for which url is generated.
+
+        ``args``, ``kwargs``,
+            Positional and keyword arguments passed to :meth:`pathfor` method.
         """
 
-    def pathfor( request, *args, **matchdict ):
-        """Generate relative url for request using route definitions, using
-        ``args`` and ``kwargs``. To learn more about ``args`` and ``kwargs``,
+    def pathfor( request, *args, **kwargs ):
+        """Generate relative url for request using route definitions, ``args``
+        and ``kwargs``. To learn more about ``args`` and ``kwargs``,
         refer corresponding router's :meth:`pathfor` interface method. Returns
         a URL path as string.
 
@@ -344,8 +360,9 @@ class IWebApp( Interface ):
 
 
 class IScaffold( Interface ):
-    """Interface specification for automatically creating scaffolding logic
-    based on collection of user-fed variables and a source-template."""
+    """Interface specification for automatically creating scaffolds of source
+    code and project tree based on collection of user-fed variables and a
+    source-template."""
 
     description = ''
     """One line description of scaffolding logic."""

@@ -5,13 +5,19 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 """Platform can be configured via ini files. For ease of administration,
-platform can be configured via web as well, where the configuration
+platform can also be configured via web as well, where the configuration
 information (basically the key, value pair) will be persisted by a backend
-store like sqlite3.
+store like `sqlite3`.
 
 Note that configuration parameters from database backend will override 
-default-configuration and configurations from ini file.
+default_settings and configurations from ini file.
 """
+
+# TODO :
+#   What are the special sections stored ? Are the special sections
+#   store for <netpath> tables as well ? Section names are prefixed with
+#   'plugin:' ?
+#           Document them.
 
 import sqlite3
 
@@ -20,8 +26,34 @@ from   pluggdapps.interfaces  import IConfigDB
 import pluggdapps.utils       as h
 
 class ConfigSqlite3DB( Plugin ):
-    """Backend interface to persist configuration information in sqlite
-    database."""
+    """Backend interface to persist configuration information in sqlite3
+    database.
+    
+    Settings are stored in tables, one table for each mounted application.
+    ``netpath`` name (contains subdomain-hostname / script), on which
+    application is mounted, will be used as table-name. Table structure,
+
+    <netpath> table :
+
+        +-------------------+-------------------------------+
+        |   section         |   settings                    |
+        +===================+===============================+
+        |  section-name     | JSON string of settings       |
+        +-------------------+-------------------------------+
+
+    where,
+
+    * section-name can be `special section` or plugin section that starts with
+      ``plugin:`` prefix.
+    * JSON string contains key,value pairs of configuration settings only for
+      those parameters that were updated using web-frontend.
+    * along with netpaths, a special table called ``platform`` will be created.
+      Platform wide settings, overriden by settings from master-ini file, will
+      be stored in this table.
+    * special sections will be present only in case of ``platform`` table.
+      For other `netpath` tables, other that ``[DEFAULT]`` section, no special
+      section will be stored.
+    """
 
     implements( IConfigDB )
 
@@ -39,8 +71,8 @@ class ConfigSqlite3DB( Plugin ):
         Optional key-word argument,
 
         ``netpaths``,
-            list of web-application mount points. A table for each netpath
-            will be created.
+            list of web-application mount points. A database table will be
+            created for each netpath.
         """
         if self.conn == None : return None
 
@@ -61,20 +93,10 @@ class ConfigSqlite3DB( Plugin ):
     def config( self, **kwargs ):
         """:meth:`pluggdapps.interfaces.IConfigDB.config` interface method.
 
-        - if netpath, section, name and value kwargs are supplied, will update
-          config-parameter name under webapp's section with value.
-        - if netpath, section, name kwargs are supplied, will return
-          configuration value for name under webapp's section.
-        - if netpath, section kwargs are supplied, will return dictionary of 
-          all configuration parameters under webapp's section.
-        - if netpath is supplied, will return dictionary of section
-          configuration.
-        - if netpath is not supplied, will assume platform configuration.
-
         Keyword arguments,
 
         ``netpath``,
-            Netpath, including hostname and script-path, on which
+            Netpath, including subdomain-hostname and script-path, on which
             web-application is mounted. Optional.
 
         ``section``,
@@ -86,6 +108,18 @@ class ConfigSqlite3DB( Plugin ):
         ``value``,
             If present, this method was invoked for setting configuration
             ``name`` under ``section``. Optional.
+
+        - if netpath, section, name and value kwargs are supplied, will update
+          config-parameter `name` under webapp's `section` with `value`.
+          Return the updated value.
+        - if netpath, section, name kwargs are supplied, will return
+          configuration `value` for `name` under webapp's `section`.
+        - if netpath, section kwargs are supplied, will return dictionary of 
+          all configuration parameters under webapp's section.
+        - if netpath is supplied, will return the entire table as dictionary
+          of sections and settings.
+        - if netpath is not supplied, will use `section`, `name` and `value`
+          arguments in the context of ``platform`` table.
         """
         if self.conn == None : return None
 
@@ -115,10 +149,8 @@ class ConfigSqlite3DB( Plugin ):
                 rc = secsetts
         else :
             c.execute( "SELECT * FROM '%s'" % (netpath,) )
-            settings = {}
-            for section, setts in list(c) :
-                settings[ section ] = h.json_decode( setts )
-            rc = settings
+            rc = {  section : h.json_decode( setts )
+                                        for section, setts in list(c) }
         return rc
 
     def close( self ):
