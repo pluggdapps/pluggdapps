@@ -67,7 +67,7 @@ setup(
     author_email='prataprc@gmail.com',
     maintainer='R Pratap Chakravarthy',
     maintainer_email='prataprc@gmail.com',
-    url='http://pluggdapps.com',
+    url='',
     download_url='',
     license='General Public License',
     description=description,
