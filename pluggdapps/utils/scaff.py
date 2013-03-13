@@ -29,6 +29,8 @@ def template_to_source( sourcedir, targetdir, _vars ):
 
         for filename in filenames :
             t_filename = filename.format( **_vars )
+            if t_filename.endswith( '.tmpl' ) :
+                t_filename = t_filename[:-5]
             print("    %s ..." % t_filename )
             txt = open( join(dirpath, filename) ).read().format( **_vars )
             open( join(targetdir, t_filename), 'w' ).write( txt )
