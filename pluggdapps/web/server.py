@@ -124,9 +124,8 @@ class HTTPEPollServer( Plugin ):
     def handle_connection( self, conn, address ):
         httpconn = None     # if query_plugin bombs.
         try :
-            httpconn = self.query_plugin( IHTTPConnection, 
-                                          self['IHTTPConnection'],
-                                          conn, address, self )
+            httpconn = self.qp( IHTTPConnection, self['IHTTPConnection'],
+                                conn, address, self )
             if httpconn.stream and httpconn.stream.closed() == False :
                 self.connections.append( httpconn )
 
@@ -742,7 +741,7 @@ class HTTPConnection( Plugin ):
         try :
             # Since the connection plugin do not operate in the context
             # of a webapp, use `webapp` plugin to query for IHTTPRequest.
-            request = webapp.query_plugin(
+            request = webapp.qp(
                             IHTTPRequest, webapp['IHTTPRequest'],
                             self, method, uri, uriparts, version, headers )
         except :

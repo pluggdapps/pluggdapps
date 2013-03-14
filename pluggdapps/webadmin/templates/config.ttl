@@ -27,12 +27,12 @@
 
   <body>
     <div .navbar>
-      @@ bc = _compiler.query_plugin( ITTLBreadCrumbs, 'TBreadCrumbs' )
+      @@ bc = _compiler.qp( ITTLBreadCrumbs, 'TBreadCrumbs' )
       ${ bc.render( navigate, crumbsmenu ) }
     <div .section>
       ${plugin_settings( pluginname, describe, secsetts )}
     <div .footer>
-      @@ footer = _compiler.query_plugin( ITTLFooter, 'PluggdappsFooter' )
+      @@ footer = _compiler.qp( ITTLFooter, 'PluggdappsFooter' )
       :py:
         counts = { 
           'interfaces' : interfaces_no,

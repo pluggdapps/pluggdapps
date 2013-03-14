@@ -33,7 +33,7 @@ class CommandCommands( Singleton ):
 
     def handle( self, args ):
         """:meth:`pluggdapps.interfaces.ICommand.handle` interface method."""
-        commands = self.query_plugins( ICommand )
+        commands = self.qps( ICommand )
         commands = sorted( commands, key=lambda x : pluginname(x)[7:] )
         for command in commands :
             rows = self._formatdescr( pluginname(command)[7:],

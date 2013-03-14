@@ -80,10 +80,10 @@ def main():
 
     if args.webapps :
         pa = Webapps.boot( args.config )
-        subcommands = pa.query_plugins( pa, None, ICommand )
+        subcommands = pa.qps( pa, None, ICommand )
     else :
         pa = Pluggdapps.boot( args.config )
-        subcommands = pa.query_plugins( pa, ICommand )
+        subcommands = pa.qps( pa, ICommand )
 
     # setup sub-command arguments
     subparsers = mainparser.add_subparsers( help="Sub-commands" )

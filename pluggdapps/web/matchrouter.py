@@ -94,8 +94,7 @@ class MatchRouter( Plugin ):
         self.viewlist = []
         self.negotiator = None
         if self['IHTTPNegotiator'] :
-            self.negotiator = \
-                self.query_plugin( IHTTPNegotiator, self['IHTTPNegotiator'] )
+            self.negotiator = self.qp(IHTTPNegotiator, self['IHTTPNegotiator'])
         self['defaultview'] = h.string_import( self['defaultview'] )
 
         # Route mapping file is configured, populate view-callables from the
@@ -320,7 +319,7 @@ class MatchRouter( Plugin ):
         v = viewd['view']
         self.pa.logdebug( "%r view callable: %r " % (request.uri, v) )
         if isinstance(v, str) and isplugin(v) :
-            view = self.query_plugin( IHTTPView, v, name, viewd )
+            view = self.qp( IHTTPView, v, name, viewd )
         elif isinstance( v, str ):
             view = h.string_import( v )
         else :
@@ -332,7 +331,7 @@ class MatchRouter( Plugin ):
         res = viewd['resource']
         self.pa.logdebug( "%r resource callable: %r " % (request.uri, res) )
         if isinstance( res, str ) and isplugin( res ) :
-            return self.query_plugin( IHTTPResource, res )
+            return self.qp( IHTTPResource, res )
         elif isinstance( res, str ) :
             return h.string_import( res )
         else :

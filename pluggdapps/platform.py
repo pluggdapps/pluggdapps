@@ -297,7 +297,7 @@ class Pluggdapps( object ):
 
         # Configuration from backend store.
         storetype = pa.settings['pluggdapps']['configdb']
-        configdb = pa.query_plugin( pa, IConfigDB, storetype )
+        configdb = pa.qp( pa, IConfigDB, storetype )
         configdb.dbinit()
         dbsett = configdb.config()
         if dbsett :
@@ -350,6 +350,10 @@ class Pluggdapps( object ):
         plugin.query_plugins = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugins, self )
         plugin.query_plugin  = h.hitch_method( plugin, plugin.__class__,
+                                      Pluggdapps.query_plugin, self )
+        plugin.qps = h.hitch_method( plugin, plugin.__class__,
+                                      Pluggdapps.query_plugins, self )
+        plugin.qp  = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugin, self )
         return args, kwargs
 
@@ -496,10 +500,12 @@ class Pluggdapps( object ):
         return [ pcls( pa, *args, **kwargs )
                  for pcls in PluginMeta._implementers[interface].values() ]
 
+    qps = query_plugins # Alias
+
     @staticmethod
     def query_plugin( pa, interface, name, *args, **kwargs ):
-        """Same as queryPlugins, but returns a single plugin instance as opposed
-        an entire list. `name` will be used to identify that plugin.
+        """Same as queryPlugins, but returns a single plugin instance as
+        opposed an entire list. `name` will be used to identify that plugin.
         Positional and keyword arguments will be used to instantiate the plugin
         object.
 
@@ -521,6 +527,8 @@ class Pluggdapps( object ):
         from pluggdapps.plugin import PluginMeta, pluginname, ISettings
         cls = PluginMeta._implementers[ interface ][ pluginname(name) ]
         return cls( pa, *args, **kwargs )
+
+    qp = query_plugin # Alias
 
 
     #---- platform logging
@@ -641,7 +649,7 @@ class Webapps( Pluggdapps ):
 
             # Instantiate the IWebAPP plugin here for each `instkey`
             appname = h.sec2plugin( appsec )
-            webapp = pa.query_plugin( pa, instkey, IWebApp, appname, appsett )
+            webapp = pa.qp( pa, instkey, IWebApp, appname, appsett )
             webapp.appsettings = appsett
             # Update with backend configuration.
             [ webapp.appsettings[section].update( d )
@@ -717,6 +725,12 @@ class Webapps( Pluggdapps ):
             plugin, plugin.__class__, Webapps.query_plugins,
             self, plugin.webapp )
         plugin.query_plugin = h.hitch_method(
+            plugin, plugin.__class__, Webapps.query_plugin,
+            self, plugin.webapp )
+        plugin.qps = h.hitch_method( 
+            plugin, plugin.__class__, Webapps.query_plugins,
+            self, plugin.webapp )
+        plugin.qp  = h.hitch_method(
             plugin, plugin.__class__, Webapps.query_plugin,
             self, plugin.webapp )
 
@@ -899,6 +913,8 @@ class Webapps( Pluggdapps ):
         return [ pcls( pa, webapp, *args, **kwargs )
                  for pcls in PluginMeta._implementers[interface].values() ]
 
+    qps = query_plugins # Alias
+
     @staticmethod
     def query_plugin( pa, webapp, interface, name, *args, **kwargs ):
         """Same as queryPlugins, but returns a single plugin instance as
@@ -930,6 +946,7 @@ class Webapps( Pluggdapps ):
         cls = PluginMeta._implementers[ interface ][ pluginname(name) ]
         return cls( pa, webapp, *args, **kwargs )
 
+    qp = query_plugin   # Alias
 
     #---- APIs related to hosting multiple-applications.
 

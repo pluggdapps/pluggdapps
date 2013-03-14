@@ -77,8 +77,7 @@ class CommandWebApp( Plugin ):
         sett = { 'target_dir'  : args.target_dir or os.getcwd(),
                  'webapp_name' : args.name }
 
-        scaff = self.query_plugin( 
-                        IScaffold, 'scaffoldingwebapp', settings=sett )
+        scaff = self.qp( IScaffold, 'scaffoldingwebapp', settings=sett )
         scaff.query_cmdline()
         print( "Generating Web-application %s" % args.name )
         scaff.generate()

@@ -243,7 +243,7 @@ class HTTPResponse( Plugin ):
         if renderer in self._renderer_plugins :
             plugin = self._renderer_plugins[ renderer ]
         elif renderer :
-            plugin = self.query_plugin( IHTTPRenderer, renderer )
+            plugin = self.qp( IHTTPRenderer, renderer )
         else :
             plugin = None
 

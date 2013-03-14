@@ -31,19 +31,18 @@ class WebApp( Plugin ):
     def startapp( self ):
         """:meth:`pluggdapps.interfaces.IWebApps.startapp` interface method."""
         # Initialize plugins required to handle http request. 
-        self.router = self.query_plugin( IHTTPRouter, self['IHTTPRouter'] )
-        self.cookie = self.query_plugin( IHTTPCookie, self['IHTTPCookie'] )
+        self.router = self.qp( IHTTPRouter, self['IHTTPRouter'] )
+        self.cookie = self.qp( IHTTPCookie, self['IHTTPCookie'] )
         self.in_transformers = [
-                self.query_plugin( IHTTPInBound, name )
+                self.qp( IHTTPInBound, name )
                 for name in self['IHTTPInBound'] ]
         self.out_transformers = [
-                self.query_plugin( IHTTPOutBound, name )
+                self.qp( IHTTPOutBound, name )
                 for name in self['IHTTPOutBound'] ]
 
         # Live debug.
         if self['debug'] :
-            self.livedebug = \
-                self.query_plugin( IHTTPLiveDebug, self['IHTTPLiveDebug'] )
+            self.livedebug = self.qp( IHTTPLiveDebug, self['IHTTPLiveDebug'] )
         else :
             self.livedebug = None
 
@@ -61,7 +60,7 @@ class WebApp( Plugin ):
             request.cookie = self.cookie
             # TODO : Initialize session attribute here.
             request.response = response = \
-              self.query_plugin( IHTTPResponse, self['IHTTPResponse'], request )
+              self.qp( IHTTPResponse, self['IHTTPResponse'], request )
             request.handle( body=body, chunk=chunk, trailers=trailers )
             self.router.route( request )
         except :

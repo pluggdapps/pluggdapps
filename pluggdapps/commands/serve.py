@@ -63,7 +63,7 @@ class CommandServe( Singleton ):
 
     def gemini( self, args ):
         """Start a poll thread and then start pluggdapps platform."""
-        server = self.query_plugin( IHTTPServer, self['IHTTPServer'] )
+        server = self.qp( IHTTPServer, self['IHTTPServer'] )
         if args.mreload :
             # Launch a thread to poll and then start serving http
             t = threading.Thread( target=self.pollthread, 
