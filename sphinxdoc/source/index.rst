@@ -1,10 +1,10 @@
-Pluggdapps is a :term:`component architecture` in python that can't get any
+Pluggdapps is a `component architecture` in python that can't get any
 simpler. A meta framework providing a platform to define interfaces and
 implement plugins. It comes with a configuration system, web-framework,
-:term:`scaffold`, command-line script and much more ...
+`scaffold`, command-line script and much more ...
 
-Web framework, when used with tayra template language, provide a plugin
-system that cut across MVC design pattern. Web-apps can be developed,
+Pluggdapps web framework, when used with `tayra template language`, provide a
+plugin system that cut across MVC design pattern. Web-apps can be developed,
 packaged and distributed as plugins.
 
 Features
@@ -48,6 +48,9 @@ Features
 * **License:** `GPLv3 license <http://www.gnu.org/licenses/>`.
 * **Requires:** Linux, Python-3.x.
 * **Status:** Core design stable. Not expected to change.
+
+Refer to `package documentation <http://pythonhosted.org/pluggdapps/>`_.
+
 
 .. include:: contents.rst.inc
 

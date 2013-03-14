@@ -19,12 +19,15 @@ Release changes
   matchrouter.
 - match_predicates() method added while resolving view-callables. Right now a
   request resolution to view-callable follows three steps.
+
   - URL pattern matching
   - match_predicates on add_view arguments and request.
   - Content_negotiation to pick a resource-variant.
+
 - Order of calls to add_view() method is preserved while resolving request to
   view-callable.
 - added platform pre-booting feature.
+
   - First load all pluggdapps packages to create a Pluggdapss() platform, then
     call package() entry point in all pluggdapps packages and finally create
     the platform.
@@ -32,6 +35,7 @@ Release changes
     pluggdapps modules are imported in __init__.py
   - Package loading during pluggdapps platform pre-boot is now handled by
     an explicit call to pluggdapps.loadpackages() function.
+
 - pluggdapps project static files - logos and css files.
 - Documentation for configuration help.
 - Gathering files for reloading is now moved to CommandServe plugin, instead

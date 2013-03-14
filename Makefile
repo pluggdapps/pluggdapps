@@ -21,10 +21,12 @@ sdist :
 	python ./setup.py sdist
 
 sphinx-compile :
+	pa -w confdoc -p pluggdapps -o docs/configuration.rst
+	cp docs/configuration.rst sphinxdoc/source/
+	cp docs/glossary.rst sphinxdoc/source/
+	cp CHANGELOG.rst sphinxdoc/source/
 	cp README.rst sphinxdoc/source/index.rst
 	cat sphinxdoc/source/index.rst.inc >> sphinxdoc/source/index.rst
-	cp CHANGELOG.rst sphinxdoc/source/
-	cp docs/glossary.rst sphinxdoc/source/
 	rm -rf sphinxdoc/build/html/
 	make -C sphinxdoc html
 

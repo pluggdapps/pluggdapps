@@ -24,3 +24,4 @@ import pluggdapps.commands.ls
 import pluggdapps.commands.serve
 import pluggdapps.commands.pviews
 import pluggdapps.commands.unittest
+import pluggdapps.commands.confdoc

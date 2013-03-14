@@ -8,9 +8,11 @@
 plugins and process them.
 """
 
+import textwrap
+
 __all__ = [ 'ConfigDict', 'settingsfor', 'sec2plugin', 'plugin2sec',
-            'is_plugin_section', 'conf_descriptionfor', 'section_settings',
-            'netpath_settings' ]
+            'is_plugin_section', 'conf_descriptionfor', 'conf_catalog',
+            'section_settings', 'netpath_settings' ]
 
 class ConfigDict( dict ):
     """A collection of configuration settings. When a fresh key, a.k.a 
@@ -132,7 +134,7 @@ def is_plugin_section( secname ):
     return secname.startswith('plugin:')
 
 
-def conf_descriptionfor( plugin ):
+def conf_descriptionfor( plugin, info=None ):
     """Gather description information for configuration settings for
     ``plugin``, which might derive from other plugin class and therefore we
     need to read the default_settings() from its base classes as well.
@@ -147,7 +149,7 @@ def conf_descriptionfor( plugin ):
     elif plugin == 'pluggdapps' :
         describe = pluggdapps_defaultsett()
     else :
-        info = PluginMeta._pluginmap[ plugin ]
+        info = info or PluginMeta._pluginmap[ plugin ]
         bases = reversed( info['cls'].mro() )
         describe = info['cls'].default_settings()
         for b in bases :
@@ -155,6 +157,20 @@ def conf_descriptionfor( plugin ):
                 describe.update( dict( b.default_settings().items() ))
                 describe._spec.update( b.default_settings()._spec )
     return describe
+
+def conf_catalog( plugin, info=None ):
+    """Use this helper function to generate a catalog of configuration
+    settings for ``plugin``,
+    """
+    describe = conf_descriptionfor( plugin, info=info )
+    s, items = '', describe._spec.items() 
+    if items :
+        for key, d in items :
+            s += key + '\n    '
+            s += '\n    '.join( textwrap.wrap( d['help'], 70 )) + '\n\n'
+    else :
+        s = '-- configuration is not supported by plugin --\n'
+    return s
 
 def section_settings( pa, netpath, section ):
     """Return configuration settings for ``section`` under the context of
