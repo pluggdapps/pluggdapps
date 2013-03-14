@@ -16,6 +16,7 @@ which defines the following entry-point (refer setuptools to know more about
 package entry-points),
 
 .. code-block:: ini
+    :linenos:
 
     [pluggdapps]
       package=<entry-point>

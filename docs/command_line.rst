@@ -8,22 +8,25 @@ extend pa script with any number of sub-commands. To list available
 sub-commands,
 
 .. code-block:: bash
+    :linenos:
 
-    pa commands # Will list available sub-commands with a short description.
+    $ pa commands # Will list available sub-commands with a short description.
 
 Options that are passed before the sub-command are treated as script options 
 and those that follow the sub-command are specific to sub-command. To learn 
 more about script options,
 
 .. code-block:: bash
+    :linenos:
 
-    pa --help
+    $ pa --help
 
 To learn about options that are specific to a <sub-command>, 
 
 .. code-block:: bash
+    :linenos:
 
-    pa <sub-command> --help
+    $ pa <sub-command> --help
 
 Virtual environment
 -------------------
@@ -36,16 +39,18 @@ To facilitate the setup of virtual environment we have created a public
 repository which can be cloned from,
 
 .. code-block:: bash
+    :linenos:
 
-    git clone https://github.com/prataprc/paenv.git paenv
+    $ git clone https://github.com/prataprc/paenv.git paenv
 
 Once cloned, execute the following commands to setup the virtual environment.
 
 .. code-block:: bash
+    :linenos:
 
-    cd paenv
-    make setup
-    source pa-env/bin/activate
+    $ cd paenv
+    $ make setup
+    $ source pa-env/bin/activate
 
 When the last command is executed your shell will move to the virtual
 environment that contains the pa script and rest of pluggdapps package.
@@ -59,8 +64,9 @@ list of interfaces and plugins available, web-application, installed under
 pluggdapps environment. Use the following command to learn available options,
 
 .. code-block:: bash
+    :linenos:
 
-    pa ls --help
+    $ pa ls --help
 
 Start built-in web server
 -------------------------
@@ -73,8 +79,9 @@ marshal web request into the system and marshal the response back. To launch a
 server,
 
 .. code-block:: bash
+    :linenos:
 
-    pa -w -c etc/master.ini serve
+    $ pa -w -c etc/master.ini serve
 
 the ``serve`` sub-command by default uses the ``HTTPEPollServer`` plugin as
 the web server. The default server executes as a single process without using
@@ -83,6 +90,7 @@ number of simultaneous connection. web-server can be configured in the master
 ini file under the section,
 
 .. code-block:: ini
+    :linenos:
 
     [plugin:HTTPEPollServer]
     host = localhost
@@ -103,8 +111,9 @@ changing files and restart the system automatically. Make sure to pass the
 following switches while invoking the server,
 
 .. code-block:: bash
+    :linenos:
 
-    pa-env/bin/pa -w -m -c etc/master.ini serve -r
+    $ pa-env/bin/pa -w -m -c etc/master.ini serve -r
 
 ``-m``,
     To start the server in monitor mode where a separate process will be
@@ -145,8 +154,9 @@ activity, pa-script provides a command to create webapp source tree base on
 few parameters.
 
 .. code-block:: bash
+    :linenos:
 
-    pa -c <master.ini> webapp [-t TARGET_DIR] <webapp-name>
+    $ pa -c <master.ini> webapp [-t TARGET_DIR] <webapp-name>
 
 to learn more options on this sub-command use ``--help``.
 

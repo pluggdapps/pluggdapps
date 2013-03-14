@@ -15,6 +15,7 @@ class CommandConfDoc( Singleton ):
     from :meth:`pluggdapps.plugin.ISettings.default_settings` method.
     
     .. code-block:: bash
+        :linenos:
         
         $ pa confdoc
 

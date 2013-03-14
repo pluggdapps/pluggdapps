@@ -53,22 +53,23 @@ class MatchRouter( Plugin ):
     **map file specification,**
 
     .. code-block:: python
+        :linenos:
 
-      [ { 'name'             : <variant-name as string>,
-          'pattern'          : <regex pattern-to-match-with-request-URL>,
-          'view'             : <view-callable as string>,
-          'resource'         : <resource-name as string>,
-          'attr'             : <attribute on view callable, as string>,
-          'method'           : <HTTP request method as byte string>,
-          'media_type'       : <content-type as string>,
-          'language'         : <language-string as string>,
-          'charset'          : <charset-string as string>,
-          'content_coding'   : <content-coding as comma separated values>,
-          'cache_control'    : <response header value>,
-          'rootloc'          : <path to root location for static documents>,
-        },
-        ...
-      ]
+        [ { 'name'             : <variant-name as string>,
+            'pattern'          : <regex pattern-to-match-with-request-URL>,
+            'view'             : <view-callable as string>,
+            'resource'         : <resource-name as string>,
+            'attr'             : <attribute on view callable, as string>,
+            'method'           : <HTTP request method as byte string>,
+            'media_type'       : <content-type as string>,
+            'language'         : <language-string as string>,
+            'charset'          : <charset-string as string>,
+            'content_coding'   : <content-coding as comma separated values>,
+            'cache_control'    : <response header value>,
+            'rootloc'          : <path to root location for static documents>,
+          },
+          ...
+        ]
     """
 
     implements( IHTTPRouter )
@@ -124,6 +125,7 @@ class MatchRouter( Plugin ):
         For EG,
 
         .. code-block:: python
+            :linenos:
 
             self.add_view( 'article', 'blog/{year}/{month}/{date}' )
 

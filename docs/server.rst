@@ -36,8 +36,9 @@ Ways to start the server
 Use the following command to start the server in production mode.
 
 .. code-block:: bash
+    :linenos:
 
-    pa -w -c etc/master.ini serve
+    $ pa -w -c etc/master.ini serve
 
 Normally this is done after entering into the virtual environment, Refer to
 `command line <./command_line.rst>_` document for more information.
@@ -47,8 +48,9 @@ changing files and restart the system automatically. Make sure to pass the
 following switches while invoking the server,
 
 .. code-block:: bash
+    :linenos:
 
-    pa-env/bin/pa -w -m -c etc/master.ini serve -r
+    $ pa-env/bin/pa -w -m -c etc/master.ini serve -r
 
 ``-m``,
     To start the server in monitor mode where a separate process will be

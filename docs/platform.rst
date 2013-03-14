@@ -108,6 +108,7 @@ that are instantiated and have the following signatures.
 To query for a plugin by name ``name`` and ``interface`` it implements,
 
 .. code-block:: python
+    :linenos:
 
     plugin.query_plugin( IHTTPResource, 'userpreference', username )
 
@@ -119,6 +120,7 @@ on to the plugin constructor (the ``__init__`` method).
 To query for all plugins implementing ``interfaces``,
 
 .. code-block:: python
+    :linenos:
 
     subcommands = plugin.query_plugins( ICommand )
 

@@ -36,15 +36,18 @@ Plugin inheritance
 
 It is also possible to create a plugin by deriving from another plugin class.
 Remember that a plugin class is any class that derives from the
-:class:`Plugin`. For example,::
+:class:`Plugin`. For example,
 
-  class YourPlugin( Plugin ):
-      def __init__( self, arg2, arg3 ):
-          pass
+.. code-block:: python
+    :linenos:
 
-  class MyPlugin( YourPlugin ):
-      def __init__( self, arg1, arg2, arg3 ):
-          self._super_init( __class__, arg2, arg3 )
+    class YourPlugin( Plugin ):
+        def __init__( self, arg2, arg3 ):
+            pass
+
+    class MyPlugin( YourPlugin ):
+        def __init__( self, arg1, arg2, arg3 ):
+            self._super_init( __class__, arg2, arg3 )
 
 `YourPlugin` is a plugin class (since it derives from :class:`Plugin`) with
 accepts two constructor arguments.

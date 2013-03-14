@@ -23,6 +23,7 @@ class CommandServe( Singleton ):
     sub-command. Typically used in development mode,
     
     .. code-block:: bash
+        :linenos:
 
         $ pa -w -m -c <master.ini> serve -r
 

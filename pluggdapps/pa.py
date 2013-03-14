@@ -11,6 +11,7 @@ Almost all functions of command line script are implemented as sub-commands.
 To get a quick summary of available sub-commads, do,
 
 .. code-block:: bash
+    :linenos:
 
     $ pa commands
 
@@ -22,6 +23,7 @@ for their documentation.
 You can also use `--help` on the sub-command for supported options.
 
 .. code-block:: bash
+    :linenos:
 
     $ pa --help
 

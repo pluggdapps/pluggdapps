@@ -17,6 +17,7 @@ parameters like, host, port, backlog etc ... the settings are configured
 in the ini-file like,
 
 .. code-block:: ini
+    :linenos:
 
     [plugin:HTTPEPollServer]
     host = mysite.com
@@ -28,6 +29,7 @@ these settings are automatically made available inside the plugin (refered by
 ``self``) logic like,
 
 .. code-block:: python
+    :linenos:
 
     class HTTPEPollServer( Pluing ):
         ...
@@ -50,8 +52,9 @@ instance, the following command provides a way to start the pluggdapps server
 with -c switch supplying master configuration file.
 
 .. code-block:: bash
+    :linenos:
 
-    pa-env/bin/pa -w -c etc/master.ini serve
+    $ pa-env/bin/pa -w -c etc/master.ini serve
 
 master configuration file is expected to provide configuration parameters
 organized under two types of sections, ``special-section`` and
@@ -76,6 +79,7 @@ platform this section is not supported. Administrators can mount web
 application instances on subdomains and script-paths. For Eg,
 
 .. code-block:: ini
+    :linenos:
 
     [mountloc]
     pluggdapps.com/webadmin = webadmin, %(here)s/webadmin.ini
@@ -96,24 +100,25 @@ Note that, application configuration file will accept only plugin sections and
 **An example master configuration file,**
 
 .. code-block:: ini
+    :linenos:
 
-  master.ini
-  ----------
+    master.ini
+    ----------
 
-  [DEFAULT]
-  <option> = <value>
-  ...
+    [DEFAULT]
+    <option> = <value>
+    ...
 
-  [pluggdapps]
-  <option> = <value>
-  ...
+    [pluggdapps]
+    <option> = <value>
+    ...
 
-  [plugin:<pluginname>]
-  <option> = <value>
-  ...
+    [plugin:<pluginname>]
+    <option> = <value>
+    ...
 
-  [plugin:<pluginname>]
-  ...
+    [plugin:<pluginname>]
+    ...
 
 
 Webadmin

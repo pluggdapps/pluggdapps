@@ -76,6 +76,7 @@ Master configuration file can refer to other configuration file.
 An example master configuration file,
 
 .. code-block:: ini
+    :linenos:
 
     [DEFAULT]
     <option> = <value>
@@ -130,11 +131,12 @@ special section. While mounting web-applications under [mountloc] additional
 configuration files can be referred. Example [mountloc] section,
 
 .. code-block:: ini
+    :linenos:
 
-  [mountloc]
-  pluggdapps.com/issues = <appname>, <ini-file>
-  tayra.pluggdapps.com/issues = <appname>, <ini-file>
-  tayra.pluggdapps.com/source = <appname>, <ini-file>
+    [mountloc]
+    pluggdapps.com/issues = <appname>, <ini-file>
+    tayra.pluggdapps.com/issues = <appname>, <ini-file>
+    tayra.pluggdapps.com/source = <appname>, <ini-file>
 
 The `lhs` side is called netpath which typically contains subdomain, hostname
 and scripth-path. The `rhs` side is a tuple of two elements. First is the

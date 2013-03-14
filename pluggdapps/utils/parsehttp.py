@@ -470,6 +470,7 @@ def parse_parameters( ls=[] ):
     """Parse parameter from list of byte-strings `ls`,
 
     .. code-block:: ini
+        :linenos:
 
         parameter  = attribute "=" value
         attribute  = token
@@ -629,6 +630,7 @@ def parse_transfer_encoding( value=b'' ):
     """Parse Transfer-Encoding header value,
 
     .. code-block:: ini
+        :linenos:
 
         transfer-coding      = "chunked" | transfer-extension
         transfer-extension   = token *( ";" parameter )

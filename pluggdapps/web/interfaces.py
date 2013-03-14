@@ -132,6 +132,7 @@ class IHTTPCookie( Interface ):
         string from ``headers`` like,
 
         .. code-block:: python
+            :linenos:
             
             headers.get( 'cookie', '' ) 
 

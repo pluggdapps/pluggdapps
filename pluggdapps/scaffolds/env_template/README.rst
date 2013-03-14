@@ -1,9 +1,10 @@
 Clone this repository from github or google-code or bit-bucket, and do,
 
 .. code-block:: bash
+    :linenos:
 
-   $ cd paenv
-   $ make setup
+    $ cd paenv
+    $ make setup
 
 This will create a virtual environment and install latest version of
 pluggdapps and related packages. A note on the directory structure,
@@ -26,17 +27,20 @@ are configured under this directory.
 **Start native HTTP server**
 
 .. code-block:: bash
+    :linenos:
 
     $ ./pa-env/bin/pa -w -c etc/master.ini serve
 
 To learn more about the ``pa`` command try,
 
 .. code-block:: bash
+    :linenos:
 
     $ ./pa-env/bin/pa -h
 
 To learn more about the ``serve`` sub-command try,
 
 .. code-block:: bash
+    :linenos:
 
     $ ./pa-env/bin/pa serve -h

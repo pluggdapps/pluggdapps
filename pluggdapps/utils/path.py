@@ -181,11 +181,12 @@ class AssetResolver( Package ):
         portion of the asset spec.  For example:
 
         .. code-block:: python
+            :linenos:
 
-           a = AssetResolver('myproject')
-           resolver = a.resolve('templates/foo.pt')
-           print resolver.abspath()
-           # -> /path/to/myproject/templates/foo.pt
+            a = AssetResolver('myproject')
+            resolver = a.resolve('templates/foo.pt')
+            print resolver.abspath()
+            # -> /path/to/myproject/templates/foo.pt
 
         If the AssetResolver is constructed without a ``package`` argument of
         ``None``, and a relative asset specification is passed to ``resolve``,

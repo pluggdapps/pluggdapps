@@ -10,6 +10,7 @@ Pluggdapps project is packaged using setuptools and while doing so, it is
 expected that ``[pluggdapps] package`` entry point is defined, for eg.,
 
 .. code-block:: python
+    :linenos:
 
     # setup.py
     ...
@@ -35,6 +36,7 @@ Tayra is a templating language that is distributed as pluggdapps package, the
 following code is taken from ``tayra/__init__.py`` package file,
 
 .. code-block:: python
+    :linenos:
 
     def package( pa ) :
         loadttls( pa, template_plugins )

@@ -13,6 +13,7 @@ class CommandCommands( Singleton ):
     along with a short description. Like,
     
     .. code-block:: bash
+        :linenos:
         
         $ pa commands
 

@@ -20,27 +20,28 @@ class CommandPViews( Singleton ):
 
 
     .. code-block:: text
+        :linenos:
 
-       $ pa -w pviews <url-path>
+        $ pa -w pviews <url-path>
 
-       mountat = <netpath>
-       urlpath = <url-path>
+        mountat = <netpath>
+        urlpath = <url-path>
 
-           ...
-           view-details
-           ....
+            ...
+            view-details
+            ....
 
-       mountat = <netpath>
-       urlpath = <url-path>
+        mountat = <netpath>
+        urlpath = <url-path>
 
-           ...
-           view-details
-           ....
+            ...
+            view-details
+            ....
 
     Typically, for the same application instance, there can be many views mapped
-    to same url-path, but differentiated by HTTP request methods and/or modifiers.
-    If that is the case you will be getting more than one list for the same
-    url-path.
+    to same url-path, but differentiated by HTTP request methods and/or
+    modifiers. If that is the case you will be getting more than one list for
+    the same url-path.
 
     **netpath** tells the url-prefix (subdomain / host / script-path) on which
     the application is mounted. By default, if no other sub-command option is
