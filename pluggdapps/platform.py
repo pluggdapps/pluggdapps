@@ -37,7 +37,7 @@ So here is what happens duing pre-booting,
 * configuration settings from .ini files and database backend, if available,
   is loaded.
 
-Pre-booting comes to an end by a call to :func:`pluggdapps.initialize`
+Pre-booting comes to an end by a call to :func:`pluggdapps.callpackages`
 function, which in turn is responsible for re-loading pluggdapps packages and 
 calling the package entry-point. Note that package re-loading is handle in the
 context of a plain vanilla platform instantiated during pre-boot phase.
@@ -86,7 +86,7 @@ An example master configuration file,
     <option> = <value>
     ... = ...
 
-    [plugin:<pluginname>]
+    [plugin:<pkgname>.<pluginname>]
     <option> = <value>
     ... = ...
 
@@ -194,7 +194,7 @@ def pluggdapps_defaultsett():
     sett = h.ConfigDict()
     sett.__doc__ = "Platform settings."
     sett['configdb'] = {
-        'default'   : 'ConfigSqlite3DB',
+        'default'   : 'pluggdapps.ConfigSqlite3DB',
         'types'     : (str,),
         'help'      : "Backend plugin to persist configurations done via "
                       "webadmin application. Can be modified only in the .ini "
@@ -218,16 +218,17 @@ def pluggdapps_defaultsett():
     sett['logging.output'] = {
         'default' : 'console',
         'types'   : (str,),
-        'help'    : "Comma separated value of names to log messages. Supported "
-                    "names are `console`, `file`.",
+        'help'    : "Comma separated value of names to log messages. "
+                    "Supported names are `console`, `file`.",
         'options' : [ 'console', 'file' ],
     }
     sett['port'] = {
         'default'   : 8080,
         'types'     : (int,),
-        'help'      : "Port addres to bind the http server. This configuration "
-                      "will be used when using pluggdapps' native HTTP "
-                      "server. Can be modified only in the .ini file.",
+        'help'      : "Port addres to bind the http server. This "
+                      "configuration will be used when using pluggdapps' "
+                      "native HTTP server. Can be modified only in the .ini "
+                      "file.",
         'webconfig' : False,
     }
     sett['scheme'] = {
@@ -276,23 +277,15 @@ class Pluggdapps( object ):
     def __init__( self, erlport=None ):
         self.erlport = erlport # TODO: Document this once bolted with netscale
 
-    #---- Overridable methods.
+    def _preboot( cls, baseini, *args, **kwargs ):
+        """Prebooting. We need pre-booting because package() entry point can
+        have option of creating dynamic plugins when it is called. The
+        package() entry point for each and every package will be called only
+        when callpackages() is called. Since callpackages() need a platform
+        context, we first pre-boot the system and then actually boot the 
+        system."""
 
-    @classmethod
-    def boot( cls, baseini, *args, **kwargs ):
-        """Boot the platform using master configuration file ``baseini``.  
-        Return a new instance of this class object. This is the only way to
-        create a platform instance.
-        """
-        from pluggdapps import loadpackages, initialize
-
-        # Prebooting. We need pre-booting because package() entry point can
-        # have option of creating dynamic plugins when it is called. The
-        # package() entry point for each and every package will be called only
-        # when initialize() is called. Since boot() needs a platform
-        # context, we pre-boot the system for initialize then then actually
-        # boot the system.
-        loadpackages()
+        from pluggdapps import callpackages
 
         pa = Pluggdapps( *args, **kwargs )
         pa.settings = pa._loadsettings( baseini )
@@ -306,9 +299,20 @@ class Pluggdapps( object ):
             [ pa.settings[section].update(d) for section, d in dbsett.items() ]
 
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
-        initialize( pa ) # Prebooting ends with initialize call.
+        callpackages( pa )
+        return configdb
 
-        # Actual booting
+
+    #---- Overridable methods.
+
+    @classmethod
+    def boot( cls, baseini, *args, **kwargs ):
+        """Boot the platform using master configuration file ``baseini``.  
+        Return a new instance of this class object. This is the only way to
+        create a platform instance.
+        """
+        configdb = Pluggdapps._preboot( cls, baseini, *args, **kwargs )
+
         pa = cls( *args, **kwargs )
         pa.inifile = baseini
         pa.settings = pa._loadsettings( baseini )
@@ -318,6 +322,8 @@ class Pluggdapps( object ):
         dbsett = pa.configdb.config()
         if dbsett :
             [ pa.settings[section].update(d) for section, d in dbsett.items() ]
+
+        # Logging related settings go under `[pluggdapps]` section
         pa.logsett = h.settingsfor( 'logging.', pa.settings['pluggdapps'] )
 
         return pa
@@ -341,13 +347,8 @@ class Pluggdapps( object ):
         ``args`` and ``kwargs``,
             are received from query_plugin's ``args`` and ``kwargs``.
         """
-        from pluggdapps.plugin import pluginname
-        plugin._settngx.update( 
-                self.settings[ h.plugin2sec( pluginname(plugin)) ])
+        plugin._settngx.update( self.settings[ h.plugin2sec(plugin.caname) ])
         plugin.pa = self
-
-        # Plugin settings
-        plugin._settngx.update( kwargs.pop( 'settings', {} ))
 
         plugin.query_plugins = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugins, self )
@@ -357,13 +358,18 @@ class Pluggdapps( object ):
                                       Pluggdapps.query_plugins, self )
         plugin.qp  = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugin, self )
+
+        # Plugin settings
+        plugin._settngx.update( kwargs.pop( 'settings', {} ))
+
         return args, kwargs
 
     #---- Configuration APIs
 
     def config( self, **kwargs ):
         """Get or set configuration parameter for the platform. If no keyword
-        arguments are supplied, will return platform-settings.
+        arguments are supplied, will return platform-settings. This API is
+        meant applications who wish to admister the platform configuration.
 
         Keyword arguments,
 
@@ -397,9 +403,9 @@ class Pluggdapps( object ):
 
 
     def _loadini( self, baseini, defaultsett ):
-        """Parse master ini configuration file ``baseini`` and ini files refered
-        by `baseini`. Construct a dictionary of settings for special sections
-        and plugin sections."""
+        """Parse master ini configuration file ``baseini`` and ini files
+        refered by `baseini`. Construct a dictionary of settings for special
+        sections and plugin sections."""
         from pluggdapps.plugin import pluginnames, plugin_info
 
         if not baseini or (not isfile(baseini)) :
@@ -442,12 +448,12 @@ class Pluggdapps( object ):
         return settings
 
     def _defaultsettings( self ):
-        """By now it is expected that all interface specs and plugin definitions
-        would have been loaded by loading packages implementing them and
-        pluggdapps' plugin meta-classing. This function will collect their
-        default settings and return them as settings dictionary,::
+        """By now it is expected that all interface specs and plugin
+        definitions would have been loaded by loading packages implementing
+        them and pluggdapps' plugin meta-classing. This function will collect
+        their default settings and return them as settings dictionary,::
 
-          { "plugin:<pluginname>" : default_settings,
+          { "plugin:<pkgname>.<pluginname>" : default_settings,
              ...
           }
         """
@@ -464,8 +470,7 @@ class Pluggdapps( object ):
         # Fetch all the default-settings for loaded plugins using `ISettings`
         # interface. Plugin inheriting from other plugins will override its
         # base's default_settings() in cls.mro() order.
-        for info in PluginMeta._pluginmap.values() :
-            name = info['name']
+        for name, info in PluginMeta._pluginmap.items() :
             bases = reversed( info['cls'].mro() )
             sett = deepcopy( default )
             for b in bases :
@@ -489,7 +494,8 @@ class Pluggdapps( object ):
             Platform object, whose base class is :class:`Pluggdapps`.
 
         ``interface``,
-            :class:`pluggdapps.plugin.Interface` class.
+            :class:`pluggdapps.plugin.Interface` class or canonical form of
+            interface-name.
 
         ``args`` and ``kwargs``,
             Positional and key-word arguments used to instantiate the plugin.
@@ -499,6 +505,9 @@ class Pluggdapps( object ):
         implementing `interface`
         """
         from pluggdapps.plugin import PluginMeta
+        if isinstance(interface, str) :
+            intrf = interface.lower()
+            interface = PluginMeta._interfmap.get(interf, {}).get('cls', None)
         return [ pcls( pa, *args, **kwargs )
                  for pcls in PluginMeta._implementers[interface].values() ]
 
@@ -515,10 +524,13 @@ class Pluggdapps( object ):
             Platform object, whose base class is :class:`Pluggdapps`.
 
         ``interface``,
-            :class:`pluggdapps.plugin.Interface` class.
+            :class:`pluggdapps.plugin.Interface` class or canonical form of
+            interface-name.
 
         ``name``,
-            plugin name, in lower case to query for.
+            Plugin name in canonical format. For example, canonical name for 
+            plugin class `ConfigSqlite3DB` defined under `pluggdapps` package
+            will be, `pluggdapps.ConfigSqlite3DB`.
 
         ``args`` and ``kwargs``,
             Positional and key-word arguments used to instantiate the plugin.
@@ -526,8 +538,11 @@ class Pluggdapps( object ):
         If ``settings`` key-word argument is present, it will be used to
         override default plugin settings. Return a single Plugin instance.
         """
-        from pluggdapps.plugin import PluginMeta, pluginname, ISettings
-        cls = PluginMeta._implementers[ interface ][ pluginname(name) ]
+        from pluggdapps.plugin import PluginMeta, ISettings
+        if isinstance(interface, str) :
+            intrf = interface.lower()
+            interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
+        cls = PluginMeta._implementers[ interface ][ name.lower() ]
         return cls( pa, *args, **kwargs )
 
     qp = query_plugin # Alias
@@ -700,9 +715,9 @@ class Webapps( Pluggdapps ):
         ``args`` and ``kwargs``,
             are received from query_plugin's ``args`` and ``kwargs``.
         """
-        from pluggdapps.plugin import pluginname
         from pluggdapps.web.webapp import WebApp
 
+        caname = plugin.caname
         if isinstance( plugin, WebApp ) : # Ought to be IWebApp plugin
             appsec, netpath, config = webapp
             plugin._settngx.update( args[0][ appsec ] )
@@ -710,15 +725,11 @@ class Webapps( Pluggdapps ):
             args = args[1:]
 
         elif webapp :                   # Not a IWebApp plugin
-            plugin._settngx.update(
-                webapp.appsettings[ h.plugin2sec( pluginname( plugin )) ]
-            )
+            plugin._settngx.update( webapp.appsettings[ h.plugin2sec(caname) ])
             plugin.webapp = webapp
 
         else :                          # plugin not under a webapp
-            plugin._settngx.update(
-                    self.settings[ h.plugin2sec( pluginname( plugin )) ]
-            )
+            plugin._settngx.update( self.settings[ h.plugin2sec(caname) ])
             plugin.webapp = None
 
         plugin.pa = self
@@ -902,7 +913,8 @@ class Webapps( Pluggdapps ):
             optional argument, which must be passed ``None`` otherwise.
 
         ``interface``,
-            :class:`pluggdapps.plugin.Interface` class.
+            :class:`pluggdapps.plugin.Interface` class or canonical form of
+            interface-name.
 
         ``args`` and ``kwargs``,
             Positional and key-word arguments used to instantiate the plugin.
@@ -912,6 +924,9 @@ class Webapps( Pluggdapps ):
         implementing `interface`
         """
         from pluggdapps.plugin import PluginMeta
+        if isinstance(interface, str) :
+            intrf = interface.lower()
+            interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
         return [ pcls( pa, webapp, *args, **kwargs )
                  for pcls in PluginMeta._implementers[interface].values() ]
 
@@ -933,10 +948,13 @@ class Webapps( Pluggdapps ):
             optional argument, which must be passed ``None`` otherwise.
 
         ``interface``,
-            :class:`pluggdapps.plugin.Interface` class.
+            :class:`pluggdapps.plugin.Interface` class or canonical form of
+            interface-name.
 
         ``name``,
-            plugin name, in lower case to query for.
+            plugin name in canonical format. For example, canonical name for 
+            plugin class `ConfigSqlite3DB` defined under `pluggdapps` package
+            will be, `pluggdapps.ConfigSqlite3DB`.
 
         ``args`` and ``kwargs``,
             Positional and key-word arguments used to instantiate the plugin.
@@ -944,8 +962,11 @@ class Webapps( Pluggdapps ):
         If ``settings`` key-word argument is present, it will be used to
         override default plugin settings. Return a single Plugin instance.
         """
-        from pluggdapps.plugin import PluginMeta, pluginname
-        cls = PluginMeta._implementers[ interface ][ pluginname(name) ]
+        from pluggdapps.plugin import PluginMeta
+        if isinstance(interface, str) :
+            intrf = interface.lower()
+            interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
+        cls = PluginMeta._implementers[ interface ][ name.lower() ]
         return cls( pa, webapp, *args, **kwargs )
 
     qp = query_plugin   # Alias
@@ -984,35 +1005,3 @@ class Webapps( Pluggdapps ):
         else :
             webapp = None
         return uriparts, webapp
-
-
-class Consoleapps( Pluggdapps ):
-    """Provides a framework for console based applications using ncurses."""
-
-    stdscr = None
-    """Standard screen"""
-
-    def __init__( self, *args, **kwargs ):
-        super().__init__( *args, **kwargs )
-
-    #---- Overridable methods
-
-    def start( self ):
-        """Boot all loaded application. Web applicationss are loaded when the
-        system is booted via boot() call. Apps are booted only when an
-        explicit call is made to this method."""
-        super().start()
-        self.stdscr = curses.initscr()
-        self.stdscr.keypad(1)   # Handle multi-byte special characters
-        curses.noecho()         # Turn off echo
-        curses.cbreak()         # Non-buffered mode
-        curses.start_color()
-
-    def shutdown( self ):
-        """Reverse of start() method."""
-        curses.nocbreak()
-        curses.echo()
-        self.stdscr.keypad(0)
-        curses.endwin()
-        super().shutdown()
-

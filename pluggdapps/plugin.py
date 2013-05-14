@@ -60,6 +60,7 @@ class it uses a special method, ``_super_init()`` instead of using the builtin
 """
 
 import sys, inspect
+from   os.path      import isfile
 
 import pluggdapps.utils as h
 
@@ -72,9 +73,9 @@ __all__ = [
     # Interfaces
     'ISettings',
     # API functions
-    'isimplement',  'isplugin', 'plugincall', 'interfaces', 'interface',
-    'plugin_info', 'interface_info', 'pluginnames', 'pluginname', 
-    'pluginclass', 'webapps', 'whichmodule', 'plugin_init',
+    'isimplement',  'isplugin', 'interfaces', 'interface', 'plugin_info',
+    'interface_info', 'pluginnames', 'canonical_name', 'pluginclass',
+    'webapps', 'whichmodule', 'plugin_init',
 ]
 
 #---- Plugin meta framework
@@ -90,48 +91,57 @@ class PluginMeta( type ):
     a dictionary of settings."""
 
     _pluginmap = {}
-    """A map of plugin name (which is lower-cased name of the plugin class)
-    to its information dictionary."""
+    """A map of plugin's canonical-name to its information dictionary."""
 
     _interfmap = {}
-    """A map of interface name (which is name of the class deriving from
-    Interface base class) to its information dictionary."""
+    """A map of interface's canonical-name to its information dictionary."""
 
     _implementers = {}
     """A map of interface class object to a map of plugin names and its 
-    class implementing the interface. If a plugin sub-class derives from
-    Singleton then query_* methods and functions will return the same object
-    all the time."""
+    class implementing the interface. Plugin-names are in canonical format.
+    If a plugin sub-class derives from Singleton then query_* methods and
+    functions will return the same object all the time."""
+
+    # Error messages
+    err1 = 'Class `%s` derives both Interface and Plugin'
+    err2 = 'Plugin/Interface %r defined multiple times, previously %r'
 
     def __new__( cls, name='', bases=(), d={} ):
         new_class = super().__new__( cls, name, bases, d )
+        new_class.caname = caname = canonical_name(new_class)
+        new_class._interfs = []
 
         if name in core_classes :
             return new_class
 
-        new_class._interfs = []
         mro_bases = list( new_class.mro() )
-        PluginMeta._sanitizecls( name, mro_bases, d )
+
+        if Interface in mro_bases and PluginBase in mro_bases :
+            raise Exception( PluginMeta.err1 % name )
+        x = PluginMeta._interfmap.get( 
+                caname, PluginMeta._pluginmap.get( caname, None ))
+        if x :
+            raise Exception( PluginMeta.err2 % (name, x['file']) )
 
         if Interface in mro_bases : # For Interface sub-classes
-            PluginMeta._interfmap[name] = \
+            PluginMeta._interfmap[caname] = \
                     PluginMeta._interf( new_class, name, bases, d )
 
         elif PluginBase in mro_bases : # For Plugin sub-classes
-            nm = pluginname(name)
-            PluginMeta._pluginmap[nm] = \
-                    PluginMeta._plugin( new_class, nm, bases, d )
+            PluginMeta._pluginmap[caname] = \
+                    PluginMeta._plugin( new_class, name, bases, d )
             # Register deriving plugin for interfaces implemented by its base
             # classes
-            for b in mro_bases :
+            for b in mro_bases[:-1] :   # Skip <class 'object'>
                 for i, pmap in list( PluginMeta._implementers.items() ) :
-                    if pluginname(b) in pmap :
-                        pmap.setdefault( nm, '-na-' )
+                    if b.caname in pmap :
+                        pmap.setdefault( caname, '-na-' )
+
             # Hook masterinit() as __init__
             init = d.get( '__init__', None )
             if init == None :
-                # Because we're replacing the initializer, we need to make sure
-                # that any inherited initializers are also called.
+                # Because we're replacing the initializer, we need to make
+                # sure that any inherited initializers are also called.
                 for b in mro_bases :
                     if issubclass(b, PluginBase) and '__init__' in vars(b) :
                         init = b.__init__._original
@@ -162,7 +172,7 @@ class PluginMeta( type ):
                 use,
                     self.__super_init__( __class__, *args, **kwargs )
 
-                Other methods that are overloaded as called as is.
+                Other overloaded methods that are called as is.
                 """
                 baseinit = getattr( cls.mro()[1], '__init__', None )
                 if baseinit and hasattr( baseinit, '_original' ) :
@@ -176,41 +186,28 @@ class PluginMeta( type ):
 
         else :
             raise Exception(
-                "Weird, class derives neither from Interface or PluginBase !!" )
+              "Weird, class derives neither from Interface or PluginBase !!" )
 
         return new_class
 
-    # Error messages
-    err1 = 'Class `%s` derives both Interface and Plugin'
-    err2 = 'Interface %r defined multiple times in %s'
-
     @classmethod
-    def _sanitizecls( cls, name, bases, d ):
-        """Perform sanitory checks on :class:`Plugin` derived classes."""
-        if Interface in bases :
-            if PluginBase in bases :
-                raise Exception( err1 % name )
-            interf = PluginMeta._interfmap.get( pluginname(name), None )
-            if interf :
-                raise Exception( err2 % (name, interf['file']) )
-
-    @classmethod
-    def _interf( cls, newcls, name, bases, d ):
-        """`newcls` is class deriving from Interface baseclass and provides 
+    def _interf( cls, new_class, name, bases, d ):
+        """`new_class` is class deriving from Interface baseclass and provides 
         specification for interface `name`."""
-        clsmod = whichmodule( newcls )
+        clsmod = whichmodule( new_class )
         info = {
-            'cls' : newcls,
-            'name' : name,
-            'file' : clsmod.__file__ if clsmod else '',
+            'cls'       : new_class,
+            'name'      : name,
+            'caname'    : new_class.caname,
+            'file'      : clsmod.__file__ if clsmod else '',
             'assetspec' : '',
-            'attributes' : {},  # Map of attribute names and its value
-            'methods' : {},     # Map of method names and method object
+            'attributes': {},   # Map of attribute names and its value
+            'methods'   : {},   # Map of method names and method object
         }
 
         # Collect attributes and methods specified by `interface` class.
-        for k in vars(newcls) :
-            v = getattr(newcls, k)
+        for k in vars(new_class) :
+            v = getattr(new_class, k)
             if callable(v) :
                 info['methods'][k] = v
             else :
@@ -218,14 +215,15 @@ class PluginMeta( type ):
         return info
 
     @classmethod
-    def _plugin( cls, newcls, nm, bases, d ):
-        """`newcls` is class deriving from Plugin baseclass and implements
+    def _plugin( cls, new_class, name, bases, d ):
+        """`new_class` is class deriving from Plugin baseclass and implements
         interface specifications.
         """
-        clsmod = whichmodule( newcls )
+        clsmod = whichmodule( new_class )
         info = {
-            'cls'       : newcls,
-            'name'      : nm,
+            'cls'       : new_class,
+            'name'      : name,
+            'caname'    : new_class.caname,
             'file'      : clsmod.__file__ if clsmod else '',
             'assetspec' : '',
         }
@@ -240,20 +238,8 @@ def isimplement( plugin, interface ):
 
 def isplugin( plugin ):
     """Return True if ``plugin`` is a plugin-object."""
-    return pluginname(plugin) in PluginMeta._pluginmap
-
-def plugincall( obj, fn ):
-    """If ``obj`` string is a plugin name, then call ``fn`` and return its
-    value. Other wise import obj, if it is a string. Else return obj as is.
-
-    TODO : document this function in sphinx. 
-    """
-    if isinstance(obj, str) and isplugin(obj) :
-        return fn()
-    elif isinstance(obj, str) :
-        return h.string_import( obj )
-    else :
-        return obj
+    caname = plugin if isinstance(plugin, str) else plugin.caname
+    return caname in PluginMeta._pluginmap
 
 def interfaces():
     """Return a complete list of interface classes defined in this
@@ -272,55 +258,45 @@ def plugin_info( *args ):
     a plugin class `nm`, where nm is the first argument in `args`. The second
     argument is optional, and if provided is the default value to be returned
     if a plugin by name `nm` is not found."""
-    nm = args[0]
-    if isinstance( nm, str ) :
-        return PluginMeta._pluginmap.get( nm, *args[1:] )
-    else :
-        nm = pluginname(nm)
-        return PluginMeta._pluginmap.get( nm, *args[1:] )
-    raise Exception( "Could not get plugin information for %r " % nm )
+    caname = args[0] if isinstance(args[0], str) else args[0].caname
+    return PluginMeta._pluginmap.get( caname, *args[1:] )
 
 def interface_info( *args ):
     """Return information dictionary gathered by :class:`PluginMeta` for an
     interface class `interf`, where `interf` is the first argument in `args`.
     The second argument is optional, and if provided is the default value to
     be returned if an interface by name `interf` is not found."""
-    interf = args[0]
-    if isinstance( interf, str ):
-        return PluginMeta._interfmap.get( interf, *args[1:] )
-    else :
-        interf = interf.__name__
-        return PluginMeta._interfmap.get( interf, *args[1:] )
+    caname = args[0] if isinstance(args[0], str) else args[0].caname
+    return PluginMeta._interfmap.get( caname, *args[1:] )
 
 def pluginnames( interface=None ):
-    """Return a list of plugin names implementing ``interface``. If `interface`
-    is None, then return a list of all plugins"""
+    """Return a list of plugin names implementing ``interface``. If
+    `interface` is None, then return a list of all plugins"""
     if interface :
         return list( PluginMeta._implementers[interface].keys() )
     else :
         return list( PluginMeta._pluginmap.keys() )
 
-def pluginname( o ):
-    """Plugin names are nothing but normalized form of plugin's class name,
-    where normalization is done by lower casing plugin's class name.
-    
-    `o` can be one of the following,
-    * string
-    * plugin class
-    * plugin class instance
+def canonical_name( cls ):
+    """Canonical names for plugins are defined as,
+
+    .. code-block::
+
+        <pkgname>.<plugin-class-name>
+
+    where the entire string is lower-cased. This function is to be called only
+    by PluginMeta class when a plugin class is about to be blue-printed.
     """
-    if isinstance(o, str) :
-        return o.lower()
-    elif inspect.isclass(o) :
-        return o.__name__.lower()
+    mod = sys.modules.get( cls.__module__ )
+    f = getattr( mod, '__file__', getattr(mod, '_ttlfile', None) )
+    if f and isfile(f) :
+        return (h.packagedin(f)  + '.' + cls.__name__).lower()
     else :
-        return o.__class__.__name__.lower()
-    return name
+        return cls.__name__.lower()
 
 def pluginclass( interface, name ):
     """Return the plugin class by ``name`` implementing ``interface``."""
-    nm = pluginname( name )
-    return PluginMeta._implementers.get( interface, {} ).get( nm, None )
+    return PluginMeta._implementers.get( interface, {} ).get( name, None )
 
 def webapps():
     """Return a list of application names (which are actually plugins
@@ -343,11 +319,11 @@ class PluginBase( object, metaclass=PluginMeta ):
 
     def __new__( cls, *args, **kwargs ):
         if issubclass( cls, Singleton ):
-            name = pluginname(cls)
-            singleton = PluginBase._singletons.get( name, None )
+            caname = getattr(cls, 'caname', None)
+            singleton = PluginBase._singletons.get( caname, None )
             if singleton == None :
                 self = super().__new__( cls, *args, **kwargs )
-                singleton = PluginBase._singletons.setdefault( name, self )
+                singleton = PluginBase._singletons.setdefault(self.caname, self)
             return singleton
         else :
             self = super().__new__( cls, *args, **kwargs )
@@ -378,15 +354,18 @@ class Attribute( object ):
 
 
 def implements( *interfaces ):
-    """Plugin classes can use this function to declare ``interfaces`` that are 
-    implemented by them. This function can be called only inside the scope
+    """Plugin classes can use this function to declare ``interfaces`` that
+    are implemented by them. This function can be called only inside the scope
     of a class deriving from :class:`Plugin`."""
     frame = sys._getframe(1)
 
     if frame.f_code.co_name in core_classes : return # Skip
 
-    nm = pluginname( frame.f_code.co_name )
+    pkg = h.packagedin( frame.f_code.co_filename )
+    nm = (pkg + '.' + frame.f_code.co_name).lower()
     for i in interfaces :
+        if isinstance(i, str) :
+            i = PluginMeta._interfmap[i]['cls']
         if nm in list( PluginMeta._implementers.get(i, {}).keys() ) :
             raise Exception( 
                 'Plugin %r implements interface %r twice' % (nm, i) )
@@ -411,6 +390,20 @@ class ISettings( Interface ):
 
     pa = None
     """Platfrom instance, of :class:`Pluggdapps` or one of its derivatives."""
+
+    caname = None
+    """Canonical name of plugin. For example, canonical name for 
+    plugin class `ConfigSqlite3DB` defined under `pluggdapps` package will be,
+    `pluggdapps.ConfigSqlite3DB`."""
+
+    _settngx = {}
+    """Hidden dictionary of configuration settings. Settings information is
+    gathered from different sources and initialized during plugin
+    instantiation. Every plugin provide a dictionary-like interface to access
+    the settings.
+    
+    IMPORTANT : Do not access this attribute directly.
+    """
 
     @classmethod
     def default_settings():
@@ -479,8 +472,8 @@ class Plugin( PluginBase ):     # Plugin base class implementing ISettings
       import the module implementing the plugin inside <package>/__init__.py
 
     Similarly to facilitate meth:`query_plugins`, interfaces implemented by a
-    plugin class (and all of its base classes) are saved under the plugin class
-    attribute :attr:`_interfs`,
+    plugin class (and all of its base classes) are saved under the plugin
+    class attribute :attr:`_interfs`,
 
     <plugin-cls>._interfs = [ <interface-class>, ... ]
 
@@ -554,6 +547,12 @@ def plugin_init():
     function, once during startup, after all pluggdapps packages are loaded.
     """
     from pluggdapps import papackages
+
+    # Re-initialize _interfs list for each plugin class, so that plugin_init()
+    # will not create duplicate entries.
+    [ setattr(info['cls'], '_interfs', []) 
+            for _, info in PluginMeta._pluginmap.items() ]
+
     # Optimize _implementers and _interfs for query_*
     d = {}
     for i, pmap in PluginMeta._implementers.items() :
