@@ -22,7 +22,7 @@ class DocRootRouter( MatchRouter ):
         """:meth:`pluggapps.web.interfaces.IHTTPRouter.onboot` interface
         method."""
         super().onboot()
-        self.add_view( 'staticmap1', '/*path', view='docrootview',
+        self.add_view( 'staticmap1', '/*path', view='pluggdapps.docrootview',
                        content_coding='gzip' )
 
     #---- ISettings interface methods

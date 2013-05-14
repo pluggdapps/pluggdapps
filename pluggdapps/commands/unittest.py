@@ -7,7 +7,7 @@
 import unittest
 from   os.path      import dirname, join
 
-from   pluggdapps.plugin      import implements, Singleton, pluginname
+from   pluggdapps.plugin      import implements, Singleton
 from   pluggdapps.platform    import Pluggdapps
 from   pluggdapps.interfaces  import ICommand
 import pluggdapps.utils       as h

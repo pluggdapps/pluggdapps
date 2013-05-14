@@ -8,20 +8,21 @@
 asset-specification format."""
 
 import pkg_resources, os
-from   os.path  import isabs, abspath
+from   os.path  import isabs, abspath, join, dirname
 
-from   pluggdapps.utils.path import package_name, package_path, join
 from   pluggdapps.utils.lib  import longest_prefix
 
 __all__ = [
     'parse_assetspec', 'asset_spec_from_abspath', 'abspath_from_asset_spec',
+    'packagedin'
 ]
 
 def parse_assetspec( spec, pname ):
     """Parse the asset specification ``spec`` in the context of package name
     ``pname``. If pname is package object, it is resolved as pname.__name__.  
     Return a tuple of (packagename, filename), where packagename is the name
-    of the package relative to which the file asset ``filename`` is located."""
+    of the package relative to which the file asset ``filename`` is located.
+    """
 
     if isabs(spec) : return None, spec
 
@@ -41,9 +42,9 @@ def asset_spec_from_abspath( abspath, papackages ):
     asset-specification format."""
     locations = { pinfo['location'] : p for p, pinfo in papackages.items() }
     prefix = longest_prefix( locations.keys(), abspath )
-    if prefix :
-        return ( locations[prefix] + ':' + 
-                 abspath[ len(prefix) : ].lstrip(os.sep) )
+    pkg = locations[prefix] if prefix else None
+    if pkg :
+        return ( pkg + ':' + abspath[ len(prefix) : ].lstrip(os.sep) )
     else :
         return None
 
@@ -63,4 +64,11 @@ def abspath_from_asset_spec( spec, pname='', relativeto=None ):
         else :
             return filename
 
+def packagedin( abspath ):
+    """Return the package name that contains the asset `abspath`."""
+    from pluggdapps import papackages # Keep this line, don't shuffle around !!
+
+    locations = { pinfo['location'] : p for p, pinfo in papackages.items() }
+    prefix = longest_prefix( locations.keys(), abspath )
+    return locations[prefix] if prefix else None
 

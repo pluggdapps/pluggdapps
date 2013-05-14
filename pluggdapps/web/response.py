@@ -205,7 +205,7 @@ class HTTPResponse( Plugin ):
         self.flush( finishing=True )
 
     _renderers = {
-        '.ttl' : 'TTLCompiler',
+        '.ttl' : 'tayra.TTLCompiler',
     }
     _renderer_plugins = {
     }
@@ -222,7 +222,8 @@ class HTTPResponse( Plugin ):
             Template text to be used for rendering.
 
         ``IHTTPRenderer``,
-            :class:`IHTTPRenderer` plugin to use for rendering. 
+            :class:`IHTTPRenderer` plugin to use for rendering. This argument
+            must be in canonical form of plugin's name.
 
         If ``file`` keyword argument is passed, this method will resolve the
         correct renderer plugin based on file-extension. if ``text`` keyword

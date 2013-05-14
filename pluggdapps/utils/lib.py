@@ -341,6 +341,7 @@ def formated_filesize( size, binary=False ):
                 return '%.1f %s' % ((base * value / unit), prefix)
         return '%.1f %s' % ((base * value / unit), prefix)
 
+
 class ETag( dict ):
     """A dictionary like object to transparently manage context information.
     Instead of directly accessing context object to update key,value pairs,

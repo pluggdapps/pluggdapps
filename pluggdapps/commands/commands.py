@@ -4,7 +4,7 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-from   pluggdapps.plugin        import implements, Singleton, pluginname
+from   pluggdapps.plugin        import implements, Singleton
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
@@ -35,10 +35,10 @@ class CommandCommands( Singleton ):
     def handle( self, args ):
         """:meth:`pluggdapps.interfaces.ICommand.handle` interface method."""
         commands = self.qps( ICommand )
-        commands = sorted( commands, key=lambda x : pluginname(x)[7:] )
+        commands = sorted( commands, key=lambda x : x.caname )
         for command in commands :
-            rows = self._formatdescr( pluginname(command)[7:],
-                                      command.description )
+            name = command.caname.split('.', 1)[1][7:]
+            rows = self._formatdescr( name, command.description )
             for r in rows : print(r)
 
     #---- Internal & local functions

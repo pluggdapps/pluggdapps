@@ -136,8 +136,9 @@ def is_plugin_section( secname ):
 
 def conf_descriptionfor( plugin, info=None ):
     """Gather description information for configuration settings for
-    ``plugin``, which might derive from other plugin class and therefore we
-    need to read the default_settings() from its base classes as well.
+    ``plugin`` section, which might derive from other plugin class and
+    therefore we need to read the default_settings() from its base classes as
+    well.
 
     Returns a dictionary of configuration key and its ConfigItem value.
     """

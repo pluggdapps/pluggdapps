@@ -9,8 +9,6 @@ eggs/
 build/
 dist/
 distribute-0.6.10.tar.gz
-.vim_maindev
-.vim_session
 pluggdapps.egg-info/
 # switch to regexp syntax.
 syntax: regexp

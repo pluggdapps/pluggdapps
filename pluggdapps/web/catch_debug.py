@@ -109,7 +109,7 @@ class CatchAndDebug( Plugin ):
         method."""
         response = request.response
         c = self.collectException( request, etype, value, tb )
-        weba = self.pa.findapp( appname='webadmin' )
+        weba = self.pa.findapp( appname='pluggdapps.webadmin' )
         c['url_jquery'] = \
             weba.pathfor( request, 'staticfiles', path='jquery-1.8.3.min.js')
         c['url_css'] = \
@@ -184,7 +184,7 @@ class CatchAndDebug( Plugin ):
         frameid = md5( str(data).encode('utf-8') ).hexdigest()
         self.frame_index[ frameid ] = ( globals_, locals_ ) 
         if request :
-            weba = self.pa.findapp( appname='webadmin' )
+            weba = self.pa.findapp( appname='pluggdapps.webadmin' )
             data['url_eval'] = \
                 weba.urlfor( request, 'framedebug', frameid=frameid )
         return data

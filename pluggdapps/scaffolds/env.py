@@ -79,7 +79,7 @@ class CommandEnv( Plugin ):
         sett = { 'target_dir'  : args.target_dir or os.getcwd(),
                  'host_name'   : args.host_name,
                }
-        scaff = self.qp( IScaffold, 'commandenv', settings=sett )
+        scaff = self.qp( IScaffold, 'pluggdapps.CommandEnv', settings=sett )
         scaff.query_cmdline()
         print( "Generating pluggdapps environment." )
         scaff.generate()

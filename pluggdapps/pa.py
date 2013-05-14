@@ -76,7 +76,8 @@ def main():
     # Get a list of sub-commands supported in command line.
     # Take only the command-line parameters uptil a subcommand.
     mainparser = mainoptions()
-    subcmds = [ x[7:] for x in PluginMeta._implementers[ ICommand ].keys() ]
+    subcmds = [ x.split('.', 1)[1][7:] 
+                for x in PluginMeta._implementers[ ICommand ].keys() ]
     mainargs = h.takewhile( lambda x : x not in subcmds, sys.argv[1:] )
     args = mainparser.parse_args( mainargs )
 

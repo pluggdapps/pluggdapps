@@ -453,7 +453,7 @@ _default_settings['defaultview']  = {
                 "cannot be resolved to a valid view-callable."
 }
 _default_settings['IHTTPNegotiator']  = {
-    'default' : 'HTTPNegotiator',
+    'default' : 'pluggdapps.HTTPNegotiator',
     'types'   : (str,),
     'help'    : "If configured, will be used to handle server side http "
                 "negotiation for best matching resource variant."

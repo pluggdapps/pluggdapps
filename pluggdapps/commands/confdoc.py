@@ -6,7 +6,7 @@
 
 import io
 
-from   pluggdapps.plugin        import implements, Singleton, pluginname
+from   pluggdapps.plugin        import implements, Singleton
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 

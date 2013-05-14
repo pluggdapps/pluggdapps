@@ -23,7 +23,7 @@ class WebAdminRouter( MatchRouter ):
         super().onboot()
         self.add_view( 'staticfiles', '/static/*path', 
                        rootloc='pluggdapps:webadmin/static',
-                       view='staticview' )
+                       view='pluggdapps.staticview' )
 
         self.add_view( 'index', '/',
                        method=b'GET',

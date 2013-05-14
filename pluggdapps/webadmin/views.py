@@ -8,7 +8,7 @@ import pprint
 from   copy                 import deepcopy
 
 from   pluggdapps.platform  import DEFAULT, pluggdapps_defaultsett
-from   pluggdapps.plugin    import pluginname, PluginMeta
+from   pluggdapps.plugin    import PluginMeta
 import pluggdapps.utils     as h
 
 SPECIAL_SECTIONS = [ 'DEFAULT', 'pluggdapps' ]
@@ -61,7 +61,7 @@ def get_html_config( request, c ):
 
     secmenu = []
     for pn in h.netpath_settings( request.pa, netpath ).keys() :
-        if pn in [ 'mountloc'] : continue
+        if pn in ['mountloc'] : continue
         name = h.plugin2sec( pn )
         secmenu.append(
             ( name,
@@ -108,7 +108,6 @@ def get_json_config( request, c ):
     response.flush( finishing=True )
 
 def frame_debug( request, c ):
-    from pluggdapps.web.catch_debug import frame_index
     frame_index = request.webapp.livedebug.frame_index 
     frameid = request.matchdict['frameid']
     response = request.response

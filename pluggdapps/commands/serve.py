@@ -7,8 +7,7 @@
 import os, fcntl, signal, sys, time, threading, imp, signal
 from   os.path  import abspath
 
-from   pluggdapps.plugin        import implements, ISettings, Singleton, \
-                                       pluginname
+from   pluggdapps.plugin        import implements, ISettings, Singleton
 from   pluggdapps.interfaces    import ICommand, IHTTPServer
 import pluggdapps.utils         as h
 
@@ -64,7 +63,7 @@ class CommandServe( Singleton ):
 
     def gemini( self, args ):
         """Start a poll thread and then start pluggdapps platform."""
-        server = self.qp( IHTTPServer, self['IHTTPServer'] )
+        server = self.qp( 'pluggdapps.IHTTPServer', self['IHTTPServer'] )
         if args.mreload :
             # Launch a thread to poll and then start serving http
             t = threading.Thread( target=self.pollthread, 
@@ -214,7 +213,7 @@ _default_settings = h.ConfigDict()
 _default_settings.__doc__ = CommandServe.__doc__
 
 _default_settings['IHTTPServer'] = {
-    'default' : 'HTTPEPollServer',
+    'default' : 'pluggdapps.HTTPEPollServer',
     'types'   : (str,),
     'help'    : "Plugin name implementing :class:`IHTTPServer`. This is the "
                 "actual web server that will be started by the sub-command. "

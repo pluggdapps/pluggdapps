@@ -142,31 +142,31 @@ _default_settings['language']  = {
                 "be customized for each view (or resource-variant)"
 }
 _default_settings['IHTTPRouter']  = {
-    'default' : 'matchrouter',
+    'default' : 'pluggdapps.MatchRouter',
     'types'   : (str,),
     'help'    : "IHTTPRouter plugin. Base router plugin for resolving "
                 "requests to view-callable."
 }
 _default_settings['IHTTPCookie']  = {
-    'default' : 'httpcookie',
+    'default' : 'pluggdapps.HTTPCookie',
     'types'   : (str,),
     'help'    : "Plugin implementing IHTTPCookie interface spec. Methods "
                 "from this plugin will be used to process both request "
                 "cookies and response cookies. "
 }
 _default_settings['IHTTPSession']  = {
-    'default' : 'httpsession',
+    'default' : 'pluggdapps.HTTPSession',
     'types'   : (str,),
     'help'    : "Plugin implementing IHTTPSession interface spec. Will be "
                 "used to handle cookie based user-sessions."
 }
 _default_settings['IHTTPRequest']  = {
-    'default' : 'httprequest',
+    'default' : 'pluggdapps.HTTPRequest',
     'types'   : (str,),
     'help'    : "Name of the plugin to encapsulate HTTP request. "
 }
 _default_settings['IHTTPResponse']  = {
-    'default' : 'httpresponse',
+    'default' : 'pluggdapps.HTTPResponse',
     'types'   : (str,),
     'help'    : "Name of the plugin to encapsulate HTTP response."
 }
@@ -178,14 +178,14 @@ _default_settings['IHTTPInBound'] = {
                 "specified order."
 }
 _default_settings['IHTTPOutBound'] = {
-    'default' : 'ResponseHeaders, GZipOutBound',
+    'default' : 'pluggdapps.ResponseHeaders, pluggdapps.GZipOutBound',
     'types'   : ('csv',list),
     'help'    : "A string of comma seperated value, where each value names a "
                 "IHTTPOutBound plugin. Transforms will be applied in "
                 "specified order."
 }
 _default_settings['IHTTPLiveDebug']  = {
-    'default' : 'CatchAndDebug',
+    'default' : 'pluggdapps.CatchAndDebug',
     'types'   : (str,),
     'help'    : "Plugin implementing IHTTPLiveDebug interface spec. Will be "
                 "used to catch application exception and render them on "

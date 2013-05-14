@@ -52,7 +52,7 @@ _default_settings['language']  = {
     'help'    : "Default language to use for content negotiation."
 }
 _default_settings['IHTTPRouter']  = {
-    'default' : 'WebAdminRouter',
+    'default' : 'pluggdapps.WebAdminRouter',
     'types'   : (str,),
     'help'    : "IHTTPRouter plugin. A request is resolved to a view-callable "
                 "by this router plugin."

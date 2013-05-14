@@ -234,7 +234,7 @@ _ds1 = h.ConfigDict()
 _ds1.__doc__ = HTTPEPollServer.__doc__
 
 _ds1['IHTTPConnection']  = {
-    'default' : 'httpconnection',
+    'default' : 'pluggdapps.HTTPConnection',
     'types'   : (str,),
     'help'    : "Plugin to handle client connections."
 }

@@ -4,7 +4,7 @@
 # file 'LICENSE', which is part of this source code package.
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
-from   pluggdapps.plugin     import PluginMeta, implements, Singleton
+from   pluggdapps.plugin     import implements, Singleton
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
@@ -12,8 +12,8 @@ import pluggdapps.utils as h
 class CommandPViews( Singleton ):
     """Pluggdapps can host many application, and application instances, in the
     same environment and each application can have any number of view-callables
-    mapped onto url-paths. Use this sub-command, ``pviews``, to print a summary of
-    matching routes and views for a given URL-path
+    mapped onto url-paths. Use this sub-command, ``pviews``, to print a summary
+    of matching routes and views for a given URL-path
     
     Note that the main script must be invoked using `webapps` platform, the
     ``-w`` switch.

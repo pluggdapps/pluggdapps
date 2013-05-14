@@ -82,8 +82,8 @@ application instances on subdomains and script-paths. For Eg,
     :linenos:
 
     [mountloc]
-    pluggdapps.com/webadmin = webadmin, %(here)s/webadmin.ini
-    tayra.pluggdapps.com/ = docroot, %(here)s/tayra.ini
+    pluggdapps.com/webadmin = pluggdapps.webadmin, %(here)s/webadmin.ini
+    tayra.pluggdapps.com/ = pluggdapps.docroot, %(here)s/tayra.ini
 
 The configuration name under [mountloc] section is nothing but url prefix on 
 which a web-application instance is mounted. When a web-request enter the 

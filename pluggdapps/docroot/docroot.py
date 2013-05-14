@@ -42,7 +42,7 @@ _default_settings = h.ConfigDict()
 _default_settings.__doc__ = DocRoot.__doc__
 
 _default_settings['IHTTPRouter']  = {
-    'default' : 'DocRootRouter',
+    'default' : 'pluggdapps.DocRootRouter',
     'types'   : (str,),
     'help'    : "IHTTPRouter plugin to resolve request into view-callables."
 }
