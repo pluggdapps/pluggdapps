@@ -8,12 +8,12 @@
 Pluggdapps, at its core, is a component architecture in python. It provides a
 platform to specify interfaces and implement them as plugins.
 
-Plugins and interfaces can be defined by any number of packages, provided
+Plugins and interfaces can be defined in any number of packages, where
 modules containing them are imported by package's `__init__.py` file. When
-`pluggdapps` is imported for the first time, it will probe for 
-all packages in current environment's working set. When finding a package
-which defines the following entry-point (refer setuptools to know more about
-package entry-points),
+`pluggdapps` is imported for the first time, it will probe for all packages
+in current environment's working set. When finding a package which defines
+the following entry-point (refer setuptools to know more about package
+entry-points),
 
 .. code-block:: ini
     :linenos:
@@ -40,7 +40,18 @@ about the package which is documented in :func:`package` function.
 Refer to :ref:`glossary` for terminologies used.
 """
 
+import imp, sys
 import pkg_resources    as pkg
+
+"""Collect a complete list of pluggdapps packages from python
+package-environment and gather them in `papackages`."""
+pkgs = pkg.WorkingSet().by_key  # A dictionary of pkg-name and object
+papackages = { 
+    pkgname : { 'package' : d,
+                'location' : d.location
+              }
+    for pkgname, d in list( pkgs.items() ) 
+    if d.get_entry_info( 'pluggdapps', 'package' ) }
 
 import pluggdapps.utils as h
 
@@ -63,12 +74,9 @@ import pluggdapps.webadmin  # Application to configure platform through
 
 __version__ = '0.31dev'
 
-pkgs = pkg.WorkingSet().by_key # A dictionary of pkg-name and object
-papackages = {}
-
 def package( pa ) :
-    """Entry point that returns a dictionary of key,value information about the
-    package.
+    """Entry point that returns a dictionary of key,value information about
+    the package.
 
     ``pa``,
         platform object deriving from :class:`pluggdapps.platform.Pluggdapps`.
@@ -85,31 +93,20 @@ def package( pa ) :
         'ttlplugins' : []
     }
 
-# A gotcha here !
-#   The following lines executed when `pluggdapps` package is imported. As a
-#   side-effect, it loops on valid pluggdapps packages to which this package
-#   is also part of. Hence, make sure that package() entry-point is defined
-#   before executing the following lines.
 def loadpackages():
-    for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
-        if d.get_entry_info( 'pluggdapps', 'package' ) :
-            __import__( pkgname )
-    # Initialize plugin data structures
-    pluggdapps.plugin.plugin_init()
+    packages = list(papackages.keys())
+    packages.remove( 'pluggdapps' )
+    for pkgname in sorted(packages) :
+        if pkgname in sys.modules : continue
+        f, path, descr = imp.find_module(pkgname)
+        imp.load_module( pkgname, f, path, descr )
+    pluggdapps.plugin.plugin_init() # Initialize plugin data structures
 
-# Called during actual boot.
-def initialize( pa ):
-    from  pluggdapps.plugin import PluginMeta
-    for pkgname, d in sorted( list( pkgs.items() ), key=lambda x : x[0] ):
-        if d.get_entry_info( 'pluggdapps', 'package' ) :
-            info = h.call_entrypoint( d,  'pluggdapps', 'package', pa )
-            info.setdefault( 'package', d )
-            info.setdefault( 'location', d.location )
-            papackages[ pkgname ] = info
-    # Re-initialize _interfs list for each plugin class, so that plugin_init()
-    # will not create duplicate entries.
-    [ setattr( info['cls'], '_interfs', [] )
-                for nm, info in PluginMeta._pluginmap.items() ]
-    # Initialize plugin data structures
-    pluggdapps.plugin.plugin_init()
+
+def callpackages( pa ):
+    """Call `package` entrypoint for each pluggdapps package."""
+    for pkgname, info in sorted( papackages.items() ) :
+        info = h.call_entrypoint(info['package'], 'pluggdapps', 'package', pa)
+        papackages[pkgname].update( info )
+    pluggdapps.plugin.plugin_init() # Initialize plugin data structures
 
