@@ -43,6 +43,8 @@ Refer to :ref:`glossary` for terminologies used.
 import imp, sys
 import pkg_resources    as pkg
 
+__version__ = '0.4dev'
+
 """Collect a complete list of pluggdapps packages from python
 package-environment and gather them in `papackages`."""
 pkgs = pkg.WorkingSet().by_key  # A dictionary of pkg-name and object
@@ -71,8 +73,6 @@ import pluggdapps.web       # Load web framework
 import pluggdapps.docroot   # Application to serve static files.
 import pluggdapps.webadmin  # Application to configure platform through
                             # browser.
-
-__version__ = '0.31dev'
 
 def package( pa ) :
     """Entry point that returns a dictionary of key,value information about

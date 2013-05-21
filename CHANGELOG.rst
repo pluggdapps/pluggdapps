@@ -1,6 +1,43 @@
 Release changes
 ===============
 
+0.4dev
+------
+
+- scaffold source files must not end with .py, as python module, this will
+  throw errors while installing them via easy_install. To solve this problem,
+  .py files are suffixed with .tmpl, and utils.scaff module will remove the
+  suffix before creating the scaffold logic in target directory.
+- Sub command `confdoc` is added to automatically generate a catalog of
+  configuration settings for plugins in pluggdapps, or any other, package.
+- A new alias for `query_plugin()`, as `qp()`,
+  and `query_plugins()`, as `qps()` is now available.
+- Cleaned up and refactored platform boot sequence.
+  - First all pluggdapps-packages are gathered from the environment.
+  - Then gathered packages are loaded.
+  - And during platform boot-time, package entry-point is called.
+
+- added namespace for plugins. Every plugin name can be queried and accessed
+  by prefixing its class-name with package name. This is not the canonical
+  form for plugin-names. For example, plugin `ConfigSqlite3DB` defined
+  in pluggdapps package is to be accessed as, `pluggdapps.ConfigSqlite3DB`.
+- Every instantiated plugin will now have a `caname` attribute that provides
+  the canonical name of the plugin. This is automatically populated by
+  component-arch during plugin instantiation.
+- `query_plugin()` and `query_plugins()` method calls now supports `interface`
+  argument as string of interface-name, specified in canonical-form.
+- `plugincall()`, `pluginname()` function is removed and `canonical_name()`
+  function is added in pluggdapps.plugin module. Note that `canonical_name()`
+  function is meant to be called only by logic inside PluginMeta class.
+- `pluggdapps.initialize()` is now `pluggdapps.callpackages()`.
+- platform.Pluggdapps class has `_preboot()` local method to handle pre-booting
+  logic.
+- Moved sphinx-documentation to docs/ directory. It is more work to manage two
+  separate versions of documentation. All articles under docs/ directory are
+  active and publishable, while documentation that are more specific to
+  internals of pluggdapps are under docs/dev/ directory.
+
+
 0.3dev
 ------
 

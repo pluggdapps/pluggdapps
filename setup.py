@@ -25,8 +25,13 @@ description='Pluggdapps component architecture, web framework'
 
 classifiers = [
 'Development Status :: 4 - Beta',
+'Environment :: Plugins',
 'Environment :: Web Environment',
 'Intended Audience :: Developers',
+'Operating System :: POSIX',
+'Programming Language :: Python :: 3',
+'Topic :: Internet :: WWW/HTTP',
+'Topic :: Software Development',
 ]
 
 setup(
