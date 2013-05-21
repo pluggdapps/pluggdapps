@@ -69,14 +69,15 @@ Release check-list
 * Make sure that sphinxdoc/modules/ has all the modules that need to be
   documented.
 
-* Upload the source into pypi.
+* Enter the virtual environment and upload the source into pypi.
     make upload
+
+* Upload documentation zip.
+
+* After making the release, taging the branch, increment the version number.
 
 * Create a tag and push the tagged branch to 
     code.google.com 
     bitbucket.com
     github.com
 
-* Upload documentation zip.
-
-* After making the release, taging the branch, increment the version number.
