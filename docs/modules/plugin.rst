@@ -29,7 +29,6 @@ Module contents
 .. autofunction:: plugin_info
 .. autofunction:: interface_info
 .. autofunction:: pluginnames
-.. autofunction:: pluginname
 .. autofunction:: pluginclass
 .. autofunction:: webapps
 .. autofunction:: whichmodule

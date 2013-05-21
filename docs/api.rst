@@ -12,6 +12,7 @@ API Listing
     modules/const
     modules/pa
     modules/commands
+    modules/scaffolds
     modules/utils
     modules/web
     modules/docroot

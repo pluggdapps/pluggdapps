@@ -8,15 +8,17 @@ interfaces.
 Pluggdapps platform
 -------------------
 
-A platform is a base system on which we can develop programs, and
-package and distribute them to other users who can then install the
-programs on machines having the same platform. In case of
-pluggdapps, it uses python's standard-library, virtual-environment and
-setuptools to create the notion of platform. On-top of that, packages are
-expected to define standard entry-points to make them compatible with
-pluggdapps. Like,::
+A platform is a base system on which we can develop programs, package and 
+distribute them to other users who can then install the programs on machines
+having the same platform. In case of pluggdapps, it uses python's
+standard-library, virtual-environment and setuptools to create the notion of
+platform. On-top of that, packages are expected to define standard entry-points
+to make them compatible with pluggdapps. Like,
 
-  [pluggdapps]
+.. code-block:: ini
+    :linenos:
+
+    [pluggdapps]
     package=<module.path.to.callable.object>
 
 Inside the package, developers can specify `interfaces` and define
@@ -50,10 +52,13 @@ Specifying interfaces are fairly straight forward. It is defined as a
 python class deriving from base class called 
 :class:`pluggdapps.plugin.Interface`, but other than specifying attributes,
 methods and their doc-strings explaining the semantics of the interface,
-the developers don't get to do much with interface classes. They are 
-automatically meta-classed and blue-printed by the component architecture.
+developers don't get to do much with interface classes. They are 
+automatically meta-classed and blue-printed by the component system.
 An example interface class that provide a blue-print for sub-command 
-plugins::
+plugins
+
+.. code-block:: python
+    :linenos:
 
     class ICommand( Interface ):
         """Handle sub-commands issued from command line script. The general
@@ -91,10 +96,10 @@ Bootstrapping the plugin system
 
 Plugins are also python classes deriving from a base class called
 :class:`pluggdapps.plugin.Plugin`, like :class:`pluggdapps.plugin.Interface` 
-classes they are also meta classes and blue-printed inside the component 
-architecture. But unlike the `Interface` classes plugin classes can be 
+classes they are also meta classes and blue-printed by the component 
+system. But unlike the `Interface` classes plugin classes can be 
 instantiated and used like regular python classes, which a minor but important 
-difference explained next,
+difference explained next.
 
 Plugins are always instantiated using query_plugin() or query_plugins()
 (plural form) APIs. For developers who work on the insides of pluggdapps'
@@ -108,19 +113,19 @@ that are instantiated and have the following signatures.
 To query for a plugin by name ``name`` and ``interface`` it implements,
 
 .. code-block:: python
-    :linenos:
 
-    plugin.query_plugin( IHTTPResource, 'userpreference', username )
+    plugin.query_plugin( IHTTPResource, 'datapkg.userpreference', username )
 
 where ``IHTTPResource`` is the interface that we are interested in, and
-``userpreference`` is the plugin name that is implementing the interface.
-Remaining arguments (like ``username``) and key-word arguments are passed
-on to the plugin constructor (the ``__init__`` method).
+``datapkg.userpreference`` is :term:`plugin canonical name`, that is
+implementing the interface.  Remaining arguments (like ``username``) and
+key-word arguments are passed on to the plugin constructor (the ``__init__``
+method). The method will return a single plugin object instantiated from
+``UserPreference`` plugin class.
 
 To query for all plugins implementing ``interfaces``,
 
 .. code-block:: python
-    :linenos:
 
     subcommands = plugin.query_plugins( ICommand )
 

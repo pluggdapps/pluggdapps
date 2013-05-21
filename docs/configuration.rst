@@ -1,7 +1,5 @@
-Catalog of plugin configuration.
-================================
-catchanddebug
--------------
+pluggdapps.catchanddebug
+------------------------
 
 xmlhttp_key
     When this key is in the request GET variables (not POST!), expect that
@@ -23,8 +21,8 @@ template
     more about the context available to the template.
 
 
-commandcommands
----------------
+pluggdapps.commandcommands
+--------------------------
 
 description_width
     Maximum width of description column.
@@ -33,13 +31,13 @@ command_width
     Maximum width of command name column.
 
 
-commandconfdoc
---------------
+pluggdapps.commandconfdoc
+-------------------------
 
 -- configuration is not supported by plugin --
 
-commandenv
-----------
+pluggdapps.commandenv
+---------------------
 
 target_dir
     Target directory to place the scaffolding logic.
@@ -52,18 +50,18 @@ template_dir
     scaffolding logic.
 
 
-commandls
----------
+pluggdapps.commandls
+--------------------
 
 -- configuration is not supported by plugin --
 
-commandpviews
--------------
+pluggdapps.commandpviews
+------------------------
 
 -- configuration is not supported by plugin --
 
-commandserve
-------------
+pluggdapps.commandserve
+-----------------------
 
 reload.poll_interval
     Relevant when the sub-command is invoked with monitor and reload
@@ -81,13 +79,13 @@ reload.config
     configuration file (.ini) is changed.
 
 
-commandunittest
----------------
+pluggdapps.commandunittest
+--------------------------
 
 -- configuration is not supported by plugin --
 
-commandwebapp
--------------
+pluggdapps.commandwebapp
+------------------------
 
 target_dir
     Target directory to place the generated modules and directories. If
@@ -102,16 +100,16 @@ template_dir
     scaffolding logic.
 
 
-configsqlite3db
----------------
+pluggdapps.configsqlite3db
+--------------------------
 
 url
     Location of sqlite3 backend file. Will be passed to sqlite3.connect()
     API. Can be modified only in the .ini file.
 
 
-docroot
--------
+pluggdapps.docroot
+------------------
 
 IHTTPRouter
     IHTTPRouter plugin. Base router plugin for resolving requests to view-
@@ -164,8 +162,8 @@ IHTTPInBound
     IHTTPInBound plugin. Transforms will be applied in specified order.
 
 
-docrootrouter
--------------
+pluggdapps.docrootrouter
+------------------------
 
 routemapper
     Route mapper file in asset specification format. A python file
@@ -181,22 +179,22 @@ defaultview
     resolved to a valid view-callable.
 
 
-docrootview
------------
+pluggdapps.docrootview
+----------------------
 
 max_age
     How long this file can remain fresh in a HTTP cache.
 
 
-gzipoutbound
-------------
+pluggdapps.gzipoutbound
+-----------------------
 
 level
     Compression level while applying gzip.
 
 
-httpconnection
---------------
+pluggdapps.httpconnection
+-------------------------
 
 read_chunk_size
     Chunk of data, size in bytes, to read at a time.
@@ -212,8 +210,8 @@ max_buffer_size
     Maximum size of read / write buffer in bytes.
 
 
-httpcookie
-----------
+pluggdapps.httpcookie
+---------------------
 
 secret
     Use this to sign the cookie value before sending it with the response.
@@ -227,8 +225,8 @@ value_encoding
     the value.
 
 
-httpepollserver
----------------
+pluggdapps.httpepollserver
+--------------------------
 
 ssl.cert_reqs
     Whether a certificate is required from the other side of the
@@ -290,23 +288,23 @@ poll_threshold
     poll instance. Will be used by HTTPIOLoop plugin.
 
 
-httpnegotiator
---------------
+pluggdapps.httpnegotiator
+-------------------------
 
 -- configuration is not supported by plugin --
 
-httprequest
------------
+pluggdapps.httprequest
+----------------------
 
 -- configuration is not supported by plugin --
 
-httpresponse
-------------
+pluggdapps.httpresponse
+-----------------------
 
 -- configuration is not supported by plugin --
 
-matchrouter
------------
+pluggdapps.matchrouter
+----------------------
 
 routemapper
     Route mapper file in asset specification format. A python file
@@ -322,21 +320,21 @@ IHTTPNegotiator
     best matching resource variant.
 
 
-responseheaders
----------------
+pluggdapps.responseheaders
+--------------------------
 
 -- configuration is not supported by plugin --
 
-staticview
-----------
+pluggdapps.staticview
+---------------------
 
 max_age
     Response max_age in seconds. How long this file can remain fresh in a
     HTTP cache.
 
 
-webadmin
---------
+pluggdapps.webadmin
+-------------------
 
 IHTTPRouter
     IHTTPRouter plugin. Base router plugin for resolving requests to view-
@@ -379,8 +377,8 @@ IHTTPInBound
     IHTTPInBound plugin. Transforms will be applied in specified order.
 
 
-webadminrouter
---------------
+pluggdapps.webadminrouter
+-------------------------
 
 routemapper
     Route mapper file in asset specification format. A python file
@@ -396,8 +394,8 @@ defaultview
     resolved to a valid view-callable.
 
 
-webapp
-------
+pluggdapps.webapp
+-----------------
 
 IHTTPRouter
     IHTTPRouter plugin. Base router plugin for resolving requests to view-

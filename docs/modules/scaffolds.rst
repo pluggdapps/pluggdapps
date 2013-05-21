@@ -6,3 +6,10 @@
     :undoc-members:
     :show-inheritance:
 
+Module Listing
+--------------
+
+.. toctree::
+    :maxdepth: 1
+
+    scaffolds.webapp

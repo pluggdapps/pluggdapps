@@ -18,6 +18,17 @@ Glossary
     ``baz.css`` in the ``static`` subdirectory of the ``mypackage``
     Python :term:`package`.
 
+  plugin name
+    Lower case name of the plugin class. For eg, if class by name
+    ``HTTPEPollServer`` derives from base :class:`Plugin`, then its
+    plugin-name is ``httpepollserver``.
+
+  plugin canonical name
+    Lower case name of the plugin class prefixed with package in which the
+    class is defiend. For eg, if class ``HTTPEPollServer`` plugin is
+    implemented by ``pluggdapps`` package, then the canonical name of the
+    plugin is ``pluggdapps.httpepollserver``.
+
   interface
     An interface specification is a python psuedo-class defining a
     collection of attributes and methods, where methods are mostly used as

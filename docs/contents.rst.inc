@@ -2,7 +2,18 @@ Contents
 --------
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
+
+   command_line
+   config
+   platform
+   develop
+   
+List of configurations
+----------------------
+
+.. toctree::
+   :maxdepth: 2
 
    configuration
 
