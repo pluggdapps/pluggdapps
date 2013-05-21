@@ -12,9 +12,24 @@ from   pluggdapps.plugin            import implements, Plugin
 from   pluggdapps.interfaces        import IScaffold, ICommand
 
 class CommandWebApp( Plugin ):
-    """Sub-command to create a new web application under project source tree.
-    This command creates relevant scaffolds, as modules and directories,
-    under the specified target directory."""
+    """
+    Inside a pluggapps package, more than one web-application can be defined.
+    Typically a web-application, which is going to be a plugin, must implement
+    :class:`IWebApp` interface and a bunch of plugins to handle http request
+    - like, routing url to view-callables, view-plugin, resource-plugin,
+    and reply back with valid response. To facilitate this repeatitive activity,
+    pa-script provides this command to create a webapp-source-tree base on
+    couple of parameters.
+
+    .. code-block:: bash
+
+        $ pa -c <master.ini> webapp [-t TARGET_DIR] <webapp-name>
+
+    creates a new web application under project source tree. This command 
+    creates relevant scaffolds, as modules and directories, under the 
+    specified target directory.
+
+    to learn more options on this sub-command use ``--help``."""
 
     implements( IScaffold, ICommand )
 

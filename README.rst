@@ -11,9 +11,9 @@ Features
 --------
 
 * simple plugin system based on interface specification.
-* define framework by specifying interfaces. Implement them as pluggable
-  components.
-* easy to use configuration system,
+* a platform to develop, package and distribute interfaces and plugins.
+* extend the platform to populate additional context for plugin objects.
+* an awesome configuration system.
 
   * configuration can be done with one or more .ini files.
   * browser based configuration that can be persisted in a backend store.
@@ -27,6 +27,8 @@ Features
   * sub-command to start web-server.
   * implement new sub-commands, outside pluggdapps package, as plugins.
 
+* define framework by specifying interfaces. Implement them as pluggable
+  components.
 * web application framework.
 
   * web framework, when used with tayra template language, provide a plugin

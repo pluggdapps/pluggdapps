@@ -21,17 +21,16 @@ sdist :
 	python ./setup.py sdist
 
 sphinx-compile :
+	mkdir -p docs/_build
 	pa -w confdoc -p pluggdapps -o docs/configuration.rst
-	cp docs/configuration.rst sphinxdoc/source/
-	cp docs/glossary.rst sphinxdoc/source/
-	cp CHANGELOG.rst sphinxdoc/source/
-	cp README.rst sphinxdoc/source/index.rst
-	cat sphinxdoc/source/index.rst.inc >> sphinxdoc/source/index.rst
-	rm -rf sphinxdoc/build/html/
-	make -C sphinxdoc html
+	cp CHANGELOG.rst docs/
+	cp README.rst docs/index.rst
+	cat docs/index.rst.inc >> docs/index.rst
+	rm -rf docs/_build/html/
+	make -C docs html
 
 sphinx : sphinx-compile
-	cd sphinxdoc/build/html; zip -r pluggdapps.sphinxdoc.zip ./
+	cd docs/_build/html; zip -r pluggdapps.sphinxdoc.zip ./
 
 upload :
 	python ./setup.py sdist register -r http://www.python.org/pypi upload -r http://www.python.org/pypi
@@ -52,11 +51,11 @@ cleanall : clean cleandoc
 	rm -rf pa-env
 
 cleandoc :
-	rm -rf sphinxdoc/build/*
+	rm -rf docs/_build/*
 
 clean :
 	rm -rf `find ./ -name "*.pyc"`;
-	rm -rf build;
+	rm -rf docs/_build;
 	rm -rf dist;
 	rm -rf pluggdapps.egg-info;
 	rm -rf pluggdapps.egg-info/;

@@ -48,8 +48,7 @@ class CommandConfDoc( Singleton ):
     def handle( self, args ):
         """:meth:`pluggdapps.interfaces.ICommand.handle` interface method."""
         from pluggdapps.plugin import PluginMeta
-        catalog = ( "Catalog of plugin configuration.\n"
-                    "================================\n" )
+        catalog = ""
         package = (args.package + ':') if args.package else ''
         catalogf = args.outpath or 'configuration.rst'
 
