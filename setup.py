@@ -50,7 +50,6 @@ setup(
     entry_points={                          # setuptools
         'console_scripts' : [
            'pa = pluggdapps.pa:main',
-           'webadmin = pluggdapps.console.webadmin:main',
         ],
         'pluggdapps' : [
             'package=pluggdapps:package',
