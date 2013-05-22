@@ -34,14 +34,14 @@ class TestPlugin( unittest.TestCase ):
         assert interface( 'ICommand' ) == ICommand
 
     def test_plugin_info( self ):
-        from pluggdapps.commands.ls import CommandLs
-        ls = query_plugin( None, ICommand, 'commandls' )
+        from pluggdapps.commands.ls import Ls
+        ls = query_plugin( None, ICommand, 'ls' )
         x = plugin_info( 'commandls' )
-        assert x['cls'] == CommandLs
-        x = plugin_info( CommandLs )
-        assert x['cls'] == CommandLs
+        assert x['cls'] == Ls
+        x = plugin_info( Ls )
+        assert x['cls'] == Ls
         x = plugin_info( ls )
-        assert x['cls'] == CommandLs
+        assert x['cls'] == Ls
 
     def test_interface_info( self ):
         x = interface_info( 'ICommand' )
@@ -74,8 +74,8 @@ class TestPlugin( unittest.TestCase ):
         assert 'webapp' not in plugins
 
     def test_pluginclass( self ):
-        from pluggdapps.commands.ls import CommandLs
-        assert pluginclass( ICommand, 'commandls' ) == CommandLs
+        from pluggdapps.commands.ls import Ls
+        assert pluginclass( ICommand, 'commandls' ) == Ls
 
     def test_applications( self ):
         assert 'webapp' in webapps()
@@ -102,10 +102,10 @@ class TestPlugin( unittest.TestCase ):
         assert whichmodule(whichmodule).__name__ == 'pluggdapps.plugin'
 
     def test_pluginname( self ):
-        from  pluggdapps.commands.ls import CommandLs
+        from  pluggdapps.commands.ls import Ls
         o = query_plugin( None, ICommand, 'commandls' )
-        assert pluginname( 'CommandLs' ) == 'commandls' 
-        assert pluginname( CommandLs ) == 'commandls'
+        assert pluginname( 'Ls' ) == 'commandls' 
+        assert pluginname( Ls ) == 'commandls'
         assert pluginname( o ) == 'commandls'
 
     def test_pluginmeta( self ):

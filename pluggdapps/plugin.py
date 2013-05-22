@@ -121,7 +121,7 @@ class PluginMeta( type ):
         x = PluginMeta._interfmap.get( 
                 caname, PluginMeta._pluginmap.get( caname, None ))
         if x :
-            raise Exception( PluginMeta.err2 % (name, x['file']) )
+            raise Exception( PluginMeta.err2 % (caname, x['file']) )
 
         if Interface in mro_bases : # For Interface sub-classes
             PluginMeta._interfmap[caname] = \

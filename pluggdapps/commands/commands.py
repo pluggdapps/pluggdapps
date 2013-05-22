@@ -8,7 +8,7 @@ from   pluggdapps.plugin        import implements, Singleton
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
-class CommandCommands( Singleton ):
+class Commands( Singleton ):
     """Subcommand plugin for pa-script to list all available sub-commands 
     along with a short description. Like,
     
@@ -75,7 +75,7 @@ class CommandCommands( Singleton ):
 
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = CommandCommands.__doc__
+_default_settings.__doc__ = Commands.__doc__
 
 _default_settings['command_width']  = {
     'default' : 15,

@@ -11,7 +11,7 @@ import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
 from   pluggdapps.interfaces        import IScaffold, ICommand
 
-class CommandWebApp( Plugin ):
+class WebApp( Plugin ):
     """
     Inside a pluggapps package, more than one web-application can be defined.
     Typically a web-application, which is going to be a plugin, must implement
@@ -92,7 +92,7 @@ class CommandWebApp( Plugin ):
         sett = { 'target_dir'  : args.target_dir or os.getcwd(),
                  'webapp_name' : args.name }
 
-        scaff = self.qp( IScaffold, 'pluggdapps.CommandWebApp', settings=sett )
+        scaff = self.qp( IScaffold, 'pluggdapps.WebApp', settings=sett )
         scaff.query_cmdline()
         print( "Generating Web-application %s" % args.name )
         scaff.generate()
@@ -111,7 +111,7 @@ class CommandWebApp( Plugin ):
         return sett
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = CommandWebApp.__doc__
+_default_settings.__doc__ = WebApp.__doc__
 
 _default_settings['template_dir']  = {
     'default' : join( dirname(__file__), 'webapp_template'),

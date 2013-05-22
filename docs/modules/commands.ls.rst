@@ -6,7 +6,7 @@
 Module contents
 ---------------
 
-.. autoclass:: CommandLs
+.. autoclass:: Ls
     :members: description, cmd, subparser, handle
     :show-inheritance:
 

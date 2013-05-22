@@ -6,8 +6,8 @@ Installing pluggdapps will automatically install ``pa`` script under the
 each sub-command implementing the :class:`ICommand` interface specification.
 It is possible to extend pa script with any number of sub-commands and can be
 developed as separate packages. In case you want to develop a sub-command
-refer one of the sub-command plugin implemented in pluggdapps and make sure to
-prefix the plugin-class-name with `Command`. To list available sub-commands,
+refer one of the sub-command plugin implemented in pluggdapps. To list 
+available sub-commands,
 
 .. code-block:: bash
 

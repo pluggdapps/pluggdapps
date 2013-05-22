@@ -6,6 +6,6 @@
 Module contents
 ---------------
 
-.. autoclass:: CommandUnitTest
+.. autoclass:: UnitTest
     :members: description, cmd, subparser, handle
     :show-inheritance:

@@ -10,7 +10,7 @@ from   pluggdapps.plugin        import implements, Singleton
 from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
-class CommandConfDoc( Singleton ):
+class ConfDoc( Singleton ):
     """Subcommand plugin for pa-script to generate configuration document
     from :meth:`pluggdapps.plugin.ISettings.default_settings` method.
     
@@ -74,5 +74,5 @@ class CommandConfDoc( Singleton ):
 
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = CommandConfDoc.__doc__
+_default_settings.__doc__ = ConfDoc.__doc__
 

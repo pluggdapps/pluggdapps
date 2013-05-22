@@ -10,7 +10,7 @@ from   pluggdapps.plugin        import implements, Plugin, pluginname
 from   pluggdapps.interfaces    import ICommand
 
 
-class CommandInfo( Plugin ):
+class Info( Plugin ):
     implements( ICommand )
 
     description = "Platform's environment Information"

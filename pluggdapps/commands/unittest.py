@@ -14,7 +14,7 @@ import pluggdapps.utils       as h
 
 TESTDIR = join( dirname( dirname( __file__ )), 'tests' )
 
-class CommandUnitTest( Singleton ):
+class UnitTest( Singleton ):
     """Sub-command to run available unittests."""
     implements( ICommand )
 
@@ -66,5 +66,5 @@ class CommandUnitTest( Singleton ):
 
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = CommandUnitTest.__doc__
+_default_settings.__doc__ = UnitTest.__doc__
 

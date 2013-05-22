@@ -6,6 +6,6 @@
 Module contents
 ---------------
 
-.. autoclass:: CommandCommands
+.. autoclass:: Commands
     :members: description, cmd, subparser, handle
     :show-inheritance:

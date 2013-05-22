@@ -11,7 +11,7 @@ import pluggdapps.utils             as h
 from   pluggdapps.plugin            import implements, Plugin
 from   pluggdapps.interfaces        import IScaffold, ICommand
 
-class CommandEnv( Plugin ):
+class Env( Plugin ):
     """Sub-command plugin to generate scaffolding logic for pluggdapps
     development environment. Can be invoked from pa-script and meant for
     upstream authors."""
@@ -79,7 +79,7 @@ class CommandEnv( Plugin ):
         sett = { 'target_dir'  : args.target_dir or os.getcwd(),
                  'host_name'   : args.host_name,
                }
-        scaff = self.qp( IScaffold, 'pluggdapps.CommandEnv', settings=sett )
+        scaff = self.qp( IScaffold, 'pluggdapps.Env', settings=sett )
         scaff.query_cmdline()
         print( "Generating pluggdapps environment." )
         scaff.generate()
@@ -100,7 +100,7 @@ class CommandEnv( Plugin ):
 
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = CommandEnv.__doc__
+_default_settings.__doc__ = Env.__doc__
 
 _default_settings['template_dir']  = {
     'default' : join( dirname(__file__), 'env_template'),

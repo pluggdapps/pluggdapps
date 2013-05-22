@@ -11,7 +11,7 @@ from   pluggdapps.interfaces    import ICommand
 import pluggdapps.utils         as h
 
 
-class CommandMounts( Plugin ):
+class Mounts( Plugin ):
     implements( ICommand )
 
     description = "Display application's configuration settings."

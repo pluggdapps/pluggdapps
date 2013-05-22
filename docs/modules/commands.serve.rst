@@ -6,6 +6,6 @@
 Module contents
 ---------------
 
-.. autoclass:: CommandServe
+.. autoclass:: Serve
     :members: description, cmd, subparser, handle
     :show-inheritance:

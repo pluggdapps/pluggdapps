@@ -75,8 +75,8 @@ Release changes
 
 - pluggdapps project static files - logos and css files.
 - Documentation for configuration help.
-- Gathering files for reloading is now moved to CommandServe plugin, instead
-  of handling it in platform classes.
+- Gathering files for reloading is now moved to `Serve` sub-command plugin,
+  instead of handling it in platform classes.
 - Improved interactive excaption handling in errorpage.ttl (WebAdmin plugin).
 - WebAdmin configuration app is more or less functional.
 - package() entry-point now can return 'ttlplugins' info.
@@ -85,10 +85,10 @@ Release changes
   string.
 - Added view callable for serving static files for an application.
 - Configured cache directory for ttl template-modules.
-- Added scaffolding plugin CommandEnv to create pluggdapps environment. This
-  plugin provides the blue-print for ``paenv`` repository which is now
-  reponsible for setting up pluggdapps environment for all kind of pluggdapps
-  users.
+- Added scaffolding plugin `Env` sub-command plugin to create pluggdapps
+  environment. This plugin provides the blue-print for ``paenv`` repository
+  which is now reponsible for setting up pluggdapps environment for all kind
+  of pluggdapps users.
 
 0.2dev
 ------

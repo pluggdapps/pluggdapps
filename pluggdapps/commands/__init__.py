@@ -13,11 +13,22 @@ How to implement a sub-command plugin
 
 Just like any other plugin, derive your class from `Plugin` base class and
 declare that the class implements :class:`pluggdapps.interfaces.ICommand`
-interface. Note that there is a convention to prefix class name `Command`
-string.  For instance, class name of plugin implementing `pviews` sub-command
-is :class:`CommandPViews`. Refer to `ICommand` interface class to learn more
-about sub-command callbacks.
+interface. Refer to `ICommand` interface class to learn more about sub-command
+callbacks.
 """
+
+def mainargs( interface, argv )
+    """Get a list of sub-commands, implementing ``interface``, supported by
+    command line. Take only the command-line parameters uptil a subcommand."""
+    from pluggdapps import PluginMeta
+    import pluggdapps.utils as h
+    
+    if isinstance(interface, str) :
+        interface = PluginMeta._interfmap[interface]['cls']
+
+    subcmds = [ x.split('.', 1)[1][7:] 
+                for x in PluginMeta._implementers[ interface ].keys() ]
+    return h.takewhile( lambda x : x not in subcmds, argv )
 
 import pluggdapps.commands.commands
 import pluggdapps.commands.ls

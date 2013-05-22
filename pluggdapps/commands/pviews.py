@@ -9,7 +9,7 @@ from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils as h
 
 
-class CommandPViews( Singleton ):
+class PViews( Singleton ):
     """Pluggdapps can host many application, and application instances, in the
     same environment and each application can have any number of view-callables
     mapped onto url-paths. Use this sub-command, ``pviews``, to print a summary
@@ -74,7 +74,8 @@ class CommandPViews( Singleton ):
     #---- ICommand API methods
 
     def subparser( self, parser, subparsers ):
-        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface method."""
+        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface
+        method."""
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
@@ -108,5 +109,5 @@ class CommandPViews( Singleton ):
 
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = CommandPViews.__doc__
+_default_settings.__doc__ = PViews.__doc__
 

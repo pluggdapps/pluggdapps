@@ -12,7 +12,7 @@ from   pluggdapps.plugin     import PluginMeta, implements, Singleton, webapps
 from   pluggdapps.interfaces import ICommand
 import pluggdapps.utils      as h
 
-class CommandLs( Singleton ):
+class Ls( Singleton ):
     """Sub-command plugin for pa-script to list internal state of pluggdapps'
     virtual environment. Instead of using this command, use `sh` sub-command
     to start a shell and introspect pluggdapps environment.
@@ -208,4 +208,4 @@ class CommandLs( Singleton ):
         return sett
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = CommandLs.__doc__
+_default_settings.__doc__ = Ls.__doc__

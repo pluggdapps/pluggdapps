@@ -11,7 +11,7 @@ from   pluggdapps.plugin        import implements, ISettings, Singleton
 from   pluggdapps.interfaces    import ICommand, IHTTPServer
 import pluggdapps.utils         as h
 
-class CommandServe( Singleton ):
+class Serve( Singleton ):
     """Sub-command for starting native web server. Configuring this plugin
     does not control the web server, instead refer to the corresponding web
     server plugin. By default it uses :class:`HTTPEPollServer`, a single
@@ -46,7 +46,8 @@ class CommandServe( Singleton ):
     #---- ICommand API methods
 
     def subparser( self, parser, subparsers ):
-        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface method."""
+        """:meth:`pluggdapps.interfaces.ICommand.subparser` interface 
+        method."""
         self.subparser = subparsers.add_parser( 
                                 self.cmd, description=self.description )
         self.subparser.set_defaults( handler=self.handle )
@@ -210,7 +211,7 @@ def SIGINT_handler( signal, frame ):
 
 
 _default_settings = h.ConfigDict()
-_default_settings.__doc__ = CommandServe.__doc__
+_default_settings.__doc__ = Serve.__doc__
 
 _default_settings['IHTTPServer'] = {
     'default' : 'pluggdapps.HTTPEPollServer',
