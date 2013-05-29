@@ -1,9 +1,6 @@
 A roadmap of things to do
 -------------------------
 
-- Add platform method qpr() that accepts plugin name as regular expression.
-  Document the same.
-
 - Benchmark pluggdapps with other web-frameworks. sinatra, dynamo, cowboy,
   pyramids, WebPy, Django, Mochiweb, RoR, Express etc ...
 

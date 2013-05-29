@@ -86,7 +86,7 @@ class PluginMeta( type ):
     """Plugin component manager. Tracks interface specifications, plugin
     definitions and plugins implementing interfaces. All interfaces and
     plugins defined across pluggdapps are blueprinted and handles
-    instantiation of plugins via query_plugin().
+    instantiation of plugins via one of the query_*() methods.
     Also responsibile for making plugin's configuration settings available as
     a dictionary of settings."""
 
@@ -380,9 +380,9 @@ class ISettings( Interface ):
     is the base class for all plugins, and provides default methods for 
     configuration settings which can later be overriden by deriving plugins.
 
-    While instantiating plugins via `query_plugin()` or `query_plugins()`
-    method, passing a ``settings`` key-word argument will override plugin's
-    settings defined by ini files and backend-store.
+    While instantiating plugins via `query_plugin()`, `query_plugins()`,
+    `query_pluginr()` methods, passing a ``settings`` key-word argument will
+    override plugin's settings defined by ini files and backend-store.
 
     All the attributes specified in this interface will automagically be
     initialised by :class:`PluginMeta`.

@@ -101,8 +101,8 @@ system. But unlike the `Interface` classes plugin classes can be
 instantiated and used like regular python classes, which a minor but important 
 difference explained next.
 
-Plugins are always instantiated using query_plugin() or query_plugins()
-(plural form) APIs. For developers who work on the insides of pluggdapps'
+Plugins are always instantiated using query_plugin(), query_plugins() or
+query_pluginr() APIs. For developers who work on the insides of pluggdapps'
 component architecture these APIs are available on the platform classes,
 :class:`pluggdapps.platform.Pluggdapps` and 
 :class:`pluggdapps.platform.Webapps` (Refer :mod:`pluggdapps.platform`).
@@ -132,6 +132,14 @@ To query for all plugins implementing ``interfaces``,
 simlar to query_plugin() except for the difference that all plugins
 implementing ``ICommand`` will be instantiated and returned as a list of
 sub-command plugins.
+
+There is also a query_pluginr() API, note the ``r`` suffix, that will allow
+developers to query plugins by accepting a regular-expression pattern,::
+
+    subcommands = plugin.query_pluginr( ICommand, pattern )
+
+returns a list of plugin instances whose canonical-name matches the supplied
+`pattern`.
 
 In essence, developers while authoring their applications, can happily
 query for plugins, pass around the instantiated plugins which can be used 

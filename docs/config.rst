@@ -166,12 +166,12 @@ The cute part about plugin configuration is that, configuration information,
 from various sources, are read, parsed aggregated and are automatically
 attached to plugin instances when they are instantiated by the platform. Like
 mentioned elsewhere plugin classes, although they are defined as regular python
-classes must be instantiated only by calling .query_plugin() and
-.query_plugins() methods. Every plugin instance created by this way will have
-its configuration settings accessible as dictionary of key,value pairs on the
-plugin itself. That is, a plugin instance can be accessed like a dictionary, 
-where the key name is the configuration name and the value return by the 
-key-name is its settings-value.
+classes must be instantiated only by calling `.query_plugin()`,
+`.query_plugins()` or `.query_pluginr()` methods. Every plugin instance created
+by this way will have its configuration settings accessible as dictionary of
+key,value pairs on the plugin itself. That is, a plugin instance can be
+accessed like a dictionary, where the key name is the configuration name and
+the value return by the key-name is its settings-value.
 
 **Default configuration**, every plugin classes deriving from :class:`Plugin`
 base-classes automatically implements :class:`ISettings` interface. This 
