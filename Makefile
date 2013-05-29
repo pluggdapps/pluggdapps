@@ -12,7 +12,7 @@ develop :
 	@echo "Setting up virtual environment for python 3.x ..."
 	@virtualenv --python=python3.2 pa-env 
 	@bash -c "source pa-env/bin/activate ; python ./setup.py develop"
-	@bash -c "source pa-env/bin/activate ; easy_install-3.2 sphinx"
+	@bash -c "source pa-env/bin/activate ; pip install sphinx"
 
 bdist_egg :
 	python ./setup.py bdist_egg

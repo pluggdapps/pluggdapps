@@ -21,8 +21,8 @@ template
     more about the context available to the template.
 
 
-pluggdapps.commandcommands
---------------------------
+pluggdapps.commands
+-------------------
 
 description_width
     Maximum width of description column.
@@ -31,74 +31,10 @@ command_width
     Maximum width of command name column.
 
 
-pluggdapps.commandconfdoc
--------------------------
+pluggdapps.confdoc
+------------------
 
 -- configuration is not supported by plugin --
-
-pluggdapps.commandenv
----------------------
-
-target_dir
-    Target directory to place the scaffolding logic.
-
-host_name
-    Host name for the environment :
-
-template_dir
-    Obsolute file path of template source-tree to be used for the
-    scaffolding logic.
-
-
-pluggdapps.commandls
---------------------
-
--- configuration is not supported by plugin --
-
-pluggdapps.commandpviews
-------------------------
-
--- configuration is not supported by plugin --
-
-pluggdapps.commandserve
------------------------
-
-reload.poll_interval
-    Relevant when the sub-command is invoked with monitor and reload
-    switch. Number of seconds to poll for file modifications. When a file
-    is modified, server is restarted.
-
-IHTTPServer
-    Plugin name implementing :class:`IHTTPServer`. This is the actual web
-    server that will be started by the sub-command. Can be modified only
-    in the .ini file.
-
-reload.config
-    Relevant when the sub-command is invoked with monitor and reload
-    switch. Specifies whether the server should be restarted when a
-    configuration file (.ini) is changed.
-
-
-pluggdapps.commandunittest
---------------------------
-
--- configuration is not supported by plugin --
-
-pluggdapps.commandwebapp
-------------------------
-
-target_dir
-    Target directory to place the generated modules and directories. If
-    not specified uses the current working directory.
-
-webapp_name
-    Name of the web application. Since a web application is also a plugin,
-    it must be a unique name.
-
-template_dir
-    Obsolute file path of template source-tree to be used for the
-    scaffolding logic.
-
 
 pluggdapps.configsqlite3db
 --------------------------
@@ -184,6 +120,20 @@ pluggdapps.docrootview
 
 max_age
     How long this file can remain fresh in a HTTP cache.
+
+
+pluggdapps.env
+--------------
+
+target_dir
+    Target directory to place the scaffolding logic.
+
+host_name
+    Host name for the environment :
+
+template_dir
+    Obsolute file path of template source-tree to be used for the
+    scaffolding logic.
 
 
 pluggdapps.gzipoutbound
@@ -303,6 +253,11 @@ pluggdapps.httpresponse
 
 -- configuration is not supported by plugin --
 
+pluggdapps.ls
+-------------
+
+-- configuration is not supported by plugin --
+
 pluggdapps.matchrouter
 ----------------------
 
@@ -320,10 +275,50 @@ IHTTPNegotiator
     best matching resource variant.
 
 
+pluggdapps.newwebapp
+--------------------
+
+target_dir
+    Target directory to place the generated modules and directories. If
+    not specified uses the current working directory.
+
+webapp_name
+    Name of the web application. Since a web application is also a plugin,
+    it must be a unique name.
+
+template_dir
+    Obsolute file path of template source-tree to be used for the
+    scaffolding logic.
+
+
+pluggdapps.pviews
+-----------------
+
+-- configuration is not supported by plugin --
+
 pluggdapps.responseheaders
 --------------------------
 
 -- configuration is not supported by plugin --
+
+pluggdapps.serve
+----------------
+
+reload.poll_interval
+    Relevant when the sub-command is invoked with monitor and reload
+    switch. Number of seconds to poll for file modifications. When a file
+    is modified, server is restarted.
+
+IHTTPServer
+    Plugin name implementing :class:`IHTTPServer`. This is the actual web
+    server that will be started by the sub-command. Can be modified only
+    in the .ini file.
+
+reload.config
+    Relevant when the sub-command is invoked with monitor and reload
+    switch. Specifies whether the server should be restarted when a
+    configuration file (.ini) is changed.
+
 
 pluggdapps.staticview
 ---------------------
@@ -332,6 +327,11 @@ max_age
     Response max_age in seconds. How long this file can remain fresh in a
     HTTP cache.
 
+
+pluggdapps.unittest
+-------------------
+
+-- configuration is not supported by plugin --
 
 pluggdapps.webadmin
 -------------------

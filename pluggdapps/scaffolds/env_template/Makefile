@@ -2,8 +2,8 @@ setup :
 	@rm -rf pa-env
 	@echo "Setting up virtual environment for python 3.x ..."
 	@virtualenv --python=python3.2 pa-env 
-	@bash -c "source pa-env/bin/activate ; easy_install-3.2 pluggdapps"
-	@bash -c "source pa-env/bin/activate ; easy_install-3.2 tayra"
+	@bash -c "source pa-env/bin/activate ; pip install pluggdapps"
+	@bash -c "source pa-env/bin/activate ; pip install tayra"
 
 pushcode: push-googlecode push-bitbucket push-github 
 

@@ -60,7 +60,7 @@ class it uses a special method, ``_super_init()`` instead of using the builtin
 """
 
 import sys, inspect
-from   os.path      import isfile
+from   os.path      import isfile, abspath
 
 import pluggdapps.utils as h
 
@@ -287,10 +287,11 @@ def canonical_name( cls ):
     where the entire string is lower-cased. This function is to be called only
     by PluginMeta class when a plugin class is about to be blue-printed.
     """
+    # TODO : This is a hack specific to tayra template file. Make it generic.
     mod = sys.modules.get( cls.__module__ )
-    f = getattr( mod, '__file__', getattr(mod, '_ttlfile', None) )
+    f = getattr( mod, '_ttlfile', getattr(mod, '__file__', None) )
     if f and isfile(f) :
-        return (h.packagedin(f)  + '.' + cls.__name__).lower()
+        return (h.packagedin( abspath(f) )  + '.' + cls.__name__).lower()
     else :
         return cls.__name__.lower()
 
@@ -361,7 +362,9 @@ def implements( *interfaces ):
 
     if frame.f_code.co_name in core_classes : return # Skip
 
-    pkg = h.packagedin( frame.f_code.co_filename )
+    # TODO : This is a hack specific to tayra template file. Make it generic.
+    filen = frame.f_globals.get('_ttlfile', None)
+    pkg = h.packagedin( abspath(filen) if filen else frame.f_code.co_filename )
     nm = (pkg + '.' + frame.f_code.co_name).lower()
     for i in interfaces :
         if isinstance(i, str) :

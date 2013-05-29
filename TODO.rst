@@ -4,6 +4,11 @@ A roadmap of things to do
 - Benchmark pluggdapps with other web-frameworks. sinatra, dynamo, cowboy,
   pyramids, WebPy, Django, Mochiweb, RoR, Express etc ...
 
+- Migrate pluggdapps, tayra, paenv and other dependant packages to python-3.3.
+  Looks like there is a tricky dependancy with Jinja2,
+    Jinja2 version 2.7 requires python 3.3
+    Jinja2 version 2.6 requires python 3.2
+
 - In command-line documentation article indicate that developers should check
   for existing commands before authoring a new-command to avoid duplicating
   names.
