@@ -8,30 +8,34 @@
 using pluggdapps frameworks."""
 
 import os
-from   os.path      import join, dirname, abspath, basename
+from   os.path      import join, dirname, abspath, basename, relpath
 
 __all__ = [ 'template_to_source' ]
 
-def template_to_source( sourcedir, targetdir, _vars ):
-    """Walk though ``sourcedir``, reading each file and sub-directory,
-    creating the scaffolding logic under ``targetdir``, using a dictionary 
+def template_to_source( sourceroot, targetroot, _vars ):
+    """Walk though ``sourceroot``, reading each file and sub-directory,
+    creating the scaffolding logic under ``targetroot``, using a dictionary 
     of variables ``_vars``."""
-    targetdirs = {}
-    print( "  Source-dir : %r" % basename( sourcedir ) )
-    print( "  Target-dir : %r" % basename( targetdir ) )
-    for dirpath, dirnames, filenames in os.walk( sourcedir ) :
-        targetdir = targetdirs.get( dirpath, targetdir )
+    maptree = {}
+    print( "  Source-dir : %r" % sourceroot )
+    print( "  Target-dir : %r" % targetroot )
+    for dirpath, dirnames, filenames in os.walk( sourceroot ) :
+        targetdir = maptree.get( dirpath, targetroot )
+
+        # Rename, if required, and copy sub-directories
         for dirname in dirnames :
-            t_dirname = dirname.format( **_vars )
-            print("    %s ..." % t_dirname )
-            os.makedirs( join( targetdir, t_dirname ), exist_ok=True )
-            targetdirs[ join(dirpath, dirname) ] = join(targetdir, t_dirname)
+            t_dir = join(targetdir, dirname.format(**_vars) )
+            s_dir = join(dirpath, dirname)
+            print("    making dir %s/ ..." % relpath(t_dir, targetroot))
+            os.makedirs( t_dir, exist_ok=True )
+            maptree[ s_dir ] = t_dir
 
         for filename in filenames :
-            t_filename = filename.format( **_vars )
-            if t_filename.endswith( '.tmpl' ) :
-                t_filename = t_filename[:-5]
-            print("    %s ..." % t_filename )
-            txt = open( join(dirpath, filename) ).read().format( **_vars )
-            open( join(targetdir, t_filename), 'w' ).write( txt )
+            t_file = join(targetdir, filename.format( **_vars ))
+            s_file = join(dirpath, filename)
+            if t_file.endswith( '.tmpl' ) :
+                t_file = t_file[:-5]
+            print("    copying file %s ..." % relpath(t_file, targetroot) )
+            txt = open( s_file ).read().format( **_vars )
+            open( t_file, 'w' ).write( txt )
 

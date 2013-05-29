@@ -34,10 +34,10 @@ class Commands( Singleton ):
 
     def handle( self, args ):
         """:meth:`pluggdapps.interfaces.ICommand.handle` interface method."""
-        commands = self.qps( ICommand )
+        commands = self.qpr(ICommand, 'pluggdapps.*')
         commands = sorted( commands, key=lambda x : x.caname )
         for command in commands :
-            name = command.caname.split('.', 1)[1][7:]
+            name = command.caname.split('.', 1)[1]
             rows = self._formatdescr( name, command.description )
             for r in rows : print(r)
 

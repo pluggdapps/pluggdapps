@@ -10,7 +10,7 @@ from   pluggdapps.plugin import Interface
 
 __all__ = [
     'IConfigDB', 'ICommand', 'IHTTPServer', 'IHTTPConnection', 'IWebApp',
-    'IScaffold',
+    'IScaffold', 'ITemplate'
     
 ]
 
@@ -381,4 +381,22 @@ class IScaffold( Interface ):
         """If executed in command line, provide a meaning full description
         about this scaffolding plugin and variables that can be defined."""
 
+
+class ITemplate( Interface ): 
+    """Attributes and methods to render a page using supplied context."""
+
+    def render( context, *args, **kwargs ):
+        """Implementing plugin should interpret `args` and ``kwargs``
+        arguments and invoke one or more rendering resource (like templates).
+        Typical plugins should accept key-word arguments like ``file`` and
+        ``text``, where `file` shall to template file or `text` shall point to
+        template text - as string.
+
+        Returns html text as string.
+
+        ``context``,
+            Dictionary like context object. Typically populated by
+            :class:`IHTTPResource` and view-callable, made 
+            availabe inside HTML templates.
+        """
 

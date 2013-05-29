@@ -8,8 +8,8 @@ from pluggdapps.plugin import Interface
 
 __all__ = [
     'IHTTPRouter', 'IHTTPResource', 'IHTTPRequest', 'IHTTPNegotiator',
-    'IHTTPResponse', 'IHTTPView', 'IHTTPRenderer', 'IHTTPCookie',
-    'IHTTPSession', 'IHTTPLiveDebug',
+    'IHTTPResponse', 'IHTTPView', 'IHTTPCookie', 'IHTTPSession',
+    'IHTTPLiveDebug',
 ]
 
 class IHTTPRouter( Interface ):
@@ -710,24 +710,6 @@ class IHTTPOutBound( Interface ):
         ``finishing``,
             In case of chunked encoding, this denotes whether this is the last
             chunk to be transmitted.
-        """
-
-class IHTTPRenderer( Interface ): 
-    """Attributes and methods to render a page using supplied context."""
-
-    def render( request, c, *args, **kwargs ):
-        """Implementing plugin should interpret `args` and ``kwargs``
-        arguments and invoke one or more rendering resource (like templates).
-        Returns html text as string.
-
-        ``request``,
-            Plugin instance implementing :class:`IHTTPRequest` interface. Same
-            as the one passed to view-callable.
-
-        ``c``,
-            Dictionary like context object. Typically populated by
-            :class:`IHTTPResource` and view-callable, made 
-            availabe inside HTML templates.
         """
 
 class IHTTPLiveDebug( Interface ):

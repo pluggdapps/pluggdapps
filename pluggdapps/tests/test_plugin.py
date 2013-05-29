@@ -9,8 +9,7 @@ from   random import choice
 
 from   pluggdapps.plugin         import *
 from   pluggdapps.interfaces     import ICommand, IWebApp, IHTTPServer
-from   pluggdapps.web.interfaces import IHTTPView, IHTTPCookie, \
-                                        IHTTPRenderer, IHTTPRequest, \
+from   pluggdapps.web.interfaces import IHTTPView, IHTTPCookie, IHTTPRequest, \
                                         IHTTPResource, IHTTPResponse, \
                                         IHTTPOutBound, IHTTPRouter
 
@@ -24,7 +23,7 @@ class TestPlugin( unittest.TestCase ):
         assert not isimplement( ls, IWebApp )
 
     def test_interfaces( self ):
-        ref = [ ICommand, IHTTPView, IHTTPCookie, IHTTPRenderer,
+        ref = [ ICommand, IHTTPView, IHTTPCookie,
                 IHTTPRequest, IHTTPRouter, IHTTPResource, IHTTPResponse,
                 IHTTPOutBound, IHTTPServer, ISettings, IWebApp ]
         fn = lambda x : x.__name__
@@ -121,7 +120,7 @@ class TestPlugin( unittest.TestCase ):
         for r in refs : assert r in PluginMeta._pluginmap.keys()
 
         refs = [ ICommand, IHTTPView, IHTTPRouter, IHTTPCookie,
-                 IHTTPRenderer, IHTTPRequest, IHTTPResource, IHTTPResponse, 
+                 IHTTPRequest, IHTTPResource, IHTTPResponse, 
                  IHTTPOutBound, IHTTPServer ]
         refs = map( fn,  refs )
         for r in refs : assert r in PluginMeta._interfmap.keys()

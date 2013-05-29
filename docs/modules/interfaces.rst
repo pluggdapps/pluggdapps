@@ -30,3 +30,6 @@ Module contents
 .. autoclass:: IScaffold
     :members: description, query_cmdline, generate, printhelp
     :show-inheritance:
+.. autoclass:: ITemplate
+    :members: render
+    :show-inheritance:

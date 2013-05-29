@@ -4,6 +4,7 @@ body {
     font-family: 'Inconsolata', sans-serif;
     font-size: 18px;
     width : 75%;
+    min-width : 970px;
     margin : 0px auto;
     background-color : white;
     color : #000;

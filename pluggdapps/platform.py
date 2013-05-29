@@ -153,7 +153,7 @@ will override settings from the master-ini-file.
 from   configparser          import SafeConfigParser
 from   os.path               import dirname, isfile, abspath
 from   copy                  import deepcopy
-import curses
+import re
 
 from   pluggdapps.const      import SPECIAL_SECS, URLSEP
 from   pluggdapps.interfaces import IWebApp, IConfigDB
@@ -352,12 +352,17 @@ class Pluggdapps( object ):
 
         plugin.query_plugins = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugins, self )
+        plugin.query_pluginr = h.hitch_method( plugin, plugin.__class__,
+                                      Pluggdapps.query_pluginr, self )
         plugin.query_plugin  = h.hitch_method( plugin, plugin.__class__,
                                       Pluggdapps.query_plugin, self )
+
         plugin.qps = h.hitch_method( plugin, plugin.__class__,
-                                      Pluggdapps.query_plugins, self )
+                                     Pluggdapps.query_plugins, self )
+        plugin.qpr = h.hitch_method( plugin, plugin.__class__,
+                                     Pluggdapps.query_pluginr, self )
         plugin.qp  = h.hitch_method( plugin, plugin.__class__,
-                                      Pluggdapps.query_plugin, self )
+                                     Pluggdapps.query_plugin, self )
 
         # Plugin settings
         plugin._settngx.update( kwargs.pop( 'settings', {} ))
@@ -507,11 +512,46 @@ class Pluggdapps( object ):
         from pluggdapps.plugin import PluginMeta
         if isinstance(interface, str) :
             intrf = interface.lower()
-            interface = PluginMeta._interfmap.get(interf, {}).get('cls', None)
-        return [ pcls( pa, *args, **kwargs )
-                 for pcls in PluginMeta._implementers[interface].values() ]
+            interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
+        pmap = PluginMeta._implementers.get(interface, {})
+        return [ pcls( pa, *args, **kwargs ) for pcls in pmap.values() ]
 
     qps = query_plugins # Alias
+
+    @staticmethod
+    def query_pluginr( pa, interface, pattern, *args, **kwargs ):
+        """Use this API to query for plugins using the ``interface`` class it
+        implements. Positional and keyword arguments will be used to
+        instantiate the plugin object.
+
+        ``pa``,
+            Platform object, whose base class is :class:`Pluggdapps`.
+
+        ``interface``,
+            :class:`pluggdapps.plugin.Interface` class or canonical form of
+            interface-name.
+
+        ``pattern``,
+            Instantiate plugins who's name match this pattern. Pattern can be
+            any regular-expression.
+
+        ``args`` and ``kwargs``,
+            Positional and key-word arguments used to instantiate the plugin.
+
+        If `settings` key-word argument is present, it will be used to
+        override default plugin settings. Returns a list of plugin instance
+        implementing `interface`
+        """
+        from pluggdapps.plugin import PluginMeta
+        if isinstance(interface, str) :
+            intrf = interface.lower()
+            interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
+        pattc = re.compile(pattern)
+        pmap = PluginMeta._implementers.get(interface, {})
+        return [ pcls( pa, *args, **kwargs )
+                 for pcls in pmap.values() if re.match(pattc, pcls.caname) ]
+
+    qpr = query_pluginr # Alias
 
     @staticmethod
     def query_plugin( pa, interface, name, *args, **kwargs ):
@@ -542,8 +582,8 @@ class Pluggdapps( object ):
         if isinstance(interface, str) :
             intrf = interface.lower()
             interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
-        cls = PluginMeta._implementers[ interface ][ name.lower() ]
-        return cls( pa, *args, **kwargs )
+        cls = PluginMeta._implementers.get(interface, {}).get(name.lower(), None)
+        return cls( pa, *args, **kwargs ) if cls else None
 
     qp = query_plugin # Alias
 
@@ -737,11 +777,18 @@ class Webapps( Pluggdapps ):
         plugin.query_plugins = h.hitch_method( 
             plugin, plugin.__class__, Webapps.query_plugins,
             self, plugin.webapp )
+        plugin.query_pluginr = h.hitch_method( 
+            plugin, plugin.__class__, Webapps.query_pluginr,
+            self, plugin.webapp )
         plugin.query_plugin = h.hitch_method(
             plugin, plugin.__class__, Webapps.query_plugin,
             self, plugin.webapp )
+
         plugin.qps = h.hitch_method( 
             plugin, plugin.__class__, Webapps.query_plugins,
+            self, plugin.webapp )
+        plugin.qpr = h.hitch_method( 
+            plugin, plugin.__class__, Webapps.query_pluginr,
             self, plugin.webapp )
         plugin.qp  = h.hitch_method(
             plugin, plugin.__class__, Webapps.query_plugin,
@@ -927,10 +974,50 @@ class Webapps( Pluggdapps ):
         if isinstance(interface, str) :
             intrf = interface.lower()
             interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
-        return [ pcls( pa, webapp, *args, **kwargs )
-                 for pcls in PluginMeta._implementers[interface].values() ]
+        pmap = PluginMeta._implementers.get(interface, {})
+        return [ pcls( pa, webapp, *args, **kwargs ) for pcls in pmap.values() ]
 
     qps = query_plugins # Alias
+
+    @staticmethod
+    def query_pluginr( pa, webapp, interface, pattern, *args, **kwargs ):
+        """Use this API to query for plugins using the ``interface`` class it
+        implements. Positional and keyword arguments will be used to
+        instantiate the plugin object.
+
+        ``pa``,
+            Platform object, whose base class is :class:`Pluggdapps`.
+
+        ``webapp``,
+            Web application object, plugin implementing
+            :class:`pluggdapps.interfaces.IWebApp` interface. It is an
+            optional argument, which must be passed ``None`` otherwise.
+
+        ``interface``,
+            :class:`pluggdapps.plugin.Interface` class or canonical form of
+            interface-name.
+
+        ``pattern``,
+            Instantiate plugins who's name match this pattern. Pattern can be
+            any regular-expression.
+
+        ``args`` and ``kwargs``,
+            Positional and key-word arguments used to instantiate the plugin.
+
+        If `settings` key-word argument is present, it will be used to
+        override default plugin settings. Returns a list of plugin instance
+        implementing `interface`
+        """
+        from pluggdapps.plugin import PluginMeta
+        if isinstance(interface, str) :
+            intrf = interface.lower()
+            interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
+        pattc = re.compile(pattern)
+        pmap = PluginMeta._implementers.get(interface, {})
+        return [ pcls( pa, webapp, *args, **kwargs )
+                 for pcls in pmap.values() if re.match(pattc, pcls.caname) ]
+
+    qpr = query_pluginr # Alias
 
     @staticmethod
     def query_plugin( pa, webapp, interface, name, *args, **kwargs ):
@@ -966,8 +1053,8 @@ class Webapps( Pluggdapps ):
         if isinstance(interface, str) :
             intrf = interface.lower()
             interface = PluginMeta._interfmap.get(intrf, {}).get('cls', None)
-        cls = PluginMeta._implementers[ interface ][ name.lower() ]
-        return cls( pa, webapp, *args, **kwargs )
+        cls = PluginMeta._implementers.get(interface, {}).get(name.lower(), None)
+        return cls( pa, webapp, *args, **kwargs ) if cls else None
 
     qp = query_plugin   # Alias
 

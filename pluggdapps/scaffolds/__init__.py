@@ -18,5 +18,5 @@ Scaffold plugins implemented in pluggdapps package are listed below.
 """
 
 # Generate scaffold logic for web-application under a project
-import pluggdapps.scaffolds.webapp
+import pluggdapps.scaffolds.newapp
 import pluggdapps.scaffolds.env

@@ -11,8 +11,8 @@ from   http.cookies import SimpleCookie
 from   os.path      import splitext, isfile
 
 from   pluggdapps.plugin         import implements, Plugin
-from   pluggdapps.web.interfaces import IHTTPResponse, IHTTPOutBound, \
-                                        IHTTPRenderer
+from   pluggdapps.web.interfaces import IHTTPResponse, IHTTPOutBound
+from   pluggdapps.interfaces     import ITemplate
 import pluggdapps.utils          as h
 
 # TODO :
@@ -210,9 +210,18 @@ class HTTPResponse( Plugin ):
     _renderer_plugins = {
     }
     def render( self, *args, **kwargs ):
-        """:meth:`pluggdapps.web.webinterfaces.IHTTPResponse.render`
+        """:meth:`pluggdapps.interfaces.IHTTPResponse.render`
         interface method.
         
+        positional argument,
+
+        ``request``,
+            Instance of plugin implement
+            :class:`pluggdapps.web.interfaces.IHTTPRequest` interface.
+
+        ``context``,
+            Dictionary of context information to be passed.
+
         keyword arguments,
 
         ``file``,
@@ -221,16 +230,17 @@ class HTTPResponse( Plugin ):
         ``text``,
             Template text to be used for rendering.
 
-        ``IHTTPRenderer``,
-            :class:`IHTTPRenderer` plugin to use for rendering. This argument
+        ``ITemplate``,
+            :class:`ITemplate` plugin to use for rendering. This argument
             must be in canonical form of plugin's name.
 
         If ``file`` keyword argument is passed, this method will resolve the
         correct renderer plugin based on file-extension. if ``text`` keyword
-        argument is passed, better pass the ``IHTTPRenderer`` argument as
+        argument is passed, better pass the ``ITemplate`` argument as
         well.
         """
-        renderer = kwargs.get( 'IHTTPRenderer', None )
+        request, context = args[0], args[1]
+        renderer = kwargs.get( 'ITemplate', None )
         if renderer is None :
             tfile = kwargs.get( 'file', '' )
             _, ext = splitext( tfile )
@@ -244,14 +254,14 @@ class HTTPResponse( Plugin ):
         if renderer in self._renderer_plugins :
             plugin = self._renderer_plugins[ renderer ]
         elif renderer :
-            plugin = self.qp( IHTTPRenderer, renderer )
+            plugin = self.qp( ITemplate, renderer )
         else :
             plugin = None
 
         if plugin :
             self.media_type = 'text/html'
             self._renderer_plugins.setdefault( renderer, plugin )
-            return plugin.render( *args, **kwargs )
+            return plugin.render( context, **kwargs )
         else :
             raise Exception('Unknown renderer')
 

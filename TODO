@@ -1,3 +1,9 @@
+* Add platform method qpr() that accepts plugin name as regular expression.
+  Document the same.
+
+* Benchmark pluggdapps with other web-frameworks. sinatra, dynamo, cowboy,
+  pyramids, WebPy, Django, Mochiweb, RoR, Express etc ...
+
 * In command-line documentation article indicate that developers should check
   for existing commands before authoring a new-command to avoid duplicating
   names.

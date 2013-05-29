@@ -77,15 +77,16 @@ def main():
     # Get a list of sub-commands supported in command line.
     # Take only the command-line parameters uptil a subcommand.
     mainparser = mainoptions()
-    mainargs = pluggdapps.commands.mainargs(ICommand, sys.argv[1:])
+    mainargs = pluggdapps.commands.mainargs(
+                        ICommand, 'pluggdapps.*', sys.argv[1:])
     args = mainparser.parse_args( mainargs )
 
     if args.webapps :
         pa = Webapps.boot( args.config )
-        subcommands = pa.qps( pa, None, ICommand )
+        subcommands = pa.qpr( pa, None, ICommand, 'pluggdapps.*' )
     else :
         pa = Pluggdapps.boot( args.config )
-        subcommands = pa.qps( pa, ICommand )
+        subcommands = pa.qpr( pa, ICommand, 'pluggdapps.*' )
 
     # setup sub-command arguments
     subparsers = mainparser.add_subparsers( help="Sub-commands" )

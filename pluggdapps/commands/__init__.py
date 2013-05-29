@@ -17,17 +17,30 @@ interface. Refer to `ICommand` interface class to learn more about sub-command
 callbacks.
 """
 
-def mainargs( interface, argv )
+import re
+
+def mainargs( interface, pattern, argv ):
     """Get a list of sub-commands, implementing ``interface``, supported by
-    command line. Take only the command-line parameters uptil a subcommand."""
-    from pluggdapps import PluginMeta
+    command line. ``pattern`` will be matched with plugin's canonical name and
+    only matching sub-command plugins will be returned. To match all plugins
+    implementing ``interface``, pass pattern as ``*``.
+
+    Take only the command-line parameters uptil a subcommand and return them."""
+    from   pluggdapps.plugin import PluginMeta
     import pluggdapps.utils as h
     
     if isinstance(interface, str) :
         interface = PluginMeta._interfmap[interface]['cls']
 
-    subcmds = [ x.split('.', 1)[1][7:] 
-                for x in PluginMeta._implementers[ interface ].keys() ]
+    if pattern :
+        pattc = re.compile(pattern)
+        subcmds = [ name.split('.', 1)[1]
+                    for name in PluginMeta._implementers[ interface ].keys()
+                    if re.match(pattc, name) ]
+    else :
+        subcmds = [ name.split('.', 1)[1]
+                    for name in PluginMeta._implementers[ interface ].keys() ]
+
     return h.takewhile( lambda x : x not in subcmds, argv )
 
 import pluggdapps.commands.commands

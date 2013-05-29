@@ -158,8 +158,8 @@ class Serve( Singleton ):
         """Return a list of ttlfile related to this environment."""
         from pluggdapps import papackages
         ttlfiles = h.flatten(
-            [ list( map( h.abspath_from_asset_spec, n['ttlplugins'] ))
-              for nm, n in papackages.items() if n['ttlplugins'] ]
+            [ list( map( h.abspath_from_asset_spec, n.get('ttlplugins', []) ))
+              for nm, n in papackages.items() ]
         )
         return ttlfiles + self.pa._monitoredfiles
 

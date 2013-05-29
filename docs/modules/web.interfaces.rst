@@ -49,9 +49,6 @@ Module contents
 .. autoclass:: IHTTPOutBound
     :members: transform
     :show-inheritance:
-.. autoclass:: IHTTPRenderer
-    :members: render
-    :show-inheritance:
 .. autoclass:: IHTTPLiveDebug
     :members: render
     :show-inheritance:
