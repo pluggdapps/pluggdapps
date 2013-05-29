@@ -1,7 +1,7 @@
 0.41dev
-------------------------------------
+-------
 
-`Wed May 29, 2013`
+``Wed May 29, 2013``
 
 - command plugins are not to be prefixed with `Command`. This is because
   plugins are now referred by their canonical names.
@@ -24,8 +24,10 @@
 
 - `webapp` command/scaffold is renamed to `newwebapp`.
 
-0.4dev :subscript:`Tue May 21, 2013`
-------------------------------------
+0.4dev
+------
+
+``Tue May 21, 2013``
 
 - scaffold source files must not end with .py, as python module, this will
   throw errors while installing them via easy_install. To solve this problem,
@@ -71,8 +73,10 @@
   internals of pluggdapps are under docs/dev/ directory.
 
 
-0.3dev :subscript:`Tue Mar 12, 2013`
-------------------------------------
+0.3dev 
+------
+
+``Tue Mar 12, 2013``
 
 - Live debug. Interactive debugging to catch exception and introspect stack
   frame via web.
@@ -141,8 +145,10 @@
   which is now reponsible for setting up pluggdapps environment for all kind
   of pluggdapps users.
 
-0.2dev :subscript:`Thu Dec 13, 2012`
-------------------------------------
+0.2dev
+------
+
+``Thu Dec 13, 2012``
 
 - Releasing DocRoot web-application, to server static web files, as part of 
   Pluggdapps package.
@@ -175,8 +181,10 @@
 - Fixed bugs, and cleaned up code, in HTTPEPollServer plugin and HTTPResponse
   plugin
 
-0.1dev :subscript:`Fri Jan 13, 2012`
-------------------------------------
+0.1dev
+------
+
+``Fri Jan 13, 2012``
 
 First release. Provides,
 
