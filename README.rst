@@ -4,8 +4,8 @@ implement plugins. It comes with a configuration system, web-framework,
 `scaffold`, command-line script and much more ...
 
 Pluggdapps web framework, when used with `tayra template language`, provide a
-plugin system that cut across MVC design pattern. Web-apps can be developed,
-packaged and distributed as plugins.
+plugin system that cut across MVC design pattern. **Web-apps can be developed,
+packaged and distributed as plugins**.
 
 Features
 --------
@@ -51,6 +51,10 @@ Features
 * **Requires:** Linux, Python-3.x.
 * **Status:** Core design stable. Not expected to change.
 
-Refer to `package documentation <http://pythonhosted.org/pluggdapps/>`_.
+For more refer to `package documentation <http://pythonhosted.org/pluggdapps/>`_.
 
+To hack the guts of pluggdapps check-out the source code from
+`github <https://github.com/prataprc/pluggdapps>`_ or from
+`google-code <http://code.google.com/p/pluggdapps>`_. Note that the orginal
+repository is maintained with mercurial.
 

@@ -1,8 +1,8 @@
 Release changes
 ===============
 
-0.4dev
-------
+0.4dev :subscript:`Tue May 21, 2013`
+------------------------------------
 
 - scaffold source files must not end with .py, as python module, this will
   throw errors while installing them via easy_install. To solve this problem,
@@ -38,8 +38,8 @@ Release changes
   internals of pluggdapps are under docs/dev/ directory.
 
 
-0.3dev
-------
+0.3dev :subscript:`Tue Mar 12, 2013`
+------------------------------------
 
 - Live debug. Interactive debugging to catch exception and introspect stack
   frame via web.
@@ -90,8 +90,8 @@ Release changes
   which is now reponsible for setting up pluggdapps environment for all kind
   of pluggdapps users.
 
-0.2dev
-------
+0.2dev :subscript:`Thu Dec 13, 2012`
+------------------------------------
 
 - Releasing DocRoot web-application, to server static web files, as part of 
   Pluggdapps package.
@@ -113,8 +113,8 @@ Release changes
 - Fixed bugs, and cleaned up code, in HTTPEPollServer plugin and HTTPResponse
   plugin
 
-0.1dev
-------
+0.1dev :subscript:`Fri Jan 13, 2012`
+------------------------------------
 
 First release. Provides,
 
