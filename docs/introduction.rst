@@ -42,7 +42,7 @@ python class deriving from base class called
 :class:`pluggdapps.plugin.Interface`, but other than specifying attributes,
 methods and their doc-strings explaining the semantics of the interface,
 the developers don't get to do much with interface classes. They are 
-automatically meta-classed and blue-printed by the component architecture.
+automatically meta-classed and blue-printed by the component system.
 An example interface class that provide a blue-print for sub-command 
 plugins::
 

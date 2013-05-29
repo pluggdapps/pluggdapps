@@ -30,7 +30,7 @@ Before justifying why pluggdapps, a short introduction on pluggdapps.
 
 Now on the reasoning of why pluggdapps,
 
-* Attempts to blend MVC design pattern and a plugin architecture.
+* Attempts to blend MVC design pattern and a plugin system.
 
   This means we had to create a templating language and CSS scripting
   language that can work in tandem with our web framework.

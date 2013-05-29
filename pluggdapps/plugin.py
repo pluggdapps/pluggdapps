@@ -530,7 +530,7 @@ class Singleton( Plugin ):
 #---- Special interfaces
 
 def plugin_init():
-    """It is a chicken egg situation in pluggdapp's component architecture.
+    """It is a chicken egg situation in pluggdapp's component system.
 
     * The plugin class objects are not available until the classes are fully
       parsed and loaded.

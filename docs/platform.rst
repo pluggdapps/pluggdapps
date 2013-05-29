@@ -1,7 +1,7 @@
 Platform
 ========
 
-Pluggdapps is a component architecture in python. It provides a platform to
+Pluggdapps is a component system in python. It provides a platform to
 specify interfaces and define plugins that can implement one or more of those
 interfaces. 
 

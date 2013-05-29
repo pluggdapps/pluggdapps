@@ -1,4 +1,4 @@
-Pluggdapps is a `component architecture` in python that can't get any
+Pluggdapps is a `component system` in python that can't get any
 simpler. A meta framework providing a platform to define interfaces and
 implement plugins. It comes with a configuration system, web-framework,
 `scaffold`, command-line script and much more ...

@@ -21,7 +21,7 @@ version = re.compile(
           ).match( 
             open( join( here, 'pluggdapps', '__init__.py' )).read()).group(1)
 
-description='Pluggdapps component architecture, web framework'
+description='Pluggdapps component system, web framework'
 
 classifiers = [
 'Development Status :: 4 - Beta',
@@ -78,5 +78,5 @@ setup(
     long_description=LONG_DESCRIPTION,
     platforms='',
     classifiers=classifiers,
-    keywords=[ 'plugin', 'component', 'architecture', 'web', 'plugin' ],
+    keywords=[ 'plugin', 'component', 'web', 'plugin', 'configuration' ],
 )

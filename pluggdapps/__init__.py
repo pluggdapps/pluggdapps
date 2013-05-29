@@ -5,7 +5,7 @@
 #       Copyright (c) 2011 R Pratap Chakravarthy
 
 """ 
-Pluggdapps, at its core, is a component architecture in python. It provides a
+Pluggdapps, at its core, is a component system in python. It provides a
 platform to specify interfaces and implement them as plugins.
 
 Plugins and interfaces can be defined in any number of packages, where

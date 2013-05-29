@@ -67,7 +67,7 @@ Glossary
     It is also possible to create a virtual environment where packages will
     be installed in user-directories.
 
-  component architecture
+  component system
     A blue print of interface specification and plugin definitions in an
     environment across several packages. This blue print will be used when
     plugins are queried / instantiated.

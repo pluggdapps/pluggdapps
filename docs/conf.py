@@ -248,7 +248,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   ('index', 'pluggdapps', 'pluggdapps Documentation',
-   'R Pratap Chakravarthy', 'pluggdapps', 'Component architecture',
+   'R Pratap Chakravarthy', 'pluggdapps', 'Component system',
    'Miscellaneous'),
 ]
 

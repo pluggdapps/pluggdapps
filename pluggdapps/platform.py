@@ -18,7 +18,7 @@ The platform is instantiated by calling the :meth:`Pluggdapps.boot` method.
 
 **Pre-boot and boot**
 
-Pluggdapps component architecture is always instantiated in the context of a
+Pluggdapps component system is always instantiated in the context of a
 platform defined by :class:`Pluggdapps` class or by classes deriving from
 `Pluggdapps`.
 
@@ -104,7 +104,7 @@ module from python stdlib.
 pluggdapps platform typically handled by :class:`Pluggdapps`.
 
 **[mountloc]** special section. Specific to web-framework (explained below)
-that is built on top of pluggdapps component architecture. Provides 
+that is built on top of pluggdapps' component system. Provides 
 configuration settings on how to mount web-applications on web-url. Handled
 by :class:`Webapps` platform class.
 

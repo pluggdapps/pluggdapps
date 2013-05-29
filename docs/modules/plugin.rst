@@ -1,5 +1,5 @@
-:mod:`plugin` -- Component architecture.
-========================================
+:mod:`plugin` -- Component system.
+==================================
 
 .. automodule:: pluggdapps.plugin
 

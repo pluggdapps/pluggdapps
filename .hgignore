@@ -6,7 +6,7 @@ syntax: glob
 *~
 pa-env
 eggs/
-build/
+_build/
 dist/
 distribute-0.6.10.tar.gz
 pluggdapps.egg-info/
