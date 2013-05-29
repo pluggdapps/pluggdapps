@@ -30,7 +30,7 @@
 ``Tue May 21, 2013``
 
 - scaffold source files must not end with .py, as python module, this will
-  throw errors while installing them via pip. To solve this problem,
+  throw errors while installing them via `pip`. To solve this problem,
   .py files are suffixed with .tmpl, and utils.scaff module will remove the
   suffix before creating the scaffold logic in target directory.
 

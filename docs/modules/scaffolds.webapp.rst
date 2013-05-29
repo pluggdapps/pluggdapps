@@ -1,7 +1,7 @@
-:mod:`scaffolds.webapp` -- Create a new web-application in project.
+:mod:`scaffolds.newapp` -- Create a new web-application in project.
 ===================================================================
 
-.. automodule:: pluggdapps.scaffolds.webapp
+.. automodule:: pluggdapps.scaffolds.newapp
     :members:
     :undoc-members:
     :show-inheritance:
