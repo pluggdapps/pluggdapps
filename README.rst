@@ -61,5 +61,5 @@ Related links
 To hack the guts of pluggdapps check-out the source code from
 `github <https://github.com/prataprc/pluggdapps>`_ or from
 `google-code <http://code.google.com/p/pluggdapps>`_. Note that the orginal
-repository is maintained with mercurial.
+repository is maintained using mercurial.
 
