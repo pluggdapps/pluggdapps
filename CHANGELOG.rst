@@ -1,5 +1,29 @@
-Release changes
-===============
+Release and changelogs
+======================
+
+0.41dev :subscript:`Wed May 29, 2013`
+------------------------------------
+
+- command plugins are not to be prefixed with `Command`. This is because
+  plugins are now referred by their canonical names.
+
+- `mainargs()` function added to gather main-script parameters from command
+  line. Remaining parameters will be passed on to the sub-commands.
+
+- Added a query_pluginr() method similar to query_plugins() method, except that
+  it accepts an additional `pattern` argument that will be matched with
+  plugin's canonical-names. Only matching plugins will be instantiated and
+  returned as a list. query_pluginr() method is aliased as qpr()
+
+- Sphinx documentation style. `min-width` of <body> tag is adjusted to
+  970px.
+
+- Removed `IHTTPRenderer` interface from `pluggdapps.web.interfaces`
+  module, instead a similar interface `ITemplate` is added to
+  `pluggdapps.interfaces` module. `IHTTPResponse` plugins are expected to use
+  this new interface.
+
+- `webapp` command/scaffold is renamed to `newwebapp`.
 
 0.4dev :subscript:`Tue May 21, 2013`
 ------------------------------------

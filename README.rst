@@ -51,7 +51,12 @@ Features
 * **Requires:** Linux, Python-3.x.
 * **Status:** Core design stable. Not expected to change.
 
-For more refer to `package documentation <http://pythonhosted.org/pluggdapps/>`_.
+Related links
+-------------
+
+* `Package documentation <http://pythonhosted.org/pluggdapps/>`_.
+* `Changelog <https://github.com/prataprc/pluggdapps/blob/master/CHANGELOG.rst>`_.
+* `Roadmap <https://github.com/prataprc/pluggdapps/blob/master/TODO.rst>`_.
 
 To hack the guts of pluggdapps check-out the source code from
 `github <https://github.com/prataprc/pluggdapps>`_ or from

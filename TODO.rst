@@ -1,3 +1,6 @@
+A roadmap of things to do
+-------------------------
+
 * Add platform method qpr() that accepts plugin name as regular expression.
   Document the same.
 
@@ -73,6 +76,12 @@ Release check-list
 * Change the release version in 
     ./CHANGELOG.rst,
     ./pluggdapps/__init__.py
+
+* Update TODO.rst if any, because both CHANGELOG.rst and TODO.rst are referred
+  by README.rst.
+
+* Check whether release changelogs in CHANGELOG.rst have their release-timeline
+  logged, atleast uptill the previous release.
 
 * Update setup.py and MANIFEST.in for release
 

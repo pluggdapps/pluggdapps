@@ -43,7 +43,7 @@ Refer to :ref:`glossary` for terminologies used.
 import imp, sys
 import pkg_resources    as pkg
 
-__version__ = '0.4dev'
+__version__ = '0.41dev'
 
 """Collect a complete list of pluggdapps packages from python
 package-environment and gather them in `papackages`."""
