@@ -24,6 +24,9 @@
 
 - `webapp` command/scaffold is renamed to `newwebapp`.
 
+- Added a script bin/relchk.sh to check pre and post releases of pluggdapps
+  package.
+
 0.4dev
 ------
 
