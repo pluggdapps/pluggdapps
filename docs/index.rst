@@ -61,7 +61,8 @@ Related links
 To hack the guts of pluggdapps check-out the source code from
 `github <https://github.com/prataprc/pluggdapps>`_ or from
 `google-code <http://code.google.com/p/pluggdapps>`_. Note that the orginal
-repository is maintained using mercurial.
+repository is maintained with mercurial and uses hg-git plugin to publish it
+on github.
 
 .. include:: contents.rst.inc
 

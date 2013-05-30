@@ -42,18 +42,21 @@ Refer to :ref:`glossary` for terminologies used.
 
 import imp, sys
 import pkg_resources    as pkg
+from   os.path          import join
 
 __version__ = '0.41dev'
 
 """Collect a complete list of pluggdapps packages from python
 package-environment and gather them in `papackages`."""
 pkgs = pkg.WorkingSet().by_key  # A dictionary of pkg-name and object
-papackages = { 
-    pkgname : { 'package' : d,
-                'location' : d.location
-              }
-    for pkgname, d in list( pkgs.items() ) 
-    if d.get_entry_info( 'pluggdapps', 'package' ) }
+papackages = {}
+for pkgname, d in list( pkgs.items() ) :
+    if not d.get_entry_info( 'pluggdapps', 'package' ) : continue
+    papackages.setdefault(
+        pkgname, { 'package' : d,
+                   'location' : join(d.location, d.project_name),
+                 }
+    )
 
 import pluggdapps.utils as h
 
