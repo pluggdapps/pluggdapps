@@ -1,6 +1,8 @@
 A roadmap of things to do
 -------------------------
 
+- Make `tayra` and `tayrakit` packages as dependency for `pluggdapps`.
+
 - Benchmark pluggdapps with other web-frameworks. sinatra, dynamo, cowboy,
   pyramids, WebPy, Django, Mochiweb, RoR, Express etc ...
 

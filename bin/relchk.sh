@@ -9,18 +9,6 @@ DEV=$HOME/dev
 rm -rf /tmp/pachk
 mkdir -p /tmp/pachk
 
-echo "Create pluggdapps source-distribution ..."
-cd $DEV/netscale/pluggdapps
-make clean sdist > /tmp/pachk/pluggdapps.sdist
-
-echo "Create tayra source-distribution ..."
-cd $DEV/tayra
-make clean sdist > /tmp/pachk/tayra.sdist
-
-echo "Create tayrakit source-distribution ..."
-cd $DEV/tayrakit
-make clean sdist > /tmp/pachk/tayrakit.sdist
-
 echo "Fetching fresh clone of paenv from github ..."
 cd /tmp/pachk
 git clone git@github.com:prataprc/paenv.git paenv
@@ -37,13 +25,20 @@ if [[ $1 = "pypi" ]] ; then
     echo "Installing from pypi ..."
     pip install pluggdapps tayra tayrakit
 else
-    echo `find $DEV/netscale/pluggdapps/dist/*.tar.gz`
+    echo "Create pluggdapps source-distribution ..."
+    cd $DEV/netscale/pluggdapps
+    make clean sdist > /tmp/pachk/pluggdapps.sdist
     pip install $DEV/netscale/pluggdapps/dist/*.tar.gz
 
-    echo `find $DEV/tayra/dist/*.tar.gz`
+    echo "Create tayra source-distribution ..."
+    cd $DEV/tayra
+    make clean sdist > /tmp/pachk/tayra.sdist
     pip install $DEV/tayra/dist/*.tar.gz
 
-    echo `find $DEV/tayrakit/dist/*.tar.gz`
+
+    echo "Create tayrakit source-distribution ..."
+    cd $DEV/tayrakit
+    make clean sdist > /tmp/pachk/tayrakit.sdist
     pip install $DEV/tayrakit/dist/*.tar.gz
 fi
 
