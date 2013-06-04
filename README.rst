@@ -7,6 +7,11 @@ Pluggdapps web framework, when used with `tayra template language`, provide a
 plugin system that cut across MVC design pattern. **Web-apps can be developed,
 packaged and distributed as plugins**.
 
+Pluggdapps core-modules are stable, though other parts like web framework,
+scaffolding are under development - you can hack the code, contribute back with
+`github <https://github.com/prataprc/pluggdapps>`_.
+            
+
 Features
 --------
 
