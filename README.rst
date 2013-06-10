@@ -59,9 +59,10 @@ Features
 Related links
 -------------
 
-* `Package documentation <http://pythonhosted.org/pluggdapps/>`_.
-* `Changelog <https://github.com/prataprc/pluggdapps/blob/master/CHANGELOG.rst>`_.
-* `Roadmap <https://github.com/prataprc/pluggdapps/blob/master/TODO.rst>`_.
+* `package documentation <http://pythonhosted.org/pluggdapps/>`_.
+* `changelog <https://github.com/prataprc/pluggdapps/blob/master/CHANGELOG.rst>`_.
+* `roadmap <https://github.com/prataprc/pluggdapps/blob/master/TODO.rst>`_.
+* `mailing-list <http://groups.google.com/group/pluggdapps>`_.
 
 To hack the guts of pluggdapps check-out the source code from
 `github <https://github.com/prataprc/pluggdapps>`_ or from
