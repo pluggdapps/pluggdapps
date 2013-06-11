@@ -1,3 +1,8 @@
+CHANGELOG
+=========
+
+List of release changes.
+
 0.41dev
 -------
 

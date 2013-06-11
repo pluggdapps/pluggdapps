@@ -1,5 +1,5 @@
-Contents
---------
+Documentation
+-------------
 
 .. toctree::
    :maxdepth: 2
@@ -25,4 +25,5 @@ Additional Information
 
    glossary
    CHANGELOG
+   TODO
    api

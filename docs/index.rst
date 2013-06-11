@@ -7,6 +7,11 @@ Pluggdapps web framework, when used with `tayra template language`, provide a
 plugin system that cut across MVC design pattern. **Web-apps can be developed,
 packaged and distributed as plugins**.
 
+Pluggdapps core-modules are stable, though other parts like web framework,
+scaffolding are under development - you can hack the code, contribute back with
+`github <https://github.com/prataprc/pluggdapps>`_.
+            
+
 Features
 --------
 
@@ -47,16 +52,17 @@ Features
 * documentation. Every aspect of pluggdapps is adequately documented. Although
   it might be a little difficult for beginners, it is fairly accessible for
   those who are comfortable with python and web-development.
-* **License:** `GPLv3 license <http://www.gnu.org/licenses/>`.
+* **License:** `GPLv3 license`_.
 * **Requires:** Linux, Python-3.x.
 * **Status:** Core design stable. Not expected to change.
 
 Related links
 -------------
 
-* `Package documentation <http://pythonhosted.org/pluggdapps/>`_.
-* `Changelog <https://github.com/prataprc/pluggdapps/blob/master/CHANGELOG.rst>`_.
-* `Roadmap <https://github.com/prataprc/pluggdapps/blob/master/TODO.rst>`_.
+* `package documentation`_.
+* changelog_.
+* todo_.
+* mailing-list_.
 
 To hack the guts of pluggdapps check-out the source code from
 `github <https://github.com/prataprc/pluggdapps>`_ or from
@@ -64,6 +70,11 @@ To hack the guts of pluggdapps check-out the source code from
 repository is maintained with mercurial and uses hg-git plugin to publish it
 on github.
 
+.. _GPLv3 license:  http://www.gnu.org/licenses/
+.. _package documentation: http://pythonhosted.org/pluggdapps
+.. _changelog: http://pythonhosted.org/pluggdapps/CHANGELOG.html
+.. _todo: http://pythonhosted.org/pluggdapps/TODO.html
+.. _mailing-list: http://groups.google.com/group/pluggdapps
 .. include:: contents.rst.inc
 
 If you can't find the information you're looking for, have a look at the

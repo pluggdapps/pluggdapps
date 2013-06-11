@@ -23,8 +23,9 @@ sdist :
 sphinx-compile :
 	mkdir -p docs/_build
 	pa -w confdoc -p pluggdapps -o docs/configuration.rst
-	cp CHANGELOG.rst docs/
 	cp README.rst docs/index.rst
+	cp CHANGELOG.rst docs/
+	cp TODO.rst docs/
 	cat docs/index.rst.inc >> docs/index.rst
 	rm -rf docs/_build/html/
 	make -C docs html

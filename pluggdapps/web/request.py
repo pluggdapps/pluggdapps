@@ -26,8 +26,8 @@ class HTTPRequest( Plugin ):
 
     # IHTTPRequest interface methods and attributes
     def __init__( self, httpconn, method, uri, uriparts, version, headers ):
-        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.__init__`
-        interface method."""
+        """:meth:`pluggdapps.web.interfaces.IHTTPRequest.__init__` interface
+        method."""
         self.router = self.cookie = None
         self.response = self.session = None
 

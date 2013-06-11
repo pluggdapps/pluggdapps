@@ -52,17 +52,17 @@ Features
 * documentation. Every aspect of pluggdapps is adequately documented. Although
   it might be a little difficult for beginners, it is fairly accessible for
   those who are comfortable with python and web-development.
-* **License:** `GPLv3 license <http://www.gnu.org/licenses/>`.
+* **License:** `GPLv3 license`_.
 * **Requires:** Linux, Python-3.x.
 * **Status:** Core design stable. Not expected to change.
 
 Related links
 -------------
 
-* `package documentation <http://pythonhosted.org/pluggdapps/>`_.
-* `changelog <https://github.com/prataprc/pluggdapps/blob/master/CHANGELOG.rst>`_.
-* `roadmap <https://github.com/prataprc/pluggdapps/blob/master/TODO.rst>`_.
-* `mailing-list <http://groups.google.com/group/pluggdapps>`_.
+* `package documentation`_.
+* changelog_.
+* todo_.
+* mailing-list_.
 
 To hack the guts of pluggdapps check-out the source code from
 `github <https://github.com/prataprc/pluggdapps>`_ or from
@@ -70,3 +70,8 @@ To hack the guts of pluggdapps check-out the source code from
 repository is maintained with mercurial and uses hg-git plugin to publish it
 on github.
 
+.. _GPLv3 license:  http://www.gnu.org/licenses/
+.. _package documentation: http://pythonhosted.org/pluggdapps
+.. _changelog: http://pythonhosted.org/pluggdapps/CHANGELOG.html
+.. _todo: http://pythonhosted.org/pluggdapps/TODO.html
+.. _mailing-list: http://groups.google.com/group/pluggdapps
