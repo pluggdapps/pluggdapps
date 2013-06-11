@@ -35,7 +35,9 @@ def template_to_source( sourceroot, targetroot, _vars ):
             s_file = join(dirpath, filename)
             if t_file.endswith( '.tmpl' ) :
                 t_file = t_file[:-5]
+                txt = open( s_file ).read().format( **_vars )
+            else :
+                txt = open( s_file ).read()
             print("    copying file %s ..." % relpath(t_file, targetroot) )
-            txt = open( s_file ).read().format( **_vars )
             open( t_file, 'w' ).write( txt )
 
