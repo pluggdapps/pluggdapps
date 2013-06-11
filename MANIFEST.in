@@ -1,1 +1,4 @@
-recursive-include pluggdapps *.css *.js *.png *.ttl *.rst
+recursive-include pluggdapps/webadmin/static *
+recursive-include pluggdapps/webadmin/templates *
+recursive-include pluggdapps/scaffolds/newapp_template *
+recursive-include pluggdapps/scaffolds/env_template *
