@@ -8,6 +8,7 @@ echo "Cleaning up /tmp/pachk ..."
 DEV=$HOME/dev
 rm -rf /tmp/pachk
 mkdir -p /tmp/pachk
+THISDIR=`pwd`
 
 echo "Fetching fresh clone of paenv from github ..."
 cd /tmp/pachk
@@ -47,4 +48,4 @@ echo `which tayra`
 echo "Testing tayra ..."
 tayra -t ok
 echo "Launching the pa-server ..."
-pa -m -w -c etc/master.ini serve -r
+pa -m -w -c $THISDIR/etc/master.ini serve -r
