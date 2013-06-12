@@ -44,7 +44,7 @@ import imp, sys
 import pkg_resources    as pkg
 from   os.path          import join
 
-__version__ = '0.42dev'
+__version__ = '0.43dev'
 
 """Collect a complete list of pluggdapps packages from python
 package-environment and gather them in `papackages`."""

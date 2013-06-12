@@ -1,7 +1,8 @@
 A roadmap of things to do
 =========================
 
-- move webadmin webapp into separate package and remove tayra and tayrakit
+- There is a circular dependancy between pluggdapps, tayra and tayrakit.
+  Move webadmin webapp into separate package and remove tayra and tayrakit
   from dependancy.
 
 - Benchmark pluggdapps with other web-frameworks. sinatra, dynamo, cowboy,
