@@ -3,6 +3,14 @@ CHANGELOG
 
 List of release changes.
 
+0.42dev
+-------
+
+``Wed Jun 12, 2013``
+
+- 3-way merge library tool added for scaffolding.
+- minor release for `pagd`.
+
 0.41dev
 -------
 

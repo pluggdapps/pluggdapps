@@ -1,8 +1,6 @@
 A roadmap of things to do
 =========================
 
-- Make `tayra` and `tayrakit` packages as dependency for `pluggdapps`.
-
 - Benchmark pluggdapps with other web-frameworks. sinatra, dynamo, cowboy,
   pyramids, WebPy, Django, Mochiweb, RoR, Express etc ...
 
@@ -14,9 +12,6 @@ A roadmap of things to do
 - In command-line documentation article indicate that developers should check
   for existing commands before authoring a new-command to avoid duplicating
   names.
-
-- When something fails in TTL, error message should point to TTL line-no not
-  the .py file's line-no.
 
 - Single-function applications to be developed and demonstrated.
   Publishing Static-web-site / Remote-file-explorer / Publishing repository /
