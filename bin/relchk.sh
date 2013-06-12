@@ -26,9 +26,9 @@ if [[ $1 = "pypi" ]] ; then
     pip install pluggdapps tayra tayrakit
 else
     echo "Create pluggdapps source-distribution ..."
-    cd $DEV/netscale/pluggdapps
+    cd $DEV/pluggdapps
     make clean sdist > /tmp/pachk/pluggdapps.sdist
-    pip install $DEV/netscale/pluggdapps/dist/*.tar.gz
+    pip install $DEV/pluggdapps/dist/*.tar.gz
 
     echo "Create tayra source-distribution ..."
     cd $DEV/tayra
