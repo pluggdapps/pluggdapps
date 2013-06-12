@@ -40,7 +40,8 @@ class Env( Plugin ):
         target_dir = abspath( self['target_dir'] )
         host_name = abspath( self['host_name'] )
         os.makedirs( target_dir, exist_ok=True )
-        h.template_to_source( self['template_dir'], target_dir, _vars )
+        h.template_to_source( self['template_dir'], target_dir, _vars,
+                              overwrite=True, verbose=True )
 
     def printhelp( self ):
         """:meth:`pluggdapps.interfaces.IScaffold.printhelp` interface

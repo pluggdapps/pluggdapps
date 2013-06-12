@@ -56,7 +56,8 @@ class NewWebApp( Plugin ):
         _vars = { 'webapp_name' : self['webapp_name'] }
         target_dir = abspath( join( self['target_dir'], self['webapp_name'] ))
         os.makedirs( target_dir )
-        h.template_to_source( self['template_dir'], target_dir, _vars )
+        h.template_to_source( self['template_dir'], target_dir, _vars,
+                              overwrite=True, verbose=True )
 
     def printhelp( self ):
         """:meth:`pluggdapps.interfaces.IScaffold.printhelp` interface
