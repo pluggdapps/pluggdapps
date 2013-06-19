@@ -9,7 +9,8 @@
 # TODO :
 #   * Improve function asbool() implementation.
 
-import sys, os, fcntl, multiprocessing, random, io, traceback, hashlib
+import sys, os, fcntl, multiprocessing, random, io, traceback, hashlib, \
+       time, imp
 from   os.path  import isfile, join
 from   binascii import hexlify
 
@@ -20,7 +21,7 @@ __all__ = [
     'reseed_random', 'mergedict', 'multivalue_dict', 'takewhile', 
     'dropwhile', 'flatten', 'print_exc', 'eval_import', 'string_import', 
     'str2module', 'locatefile', 'hitch', 'hitch_method', 'colorize', 'strof',
-    'longest_prefix', 'dictsort', 'formated_filesize',
+    'longest_prefix', 'dictsort', 'formated_filesize', 'age', 'pynamespace',
     # Classes
     'Context', 'Bunch',
 ]
@@ -340,6 +341,45 @@ def formated_filesize( size, binary=False ):
             if value < unit :
                 return '%.1f %s' % ((base * value / unit), prefix)
         return '%.1f %s' % ((base * value / unit), prefix)
+
+agescales = [("year", 3600 * 24 * 365),
+             ("month", 3600 * 24 * 30),
+             ("week", 3600 * 24 * 7),
+             ("day", 3600 * 24),
+             ("hour", 3600),
+             ("minute", 60),
+             ("second", 1)]
+
+
+def age(then, format="%a %b %d, %Y"):
+    """convert (timestamp, tzoff) tuple into an age string. both `timestamp` and
+    `tzoff` are expected to be integers."""
+
+    plural = lambda t, c : t if c == 1 else (t + "s")
+    fmt = lambda t, c : "%d %s" % (c, plural(t, c))
+
+    now = time.time()
+    if then > now :
+        return 'in the future'
+
+    delta = max(1, int(now - then))
+    if delta > agescales[0][1] * 2:
+        return time.strftime(format, time.gmtime(then))
+
+    for t, s in agescales:
+        n = delta // s
+        if n >= 2 or s == 1:
+            return '%s ago' % fmt(t, n)
+
+def pynamespace(module, filterfn=None):
+    """if ``module`` is string import module and collect all attributes
+    defined in the module that do not start with `_`. If ``__all__`` is
+    defined, only fetch attributes listed under __all__. Additionally apply
+    ``filterfn`` function and return a dictionary of namespace from module."""
+    module = string_import(module) if isinstance(module, str) else module
+    d = { k:getattr(module,k) for k in getattr(module,'__all__',vars(module)) }
+    [ d.pop(k) for k,v in d.items() if filterfn(k, v) ] if filterfn else None
+    return d
 
 
 class ETag( dict ):

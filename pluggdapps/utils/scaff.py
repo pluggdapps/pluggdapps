@@ -74,5 +74,5 @@ def template_to_source( sourceroot, targetroot, _vars, **kwargs ):
             else :
                 print("    copying file %s ... new" % t_file_)
                 txt = stxt
-            # open( t_file, 'w' ).write( txt )
+            open( t_file, 'w' ).write( txt )
 
