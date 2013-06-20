@@ -351,7 +351,7 @@ agescales = [("year", 3600 * 24 * 365),
              ("second", 1)]
 
 
-def age(then, format="%a %b %d, %Y"):
+def age(then, format="%a %b %d, %Y", scale="year"):
     """convert (timestamp, tzoff) tuple into an age string. both `timestamp` and
     `tzoff` are expected to be integers."""
 
@@ -362,8 +362,9 @@ def age(then, format="%a %b %d, %Y"):
     if then > now :
         return 'in the future'
 
+    threshold = dropwhile( lambda x : x[0] != scale, agescales )[0][1]
     delta = max(1, int(now - then))
-    if delta > agescales[0][1] * 2:
+    if delta > threshold :
         return time.strftime(format, time.gmtime(then))
 
     for t, s in agescales:
