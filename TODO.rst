@@ -67,6 +67,10 @@ A roadmap of things to do
 - Response header fields are encoded using utf-8 encoding. But looks like the
   specification says that it must be ISO-8859-1.
 
+- pip seems to have a problem, let us say we do,
+    pip install --no-index -f <dir> pagd
+  under ~/dev/pagd, it does not install pagd package !!
+
 Release check-list 
 ------------------
 

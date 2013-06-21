@@ -4,48 +4,103 @@
 # the latest pluggdapps and related packages, like tayra, pagd, from pypi and
 # run few tests to check whether the release is broken or not. 
 
-echo "Cleaning up /tmp/pachk ..."
+# $ relchk download
+# $ relchk
+# $ relchk pypi
+
 DEV=$HOME/dev
-rm -rf /tmp/pachk
-mkdir -p /tmp/pachk
-THISDIR=`pwd`
+ROOT=/tmp/pachk
+EGGCACHE=/tmp/egg-cache
 
-echo "Fetching fresh clone of paenv from github ..."
-cd /tmp/pachk
-git clone git@github.com:prataprc/paenv.git paenv
-cd paenv
+echo "Cleaning up $ROOT ..."
+rm -rf $ROOT
 
-echo "Setting up virtual environment for python 3.x ..."
-virtualenv-3.2 --python=python3.2 pa-env 
-. pa-env/bin/activate
+mkdir -p $ROOT
+mkdir -p $EGGCACHE
 
-echo "beautifulsoup4"
-pip install beautifulsoup4
+do_paenv_clone() {
+    echo "Fetching fresh clone of paenv from github ..."
+    cd $ROOT
+    git clone git@github.com:prataprc/paenv.git paenv
+    cd paenv
+}
 
-if [[ $1 = "pypi" ]] ; then
+do_virtual() {
+    echo "Setting up virtual environment for python 3.x ..."
+    cd $ROOT/paenv
+    virtualenv-3.2 --python=python3.2 pa-env 
+    . pa-env/bin/activate
+}
+
+test_tayra() {
+    echo `which tayra`
+    echo "Testing tayra ..."
+    tayra -t ok
+}
+
+test_pluggdapps() {
+    echo `which pa`
+    echo "Launching the pa-server ..."
+    cd $DEV/paenv-dev
+    pa -m -w -c etc/master.ini serve -r
+}
+
+test_pagd() {
+    echo `which pagd`
+    echo "Testing pagd ..."
+    mkdir -p $ROOT/myblog
+    pagd -s $ROOT/myblog -l pagd.myblog create
+    cp -r $HOME/dev/prataprc.github.io/* $ROOT/myblog
+    pagd -s $ROOT/myblog gen
+    chromium-browser $ROOT/myblog/index.html&
+}
+
+if [[ $1 = "download" ]] ; then
+    rm -rf $EGGCACHE
+    pip install -d $EGGCACHE beautifulsoup4 markdown docutils
+    pip install -d $EGGCACHE lxml pygments mako ply jinja2==2.6
+elif [[ $1 = "pypi" ]] ; then
+    do_paenv_clone
+    do_virtual
     echo "Installing from pypi ..."
-    pip install pluggdapps tayra tayrakit
+    pip install beautifulsoup4 markdown docutils
+    pip install lxml pygments jinja2 mako ply
+    pip install pluggdapps tayra tayrakit pagd
+    test_tayra
+    test_pagd
+    test_pluggdapps
 else
+    do_paenv_clone
+    do_virtual
     echo "Create pluggdapps source-distribution ..."
     cd $DEV/pluggdapps
-    make clean sdist > /tmp/pachk/pluggdapps.sdist
-    pip install $DEV/pluggdapps/dist/*.tar.gz
+    make clean sdist > $ROOT/pluggdapps.sdist
+    cp dist/* $EGGCACHE
 
     echo "Create tayra source-distribution ..."
     cd $DEV/tayra
-    make clean sdist > /tmp/pachk/tayra.sdist
-    pip install $DEV/tayra/dist/*.tar.gz
+    make clean sdist > $ROOT/tayra.sdist
+    cp dist/* $EGGCACHE
 
 
     echo "Create tayrakit source-distribution ..."
     cd $DEV/tayrakit
-    make clean sdist > /tmp/pachk/tayrakit.sdist
-    pip install $DEV/tayrakit/dist/*.tar.gz
+    make clean sdist > $ROOT/tayrakit.sdist
+    cp dist/* $EGGCACHE
+
+    echo "Create pagd source-distribution ..."
+    cd $DEV/pagd
+    make clean sdist > $ROOT/pagd.sdist
+    cp dist/* $EGGCACHE
+
+    # This is important, pip gets screwed up ! (TODO : post this mailing list ?)
+    cd $ROOT
+    pip install --no-index -f file://$EGGCACHE beautifulsoup4 markdown docutils
+    pip install --no-index -f file://$EGGCACHE lxml pygments ply mako jinja2 
+    pip install --no-index -f file://$EGGCACHE pagd
+    pip install --no-index -f file://$EGGCACHE tayrakit
+    test_tayra
+    test_pagd
+    test_pluggdapps
 fi
 
-echo `which pa`
-echo `which tayra`
-echo "Testing tayra ..."
-tayra -t ok
-echo "Launching the pa-server ..."
-pa -m -w -c $THISDIR/etc/master.ini serve -r
