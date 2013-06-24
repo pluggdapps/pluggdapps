@@ -63,8 +63,8 @@ elif [[ $1 = "pypi" ]] ; then
     do_paenv_clone
     do_virtual
     echo "Installing from pypi ..."
-    pip install beautifulsoup4 markdown docutils
-    pip install lxml pygments jinja2 mako ply
+    pip install --no-index -f file://$EGGCACHE beautifulsoup4 markdown docutils
+    pip install --no-index -f file://$EGGCACHE lxml pygments ply mako jinja2 
     pip install pluggdapps tayra tayrakit pagd
     test_tayra
     test_pagd
