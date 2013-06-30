@@ -4,12 +4,12 @@ syntax: glob
 *.swp
 *.vimsession
 *~
-pa-env
-eggs/
-_build/
-dist/
 distribute-0.6.10.tar.gz
-pluggdapps.egg-info/
 # switch to regexp syntax.
 syntax: regexp
 ^\.pc/
+^pa-env/*
+^eggs/*
+^_build/*
+^dist/*
+^pluggdapps.egg-info/*
