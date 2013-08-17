@@ -354,11 +354,15 @@ def add_accept_handler( server, sock, callback, ioloop ):
 class IOLoop( object ):
     """A level-triggered I/O loop using Linux epoll and requires python 3."""
 
-    # Our events map exactly to the epoll events
-    NONE  = 0
-    READ  = select.EPOLLIN
-    WRITE = select.EPOLLOUT
-    ERROR = select.EPOLLERR | select.EPOLLHUP
+    # Our events map exactly to the epoll events,
+    # TODO : select, does not work with Mac.
+    try :
+        NONE  = 0
+        READ  = select.EPOLLIN
+        WRITE = select.EPOLLOUT
+        ERROR = select.EPOLLERR | select.EPOLLHUP
+    except :
+        pass
 
     # Book keeping
     _evpoll = None

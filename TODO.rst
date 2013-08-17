@@ -1,6 +1,12 @@
 A roadmap of things to do
 =========================
 
+- PluginBase, 
+    can super().__new__(cls) pass addition parameter
+
+- select, fcntl does not work with mac - needed for pluggdapps builtin http
+  server.
+
 - There is a circular dependancy between pluggdapps, tayra and tayrakit.
   Move webadmin webapp into separate package and remove tayra and tayrakit
   from dependancy.

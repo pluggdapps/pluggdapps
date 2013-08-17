@@ -193,8 +193,8 @@ class Serve( Singleton ):
         # finally blocks, flush open files, etc.  In otherwords, it is rude.
         os._exit(3)
 
-    _watch_flag = fcntl.DN_MODIFY | fcntl.DN_CREATE | fcntl.DN_MULTISHOT
     def _watch_files( self, args ):
+        _watch_flag = fcntl.DN_MODIFY | fcntl.DN_CREATE | fcntl.DN_MULTISHOT
         filenames = [args.config] if args.config else []
         filenames.extend(
             getattr( mod, '__file__', None) for mod in sys.modules.values()
