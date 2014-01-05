@@ -11,6 +11,9 @@ List of release changes.
 - migrated from mercurial to git and the project is now tracked via github.
 - removed tayra and tayrakit dependencies from setup.py.
 - Bug fix to PluginBase __new__() method.
+- added library function to calculate age from certain date.
+- removed explicit dependency on `tayra` and `tayrakit`
+- updated relchk.sh to run on mac.
 
 0.42dev
 -------

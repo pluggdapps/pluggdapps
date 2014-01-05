@@ -8,15 +8,13 @@
 # $ relchk
 # $ relchk pypi
 
-DEV=$HOME/dev
+DEV=$HOME/devgit
 ROOT=/tmp/pachk
 EGGCACHE=/tmp/egg-cache
 
 echo "Cleaning up $ROOT ..."
 rm -rf $ROOT
-
 mkdir -p $ROOT
-mkdir -p $EGGCACHE
 
 do_paenv_clone() {
     echo "Fetching fresh clone of paenv from github ..."
@@ -28,7 +26,7 @@ do_paenv_clone() {
 do_virtual() {
     echo "Setting up virtual environment for python 3.x ..."
     cd $ROOT/paenv
-    virtualenv-3.2 --python=python3.2 pa-env 
+    virtualenv-$1 --python=python$1 pa-env
     . pa-env/bin/activate
 }
 
@@ -49,29 +47,31 @@ test_pagd() {
     echo `which pagd`
     echo "Testing pagd ..."
     mkdir -p $ROOT/myblog
-    pagd -s $ROOT/myblog -l pagd.myblog create
-    cp -r $HOME/dev/prataprc.github.io/* $ROOT/myblog
-    pagd -s $ROOT/myblog gen
+    git clone $HOME/devgit/prataprc.github.io $ROOT/myblog
+    cd $ROOT/myblog
+    pagd gen
     chromium-browser $ROOT/myblog/index.html&
+    cd -
 }
 
 if [[ $1 = "download" ]] ; then
     rm -rf $EGGCACHE
+    mkdir -p $EGGCACHE
     pip install -d $EGGCACHE beautifulsoup4 markdown docutils
     pip install -d $EGGCACHE lxml pygments mako ply jinja2==2.6
 elif [[ $1 = "pypi" ]] ; then
     do_paenv_clone
-    do_virtual
+    do_virtual 3.3
     echo "Installing from pypi ..."
     pip install --no-index -f file://$EGGCACHE beautifulsoup4 markdown docutils
     pip install --no-index -f file://$EGGCACHE lxml pygments ply mako jinja2 
     pip install pluggdapps tayra tayrakit pagd
     test_tayra
     test_pagd
-    test_pluggdapps
+    # test_pluggdapps
 else
     do_paenv_clone
-    do_virtual
+    do_virtual 3.3
     echo "Create pluggdapps source-distribution ..."
     cd $DEV/pluggdapps
     make clean sdist > $ROOT/pluggdapps.sdist
@@ -101,6 +101,6 @@ else
     pip install --no-index -f file://$EGGCACHE tayrakit
     test_tayra
     test_pagd
-    test_pluggdapps
+    # test_pluggdapps
 fi
 
