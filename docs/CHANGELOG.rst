@@ -13,6 +13,7 @@ List of release changes.
 - Bug fix to PluginBase __new__() method.
 - added library function to calculate age from certain date.
 - removed explicit dependency on `tayra` and `tayrakit`
+- updated relchk.sh to run on mac.
 
 0.42dev
 -------

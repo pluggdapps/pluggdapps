@@ -5,6 +5,9 @@ A roadmap of things to do
   Move webadmin webapp into separate package and remove tayra and tayrakit
   from dependancy.
 
+- fix test cases for pluggdapps so that relchk.sh should be able validate the
+  distribution and installation of pluggdapps standalone.
+
 - select, fcntl does not work with mac - needed for pluggdapps builtin http
   server.
 
