@@ -5,6 +5,7 @@ syntax: glob
 *.vimsession
 *~
 distribute-0.6.10.tar.gz
+
 # switch to regexp syntax.
 syntax: regexp
 ^\.pc/

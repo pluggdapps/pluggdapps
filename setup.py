@@ -56,8 +56,6 @@ setup(
         ]
     },
     install_requires=[                      # setuptools
-        #'tayra>=0.43dev',
-        #'tayrakit>=0.2dev',
     ],
     extras_require={},                      # setuptools
     setup_requires={},                      # setuptools

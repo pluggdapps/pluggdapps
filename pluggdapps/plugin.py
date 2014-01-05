@@ -323,15 +323,17 @@ class PluginBase( object, metaclass=PluginMeta ):
             caname = getattr(cls, 'caname', None)
             singleton = PluginBase._singletons.get( caname, None )
             if singleton == None :
-                # TODO : check this out on linux !
-                # self = super().__new__( cls, *args, **kwargs )
-                self = super().__new__( cls )
+                if isinstance(cls, object) :
+                    self = super().__new__( cls )
+                else :
+                    self = super().__new__( cls, *args, **kwargs )
                 singleton = PluginBase._singletons.setdefault(self.caname, self)
             return singleton
         else :
-            # TODO : check this out on linux !
-            # self = super().__new__( cls, *args, **kwargs )
-            self = super().__new__( cls )
+            if isinstance(cls, object) :
+                self = super().__new__( cls )
+            else :
+                self = super().__new__( cls, *args, **kwargs )
             return self
 
 

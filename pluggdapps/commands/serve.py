@@ -104,7 +104,6 @@ class Serve( Singleton ):
                         sys.exit( status )
                 except KeyboardInterrupt :
                     sys.exit(0)
-                    
 
     def pollthread( self, args, server ):
         """Thread (daemon) to monitor for changing files."""
@@ -194,7 +193,12 @@ class Serve( Singleton ):
         os._exit(3)
 
     def _watch_files( self, args ):
-        _watch_flag = fcntl.DN_MODIFY | fcntl.DN_CREATE | fcntl.DN_MULTISHOT
+        if 'darwin' in sys.platform :
+            log.info("Not supported on `darwin`")
+            os.exit(64)
+        else :
+            _watch_flag = fcntl.DN_MODIFY | fcntl.DN_CREATE | fcntl.DN_MULTISHOT
+
         filenames = [args.config] if args.config else []
         filenames.extend(
             getattr( mod, '__file__', None) for mod in sys.modules.values()

@@ -3,6 +3,15 @@ CHANGELOG
 
 List of release changes.
 
+0.43dev
+-------
+
+``Wed Jan 05, 2014``
+
+- migrated from mercurial to git and the project is now tracked via github.
+- removed tayra and tayrakit dependencies from setup.py.
+- Bug fix to PluginBase __new__() method.
+
 0.42dev
 -------
 

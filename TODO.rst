@@ -1,15 +1,12 @@
 A roadmap of things to do
 =========================
 
-- PluginBase, 
-    can super().__new__(cls) pass addition parameter
-
-- select, fcntl does not work with mac - needed for pluggdapps builtin http
-  server.
-
 - There is a circular dependancy between pluggdapps, tayra and tayrakit.
   Move webadmin webapp into separate package and remove tayra and tayrakit
   from dependancy.
+
+- select, fcntl does not work with mac - needed for pluggdapps builtin http
+  server.
 
 - Benchmark pluggdapps with other web-frameworks. sinatra, dynamo, cowboy,
   pyramids, WebPy, Django, Mochiweb, RoR, Express etc ...
@@ -101,6 +98,8 @@ Release check-list
     make upload
 
 - Upload documentation zip.
+
+- Check with relchk.sh whether the system is working fine.
 
 - After making the release, taging the branch, increment the version number.
 
