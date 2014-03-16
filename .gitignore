@@ -5,6 +5,10 @@ syntax: glob
 *.vimsession
 *~
 distribute-0.6.10.tar.gz
+lextyrtab.py
+parsetyrtab.py
+docs/_build
+pluggdapps.egg-info/*
 
 # switch to regexp syntax.
 syntax: regexp
@@ -13,4 +17,3 @@ syntax: regexp
 ^eggs/*
 ^_build/*
 ^dist/*
-^pluggdapps.egg-info/*

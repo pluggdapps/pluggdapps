@@ -54,7 +54,7 @@ Features
   it might be a little difficult for beginners, it is fairly accessible for
   those who are comfortable with python and web-development.
 * **License:** `GPLv3 license`_.
-* **Requires:** Linux, Python-3.x.
+* **Requires:** Linux/OS-X, Python-3.x.
 * **Status:** Core design stable. Not expected to change.
 
 Related links
