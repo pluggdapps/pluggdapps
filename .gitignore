@@ -9,6 +9,8 @@ lextyrtab.py
 parsetyrtab.py
 docs/_build
 pluggdapps.egg-info/*
+build/
+dist/
 
 # switch to regexp syntax.
 syntax: regexp
